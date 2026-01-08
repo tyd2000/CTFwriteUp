@@ -396,7 +396,7 @@ echo "Can you find out the flag?";
 /index.php?category=php://filter/convert.base64-encode/resource=index
 ```
 
-靶机显示信息中会包含｀base64｀编码信息。
+靶机显示信息中会包含`base64`编码信息。
 
 直接在`cmd`命令行用`php -r "var_dump(base64_decode(''));"`进行`base64`解码，得到源码信息。
 
@@ -3969,6 +3969,263 @@ if response.status_code == 200:
 else:
     print('error')
 ```
+
+------
+
+### Base64编码隐藏
+
+进入靶机后看到一个登录界面，右键查看源码可以找到关键字符串`Q1RGe2Vhc3lfYmFzZTY0fQ==`。
+
+```html
+<body>
+    <div class="login-container">
+        <h2>CTFshow Admin Login</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" value="admin" readonly>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter password" required>
+            </div>
+            <button type="submit">Login</button>
+            <div id="message" class="message"></div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+        
+            const correctPassword = "Q1RGe2Vhc3lfYmFzZTY0fQ==";
+            const enteredPassword = document.getElementById('password').value;
+            const messageElement = document.getElementById('message');
+            
+            if (btoa(enteredPassword) === correctPassword) {
+                messageElement.textContent = "Login successful! Flag: "+enteredPassword;
+                messageElement.className = "message success";
+            } else {
+                messageElement.textContent = "Login failed! Incorrect password.";
+                messageElement.className = "message error";
+            }
+        });
+    </script>
+</body>
+```
+
+直接在`cmd`命令行用`php -r "var_dump(base64_decode(''));"`进行`base64`解码，得到`flag`。
+
+```bash
+C:\Users\tyd>php -r "var_dump(base64_decode('Q1RGe2Vhc3lfYmFzZTY0fQ=='));"
+string(16) "CTF{easy_base64}"
+```
+
+------
+
+### HTTP头注入
+
+进入靶机后右键查看网页源码，这道题也出现了上一道题的那个字符串`Q1RGe2Vhc3lfYmFzZTY0fQ==`。
+
+`base64`解码后得到`CTF{easy_base64}`，然而这不是真正的`flag`，而是这道题的`admin`登录密码。
+
+输入账号密码后，看到信息：
+
+> Invalid User-Agent
+>
+> You must use "ctf-show-brower" browser to access this page
+
+用`HackBar`构造`POST`请求求解吧，访问靶机的`/check.php`，点击`MODIFY HEADER`添加HTTP头，新增User-Agent值为`ctf-show-brower`，在Body填入`username=admin&password=CTF{easy_base64}`。
+
+发送`POST`请求后得到`flag`，提交`CTF{user_agent_inject_success}`即可。
+
+------
+
+### Base64多层嵌套解码
+
+进入靶机后右键查看网页源码，定位关键代码。
+
+```html
+<script>
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        const correctPassword = "SXpVRlF4TTFVelJtdFNSazB3VTJ4U1UwNXFSWGRVVlZrOWNWYzU=";
+
+        function validatePassword(input) {
+            let encoded = btoa(input);
+            encoded = btoa(encoded + 'xH7jK').slice(3);
+            encoded = btoa(encoded.split('').reverse().join(''));
+            encoded = btoa('aB3' + encoded + 'qW9').substr(2);
+            return btoa(encoded) === correctPassword;
+        }
+
+        const enteredPassword = document.getElementById('password').value;
+        const messageElement = document.getElementById('message');
+
+        if (!validatePassword(enteredPassword)) {
+            e.preventDefault();
+            messageElement.textContent = "Login failed! Incorrect password.";
+            messageElement.className = "message error";
+        }
+    });
+</script>
+```
+
+发现字符串`SXpVRlF4TTFVelJtdFNSazB3VTJ4U1UwNXFSWGRVVlZrOWNWYzU=`，并且用`JavaScript`进行逻辑加密，我们需要逆向破解。
+
+```javascript
+let encoded = btoa(input);                         // 第1层 获取输入
+encoded = btoa(encoded + 'xH7jK').slice(3);        // 第2层 +'xH7jK'后截断前3字符
+encoded = btoa(encoded.split('').reverse().join('')); // 第3层 反转字符串
+encoded = btoa('aB3' + encoded + 'qW9').substr(2); // 第4层 拼接前后缀 再截断前2字符
+return btoa(encoded) === correctPassword;          // 第5层 验证密码
+```
+
+在`JavaScript`中，`btoa()` 是 Base64 编码，`atob()` 是解码。先用`Python`进行`base64`解码。
+
+```python
+>>> from base64 import b64decode
+>>> b64decode('SXpVRlF4TTFVelJtdFNSazB3VTJ4U1UwNXFSWGRVVlZrOWNWYzU=')
+b'IzUFQxM1UzRmtSRk0wU2xSU05qRXdUVVk9cVc5'
+```
+
+由于`substr(2)`去掉前两个字符，完整的字符串是`??IzUFQxM1UzRmtSRk0wU2xSU05qRXdUVVk9cVc5`。
+
+`Base64`编码的长度必须是 4 的倍数。当前长度是43 → 需要补一个 `=` 让编码长度达到44。
+
+编写`Python`代码暴力破解。利用笛卡尔积排序法逐个爆破可能被删除的前两位字符，找出`base64`解码后前三位是"aB3"的所有字符串，再验证其是否可以`base64`解码，以及`base64`解码后的字符是否合法。
+
+```python
+import itertools
+from base64 import b64decode
+
+L4 =  # 'IzUFQxM1UzRmtSRk0wU2xSU05qRXdUVVk9cVc5'
+s = list("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+for combo in itertools.product(s, s):
+    passwd_4 = ''.join(combo) + L4
+    if str(b64decode(passwd_4)).find("aB3") > 0:
+        # print(passwd_4)
+        try:
+            passwd_3 = b64decode(passwd_4).decode()
+            if passwd_3.startswith('aB3') and passwd_3.endswith('qW9'):
+                L3 = passwd_3[3:-3]
+                print("L3 is Found! " + L3)
+        except:
+            continue
+```
+
+运行结果如下：
+
+```
+L3 is Found! PT13U3FkRFM0SlRSNjEwTUY=
+```
+
+对去掉前后缀字符串后的L3进行`base64`解码，再将字符串进行翻转得到`L2`。
+
+```python
+>>> L3 = 'PT13U3FkRFM0SlRSNjEwTUY='
+>>> b64decode(L3)
+b'==wSqdDS4JTR610MF'
+>>> L2 = b64decode(L3)[::-1]
+>>> L2
+b'FM016RTJ4SDdqSw=='
+```
+
+第一层密文在加密前添加了后缀字符串"xH7jK"，并在加密后去掉了前三位，所以我们需要先爆破前三位，再去掉后5位，然后去掉所有包含字节或特殊符号的爆破结果，删除base64的固定字符，逐步缩小正确密文的范围。
+
+```python
+import re
+import itertools
+from base64 import b64decode
+
+L2 = 'FM016RTJ4SDdqSw=='
+s = list("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+for combo in itertools.product(s,s,s):
+     passwd_1=''.join(combo) + L2
+     passwd_0=str(b64decode(passwd_1))[slice(0,-6)]   # 解码后去掉最后5个字符
+     passwd=passwd_0[slice(2, None)]  # 去掉前2个字符
+     if re.match(r'^[A-Za-z0-9]{3}', passwd):
+          filtered = [s for s in str(b64decode(passwd)) if '\\' not in s]
+          passwd="".join(filtered)[slice(2,None)]
+          if
+          print(passwd[0:-1])
+```
+
+这些密码还是太多了。算了，直接整理一下`Python`代码，准备爆破吧。
+
+```python
+import re
+import requests
+import itertools
+from base64 import b64decode
+from bs4 import BeautifulSoup
+
+correct = "SXpVRlF4TTFVelJtdFNSazB3VTJ4U1UwNXFSWGRVVlZrOWNWYzU="
+# Layer 5: btoa(L4) = correct → L4 = base64.b64decode(correct)
+L4 = b64decode(correct).decode()  
+print("L4:", L4)  # IpUFQxM1UzRmtSRk0wU2xSU05qRXduVVVk9cVc5
+# Layer 4: L4 = b64encode('aB3' + L3 + 'qW9')[2:]
+# So full_b64 = ?? + L4, and len(full_b64) % 4 == 0
+s = list("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+for combo in itertools.product(s, s):
+    passwd_4 = ''.join(combo) + L4
+    if str(b64decode(passwd_4)).find("aB3") > 0:
+        # print(passwd_4)
+        try:
+            passwd_3 = b64decode(passwd_4).decode()
+            if passwd_3.startswith('aB3') and passwd_3.endswith('qW9'):
+                L3 = passwd_3[3:-3]
+                print("L3:", L3)  # PT13U3FkRFM0SlRSNjEwTUY=
+        except:
+            continue
+# Layer 3: L3 = b64encode(reverse(L2))
+# So reverse(L2) = base64.b64decode(L3)
+rev_L2 = b64decode(L3).decode()
+L2 = rev_L2[::-1]
+print("L2:", L2)  # FM016RTJ4SDdqSw==
+# Layer 2: L2 = b64encode(L1 + 'xH7jK')[3:]
+# Again, need to recover full b64
+
+url = 'https://e858b1f7-9a9b-4bce-b913-25323b065280.challenge.ctf.show/check.php'
+# 配置HTTP协议的代理，监听本地8080端口
+proxies = {'http': "http://127.0.0.1:8080"}
+heads = {'User-Agent': "ctf-show-brower"}
+
+for combo in itertools.product(s,s,s):
+    passwd_1=''.join(combo) + L2
+    passwd_0=str(b64decode(passwd_1))[slice(0,-6)]   # 解码后去掉最后5个字符
+    passwd=passwd_0[slice(2, None)]  # 去掉前2个字符
+    if re.match(r'^[A-Za-z0-9]{3}', passwd):
+        filtered = [s for s in str(b64decode(passwd)) if '\\' not in s]
+        passwd="".join(filtered)[slice(2,None)][0:-1]
+        # print(passwd)
+        if passwd == 'T17316':
+            response = requests.post(
+                url=url,
+                data={"username": "admin", "password":passwd},
+                proxies=proxies,
+                headers=heads,
+                verify=False)  # 如果报错InsecureRequestWarning添加verify=False
+            html = response.text
+            soup = BeautifulSoup(html, 'html.parser')
+            text = soup.get_text()
+            match = re.search(r'CTF\{[^}]+\}', text)
+            if match:
+                print("Flag:", match.group(0))  
+                # Flag: CTF{base64_brute_force_success}
+```
+
+密码是T17316。我这里加了个`if`条件，这个密码在我们计算得到的密码表中。
+
+```
+L4: IzUFQxM1UzRmtSRk0wU2xSU05qRXdUVVk9cVc5
+L3: PT13U3FkRFM0SlRSNjEwTUY=
+L2: FM016RTJ4SDdqSw==
+E:\Anaconda3\Lib\site-packages\urllib3\connectionpool.py:1097: InsecureRequestWarning: Unverified HTTPS request is being made to host '127.0.0.1'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#tls-warnings
+  warnings.warn(
+Flag: CTF{base64_brute_force_success}
+```
+
+提交`CTF{base64_brute_force_success}`即可。
 
 ------
 
