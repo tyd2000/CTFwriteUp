@@ -348,3 +348,46 @@ base64 decode 得到：
 注意到结尾处存在 `rar` 的文件尾 `C43D7B00400700`，但缺少文件头，于是补上 rar 的文件头` 526172211A0700`，保存为新文件得到 `flag`：`flag{nev3r_enc0de_t00_sm4ll_fil3_w1th_zip}`。
 
 ------
+
+### 404号
+
+> 一个被时间抹空的 Git 仓库，flag 藏在“看不见的历史”里
+
+下载附件后解压缩得到文件夹`404_timecapsule`，内含`.no_file_here`、`README.md`和`.git`文件夹。
+
+用`git fsck --full`检查`.git`目录中的对象完整性。
+
+用`git reset --hard`回滚到之前提交的历史版本。
+
+用`git log --all`显示仓库中所有分支提交历史。‌
+
+```bash
+C:\Users\tyd\Downloads\404_timecapsule>git fsck --full
+Checking ref database: 100% (1/1), done.
+error in commit ed102331474a5b036d29be77938be8ac8edc6bc5: badDate: invalid author/committer line - bad date
+Checking object directories: 100% (256/256), done.
+notice: HEAD points to an unborn branch (master)
+notice: No default references
+dangling commit 47a3f4237ab26d53778bd943a0fa06e7cd6d253a
+
+C:\Users\tyd\Downloads\404_timecapsule>git reset --hard 47a3f4237ab26d53778bd943a0fa06e7cd6d253a
+HEAD is now at 47a3f42 你终于来了。时间不是我走的方向。 flag{you_traveled_beyond_time_itself}
+
+C:\Users\tyd\Downloads\404_timecapsule\404_timecapsule>git log --all
+commit 47a3f4237ab26d53778bd943a0fa06e7cd6d253a (HEAD -> master)
+Author: 404 <404@localhost>
+Date:   Tue Jan 19 03:14:07 2038 +0000
+
+    你终于来了。时间不是我走的方向。
+    flag{you_traveled_beyond_time_itself}
+
+commit ed102331474a5b036d29be77938be8ac8edc6bc5
+Author: 404 <404@localhost>
+Date:   Thu Jan 1 00:00:00 1970 +0000
+
+    Initial commit
+```
+
+提交`flag{you_traveled_beyond_time_itself}`即可。
+
+------

