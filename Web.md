@@ -4428,6 +4428,36 @@ $flag = "CTF{no_space_to_execute_shell_commands}";</div>
 
 ------
 
+### 驷马难追
+
+PHP代码审计题。首先num=114514绕过，然后需要`intval(num)==1919810`获取`flag`。
+
+```php
+<?php
+highlight_file(__FILE__); 
+include "flag.php";  
+if (isset($_GET['num'])){
+     if ($_GET['num'] == 114514 && check($_GET['num'])){
+              assert("intval($_GET[num])==1919810") or die("一言既出，驷马难追!");
+              echo $flag;
+     } 
+} 
+
+function check($str){
+  return !preg_match("/[a-z]|\;|\(|\)/",$str);
+}
+```
+
+这道题的`Payload`是`?num=114514%2b1805296`，通过GET方式传值的时候，+号会被浏览器处理为空，所以需要转换为`%2b`的形式。而114514+1805296=1919810，这样就可以完美绕过那三个判断条件。
+
+- **弱比较时**，`"114514+1805296"` 被转为 `114514`，满足 `== 114514`。
+- **`assert` 执行时**，`114514+1805296` 被当作算术表达式，结果为 `1919810`，满足 `==1919810`。
+- **`check()`** 允许 `+`，不包含禁用字符。
+
+提交`ctfshow{e506febd-bfa4-4d07-93f7-1a2c88075b49}`即可。
+
+------
+
 ## [sqli-labs](https://github.com/Audi-1/sqli-labs)
 
 ### Less-1
