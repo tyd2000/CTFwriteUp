@@ -8125,3 +8125,153 @@ for i in range(10): # 少了第6位 用数字爆破
 
 ------
 
+## CTFSHOW
+
+### re_signin
+
+用`IDA Pro 64bit`打开题目附件`warmup`，按下`F5`反汇编可以看到主函数的伪`C`代码如下：
+
+```c
+int __cdecl main(int argc, const char **argv, const char **envp)
+{
+  char s2[144]; // [rsp+0h] [rbp-1A0h] BYREF
+  char s1[128]; // [rsp+90h] [rbp-110h] BYREF
+  char s[136]; // [rsp+110h] [rbp-90h] BYREF
+  unsigned int v7; // [rsp+198h] [rbp-8h]
+  int v8; // [rsp+19Ch] [rbp-4h]
+
+  memset(s, 0, 0x80uLL);
+  memset(s1, 0, sizeof(s1));
+  memset(s2, 0, sizeof(s2));
+  s2[0] = -100;
+  s2[1] = -52;
+  s2[2] = -120;
+  s2[3] = 118;
+  s2[4] = -41;
+  s2[5] = -119;
+  s2[6] = 120;
+  s2[7] = -20;
+  s2[8] = 124;
+  s2[9] = -41;
+  s2[10] = -119;
+  s2[11] = 113;
+  s2[12] = -29;
+  s2[13] = 109;
+  s2[14] = -104;
+  s2[15] = 23;
+  s2[16] = -108;
+  s2[17] = 15;
+  s2[18] = -54;
+  s2[19] = -97;
+  s2[20] = 126;
+  s2[21] = -39;
+  s2[22] = -96;
+  s2[23] = -118;
+  s2[24] = 121;
+  s2[25] = -47;
+  s2[26] = 0x80;
+  s2[27] = 119;
+  printf(&byte_400A66, s2, 18LL);
+  fgets(s, 128, stdin);
+  v8 = strlen(s);
+  if ( s[v8 - 1] == 10 )
+    s[v8 - 1] = 0;
+  v7 = generate_key(877LL);
+  encrypt(s, s1, 2024LL, v7);
+  if ( !memcmp(s1, s2, 0x80uLL) )
+    puts("success");
+  else
+    puts("fail");
+  return 0;
+}
+```
+
+在`Functions window`中点击`generate_key()`查看源码。
+
+```c
+__int64 __fastcall generate_key(int a1)
+{
+  return (unsigned int)(1540483477 * a1 + 305419896) >> 16;
+}
+```
+
+在`Functions window`中点击`encrypt()`查看源码。
+
+```c
+__int64 __fastcall encrypt(__int64 a1, __int64 a2, int a3, int a4)
+{
+  __int64 result; // rax
+  int i; // [rsp+20h] [rbp-8h]
+  int v6; // [rsp+24h] [rbp-4h]
+  unsigned int v7; // [rsp+24h] [rbp-4h]
+
+  v6 = 0;
+  for ( i = 0; i <= 127; ++i )
+  {
+    result = *(unsigned __int8 *)(i + a1);
+    if ( (_BYTE)result )
+    {
+      v7 = a4 + a3 + v6;
+      *(_BYTE *)(i + a2) = *(_BYTE *)(i + a1) + v7;
+      result = (v7 >> 4) ^ *(unsigned __int8 *)(i + a2);
+      v6 = (v7 >> 4) ^ *(unsigned __int8 *)(i + a2);
+    }
+  }
+  return result;
+}
+```
+
+解密代码如下：
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define KEY 2024
+#define CTFSHOW2024 0x36D
+
+unsigned int generate_key(unsigned int s) {
+  s = s * 0x5bd1e995 + 0x12345678;
+  return (s >> 16) & 0xffff;
+}
+
+void decrypt(unsigned char *plaintext, unsigned char *ciphertext, unsigned int key1, unsigned int key2) {
+  unsigned int sum = 0;
+  int i;
+
+  for (i = 0; i < 128; i++) {
+    if(ciphertext[i]==0){
+      continue;
+    }
+    sum += key1;
+    sum += key2;
+    plaintext[i] = ciphertext[i]  - sum;
+    sum = (sum >> 4) ^ ciphertext[i];
+  }
+}
+
+int main() {
+  unsigned char plaintext[128]={0};
+  unsigned char ciphertext[128]={0};
+  unsigned int number;
+  unsigned char code[] = {
+  0x9c, 0xcc, 0x88, 0x76, 0xd7, 0x89, 0x78, 0xec, 0x7c, 0xd7, 0x89, 0x71, 0xe3, 0x6d, 0x98, 0x17,
+  0x94, 0x0f, 0xca, 0x9f, 0x7e, 0xd9, 0xa0, 0x8a, 0x79, 0xd1, 0x80, 0x77, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  };
+  number = generate_key(CTFSHOW2024);  //0x36D=877
+  decrypt(plaintext, code, KEY, number);
+  printf("%s",plaintext);   // ctfshow{happy_2024_jiayou_a}
+}
+```
+
+提交`ctfshow{happy_2024_jiayou_a}`即可。
+
+------

