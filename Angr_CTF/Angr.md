@@ -33,6 +33,8 @@ ipython
 
 输入以下代码以及两次密码即可生成密钥。
 
+这是旧版本的Jupyter Notebook（< 7.0）中，生成密码哈希的方式。
+
 ```python
 In [1]: from notebook.auth import passwd                                        
 In [2]: passwd()         
@@ -43,6 +45,24 @@ Out[2]: 'sha1:salt:hashed-password'
 In [3]: exit()
 ```
 
+这是几年前写的了，更新一下：从Jupyter Notebook 7.0+开始，官方已将认证相关功能迁移到了 [`jupyter-server`](https://github.com/jupyter-server/jupyter_server) 中。因此，`notebook.auth` 模块不再存在，替代方法如下：
+先安装`pip install jupyter-server`。
+
+- 方法一：使用`jupyter-server`提供的命令，这是官方推荐的方式，无需手动处理哈希。
+
+  - 直接在终端运行`jupyter server password`。该命令会提示你输入密码，并自动将加密后的密码写入 Jupyter 配置文件（通常是 `～/.jupyter/jupyter_server_config.json`）。
+
+- 方法二：在`Python`中手动生成密码哈希（如需编程方式）
+
+  - 如果确实需要在代码中生成`Jupyter`兼容的密码哈希（例如用于自动化配置），可以使用`jupyter-server`提供的工具：
+
+    ```python
+    from jupyter_server.auth import passwd
+    
+    hashed = passwd()  # 会提示输入密码
+    print(hashed)
+    ```
+
 生成配置文件。
 
 ```bash
@@ -52,7 +72,7 @@ jupyter notebook --generate-config
 修改配置文件。
 
 ```bash
-vim /root/.jupyter/jupyter_notebook_config.py
+vim ~/.jupyter/jupyter_notebook_config.py
 ```
 
  用 **/** 查找内容并修改注释为以下内容然后**:wq**保存退出即可。字符串前加'u'表示后面的字符串以Unicode格式进行编码，防止因为字符串存储格式不同而导致解析出错。

