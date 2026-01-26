@@ -391,3 +391,230 @@ Date:   Thu Jan 1 00:00:00 1970 +0000
 提交`flag{you_traveled_beyond_time_itself}`即可。
 
 ------
+
+## CTFSHOW
+
+### 单身杯misc签到
+
+> **重要提示：**
+>
+> 1. 压缩包密码是5位字符
+> 2. lsb有内容
+> 3. flag包含5个空格、2个逗号，均替换为下划线，连续只留1个下划线
+
+这道题考点太多了，求解步骤很繁琐，涉及到压缩包密码爆破，lsb隐写，缺失定位块的二维码修复。
+
+下载附件`xxxtentacion.zip`，用`ARCHPR`爆破所有可打印字符，位数为5，得到压缩包密码`61f@X`。
+
+输入密码解压缩后得到图片`xxxtentacion.jpg`，用`010editor`打开图片可以找到`base64`字符串。
+
+在浏览器中输入`data:image/png,base64,`粘贴`base64`字符串可以将其转换为图片，右键保存。
+
+```
+data:image/png;base64,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
+```
+
+打开图片后，发现这是一张缺少三个定位块的二维码。用`zsteg -a broken_qr.png`检查隐写内容，发现关键内容`ctfshow{Your potential,va`，这是`flag`的前一部分，还需要找另一部分。
+
+```bash
+┌──(t0ur1st㉿kali)-[~/problems]
+└─$ zsteg -a broken_qr.png
+b6,abgr,msb,xy      .. file: MPEG ADTS, layer I, v2, 112 kbps, Monaural
+b6p,abgr,msb,xy     .. text: ["?" repeated 14 times]
+b8,rgb,msb,xy       .. file: RDI Acoustic Doppler Current Profiler (ADCP)
+b8,rgba,msb,xy      .. file: RDI Acoustic Doppler Current Profiler (ADCP)
+b1,r,lsb,xy,prime   .. file: MPEG ADTS, layer II, v1, 112 kbps, Stereo
+b1,r,lsb,yx         .. text: "ctfshow{Your potential,va"
+b1,r,msb,yx         .. file: OpenPGP Public Key
+b6,abgr,msb,yx      .. file: MPEG ADTS, layer I, v2, 112 kbps, Monaural
+b6p,abgr,msb,yx     .. text: ["?" repeated 14 times]
+```
+
+补全二维码定位点这里有一个坑，因为我尝试直接修补定位块后扫描二维码但一直解码内容失败。仔细观察后发现这张二维码图片的黑白区域正好相反，用`Stegsolve`打开图片，黑白颠倒转换一下，保存为`turn_black_into_white.png`。编写`Python`代码补全黑白颠倒转换后的二维码的三个定位点并解码。
+
+```python
+import numpy as np
+from PIL import Image, ImageDraw
+import cv2
+
+def detect_qr_structure(image_path):
+    """检测QR码结构"""
+    img = Image.open(image_path).convert('RGB')
+    img_array = np.array(img)
+    height, width = img_array.shape[:2]
+    # 转换为灰度图
+    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    # 使用自适应阈值
+    binary = cv2.adaptiveThreshold(gray, 255, 
+                                  cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                  cv2.THRESH_BINARY, 11, 2)
+    # 查找轮廓
+    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # 找到最大的轮廓（假设是QR码）
+    if contours:
+        largest_contour = max(contours, key=cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(largest_contour)
+        # 确保有合理的边界
+        x = max(0, x-5)
+        y = max(0, y-5)
+        w = min(width-x, w+10)
+        h = min(height-y, h+10)
+        # 裁剪QR码区域
+        qr_region = img_array[y:y+h, x:x+w]
+        return qr_region, (x, y, w, h)
+    return img_array, (0, 0, width, height)
+
+def estimate_module_size(qr_region):
+    """估计模块大小"""
+    height, width = qr_region.shape[:2]
+    # 转换为灰度
+    gray = cv2.cvtColor(qr_region, cv2.COLOR_RGB2GRAY)
+    # 取中间几行进行采样
+    sample_row = gray[height//2, :]
+    # 计算黑白转换
+    is_black = sample_row < 128
+    changes = np.where(is_black[:-1] != is_black[1:])[0]
+    if len(changes) > 5:
+        # 计算相邻变化之间的距离
+        distances = np.diff(changes)
+        # 去除异常值（太大或太小的距离）
+        median_dist = np.median(distances)
+        distances = distances[(distances > median_dist*0.5) & (distances < median_dist*2)]
+        module_size = np.median(distances) if len(distances) > 0 else max(1, width // 40)
+    else:
+        module_size = max(1, width // 40)
+    return int(round(module_size))
+
+def create_finder_pattern(module_size):
+    """创建定位块图案"""
+    # 确保模块大小至少为1
+    module_size = max(1, module_size)
+    size = 7 * module_size
+    # 创建图案
+    pattern = np.ones((size, size, 3), dtype=np.uint8) * 255  # 白色背景
+    # 绘制黑色边框
+    pattern[:module_size, :] = [0, 0, 0]  # 上边框
+    pattern[-module_size:, :] = [0, 0, 0]  # 下边框
+    pattern[:, :module_size] = [0, 0, 0]  # 左边框
+    pattern[:, -module_size:] = [0, 0, 0]  # 右边框
+    # 绘制白色边框内的区域
+    pattern[module_size:-module_size, module_size:-module_size] = [255, 255, 255]
+    # 绘制中心黑色方块 (3x3)
+    center_start = 2 * module_size
+    center_end = 5 * module_size
+    pattern[center_start:center_end, center_start:center_end] = [0, 0, 0]
+    # 绘制中心白色点
+    white_start = 3 * module_size
+    white_end = 4 * module_size
+    pattern[white_start:white_end, white_start:white_end] = [255, 255, 255]
+    return pattern
+
+def find_qr_corners(qr_region, module_size):
+    """查找QR码的角点"""
+    height, width = qr_region.shape[:2]
+    # 假设标准QR码结构
+    # 尝试不同版本 (1-40)
+    for version in range(1, 41):
+        total_modules = 17 + 4 * version
+        estimated_width = total_modules * module_size
+        # 如果估计的宽度接近实际宽度，则采用此版本
+        if abs(estimated_width - width) <= module_size * 2:
+            # 计算角点位置
+            finder_size = 7 * module_size
+            corners = {
+                'top_left': (0, 0),
+                'top_right': (0, width - finder_size),
+                'bottom_left': (height - finder_size, 0)
+            }
+            return corners, version
+    # 如果无法确定版本，使用默认位置
+    finder_size = 7 * module_size
+    corners = {
+        'top_left': (0, 0),
+        'top_right': (0, width - finder_size),
+        'bottom_left': (height - finder_size, 0)
+    }
+    return corners, 1
+
+def repair_qr_code(image_path, output_path='repaired_qr.png'):
+    """二维码修复函数"""
+    try:
+        # 1. 检测并裁剪QR码区域
+        qr_region, bbox = detect_qr_structure(image_path)
+        print(f"QR码区域: 位置={bbox[0:2]}, 尺寸={bbox[2:4]}")
+        # 2. 估计模块大小
+        module_size = estimate_module_size(qr_region)
+        print(f"估计模块大小: {module_size} 像素")
+        # 确保模块大小合理
+        if module_size <= 0:
+            module_size = max(1, bbox[2] // 40)
+            print(f"调整模块大小为: {module_size} 像素")
+        # 3. 创建定位块图案
+        finder_pattern = create_finder_pattern(module_size)
+        pattern_size = finder_pattern.shape[0]
+        print(f"定位块尺寸: {pattern_size}x{pattern_size} 像素")
+        # 4. 查找角点位置
+        corners, version = find_qr_corners(qr_region, module_size)
+        print(f"估计QR码版本: {version}")
+        print(f"角点位置: {corners}")
+        # 5. 复制原始图像
+        repaired = qr_region.copy()
+        # 6. 在三个角点绘制定位块
+        for corner_name, (y, x) in corners.items():
+            # 确保坐标有效
+            if x >= 0 and y >= 0 and x + pattern_size <= repaired.shape[1] and y + pattern_size <= repaired.shape[0]:
+                repaired[y:y+pattern_size, x:x+pattern_size] = finder_pattern
+                print(f"在 {corner_name} ({y}, {x}) 绘制定位块")
+            else:
+                print(f"警告: {corner_name} 位置无效，跳过")
+        # 7. 保存修复后的图像
+        repaired_img = Image.fromarray(repaired)
+        repaired_img.save(output_path)
+        print(f"修复完成，图像已保存到: {output_path}")
+        # 8. 显示修复后的图像
+        repaired_img.show()
+        return repaired_img
+    except Exception as e:
+        print(f"修复过程中出现错误: {e}")
+        print("尝试备用方法...")
+        return repair_qr_code_simple(image_path, output_path)
+
+def decode_qr(image_path: str)->str:
+    """ 读取扫描二维码图片解码出QR内容 """
+    img = Image.open(image_path)
+    from pyzbar import pyzbar
+    barcodes = pyzbar.decode(img)
+    data = ''.join(barcode.data.decode('utf-8') for barcode in barcodes)
+    return data
+
+# 主程序
+if __name__ == "__main__":    
+    input_image = "turn_black_into_white.png"
+    print("开始修复QR码...")
+    output_file = "repaired_qr.png"
+    repaired = repair_qr_code(input_image, output_file)
+    print("\n修复完成！请查看生成的图像文件。")
+    try:
+        msg = decode_qr(output_file)
+        if msg:
+            print("解码成功:", msg)
+        else:
+            print("未检测到有效二维码")
+    except Exception as e:
+        print("解码失败:", e)
+    # ctfshow单身杯misc签到题
+    flag = bytes.fromhex(msg).decode()
+    # lue, far exceeds your belief}
+    flag = 'ctfshow{Your potential,va'+flag
+    print(flag)
+    # ctfshow{Your potential,value, far exceeds your belief}
+    flag = flag.replace(" ", "_").replace(",", "_")
+    print(f'🎉Final Flag is found!\n{flag}')
+    # ctfshow{Your_potential_value__far_exceeds_your_belief}
+```
+
+拿到另一半`flag`后直接拼接提交报错，还需要将`,`和空格全部替换为`_`，这部分代码补充在脚本尾部。
+
+提交`ctfshow{Your_potential_value__far_exceeds_your_belief}`即可。
+
+------
