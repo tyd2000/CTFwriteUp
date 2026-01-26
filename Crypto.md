@@ -3499,6 +3499,37 @@ print(flag)
 
 ------
 
+### 古典base
+
+打开靶机后，看到信息：
+
+```
+The flag is:Y0Q23M1QRzMxmFjNclcz2MtAhSO1v1TZdicj3Z3EsWMzwIyNN30TjLwVYTY9
+```
+
+这道题的考点是栅栏密码 + base64。
+
+```python
+>>> from base64 import *
+>>> b64encode(b'ctfshow{')
+b'Y3Rmc2hvd3s='
+```
+
+当栏目数为4的时候，解密结果的开头和`ctfshow{`的base64编码值相等。
+
+```
+Y3Rmc2hvd3swNjY0MzFlMS1iZWI3LTQ1MjctOTc3My0wY2QxNzA1ZjEzNTV9
+```
+
+```python
+>>> b64decode('Y3Rmc2hvd3swNjY0MzFlMS1iZWI3LTQ1MjctOTc3My0wY2QxNzA1ZjEzNTV9')
+b'ctfshow{066431e1-beb7-4527-9773-0cd1705f1355}'
+```
+
+提交`ctfshow{066431e1-beb7-4527-9773-0cd1705f1355}`即可。
+
+------
+
 ## CTFHub
 
 ### 2020-BJDCTF-Crypto-sign in

