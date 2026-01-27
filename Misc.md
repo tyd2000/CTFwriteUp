@@ -613,7 +613,26 @@ if __name__ == "__main__":
     # ctfshow{Your_potential_value__far_exceeds_your_belief}
 ```
 
-拿到另一半`flag`后直接拼接提交报错，还需要将`,`和空格全部替换为`_`，这部分代码补充在脚本尾部。
+拿到另一半`flag`后直接拼接提交报错，还需要将`,`和空格全部替换为`_`，这部分代码补充在脚本尾部。`Python`代码的运行结果如下：
+
+```
+开始修复QR码...
+QR码区域: 位置=(0, 0), 尺寸=(280, 280)
+估计模块大小: 7 像素
+定位块尺寸: 49x49 像素
+估计QR码版本: 6
+角点位置: {'top_left': (0, 0), 'top_right': (0, 231), 'bottom_left': (231, 0)}
+在 top_left (0, 0) 绘制定位块
+在 top_right (0, 231) 绘制定位块
+在 bottom_left (231, 0) 绘制定位块
+修复完成，图像已保存到: repaired_qr.png
+
+修复完成！请查看生成的图像文件。
+解码成功: 6C75652C20666172206578636565647320796F75722062656C6965667D
+ctfshow{Your potential,value, far exceeds your belief}
+🎉Final Flag is found!
+ctfshow{Your_potential_value__far_exceeds_your_belief}
+```
 
 提交`ctfshow{Your_potential_value__far_exceeds_your_belief}`即可。
 
