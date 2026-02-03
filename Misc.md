@@ -637,3 +637,447 @@ ctfshow{Your_potential_value__far_exceeds_your_belief}
 提交`ctfshow{Your_potential_value__far_exceeds_your_belief}`即可。
 
 ------
+
+### project Tao-1
+
+进入靶机后，首先看到的是`/W4lc0me`。
+
+> 你可以通过访问特定地址来跳转下一关，如/Letsstart，此页面为第0关，请注意关卡。
+
+根据提示访问第一关`/Letsstart`，可以看到以下信息。
+
+```
+开始你的CTF秀之旅
+要不动动鼠标看看你要干啥？
+
+/some_informations
+
+35903762.log
+```
+
+`35903762.log`文件是一段聊天记录，继续访问第二关`/some_informations`。
+
+> 题目在哪呢?
+>
+> 这个页面会不会有什么错误
+>
+> 我的意思是，来到这个奇怪名字的页面本身就是一个错误
+
+根据提示可知名字错了，`information`是不可数名词，正确的应该是`some_information`。
+
+访问第三关暨真正的第二关`/some_information`，可以看到一些“可爱的色块”。
+
+```html
+<div class="not-here">
+    <p>可爱的色块</p>
+    <div>
+        <div class="color-block" style="background-color: rgb(71,48,111)"></div>
+        <div class="color-block" style="background-color: rgb(100,33,32)"></div>
+        <div class="color-block" style="background-color: rgb(78,101,120)"></div>
+        <div class="color-block" style="background-color: rgb(116,32,105)"></div>
+        <div class="color-block" style="background-color: rgb(115,32,47)"></div>
+        <div class="color-block" style="background-color: rgb(67,84,70)"></div>
+        <div class="color-block" style="background-color: rgb(71,48,100)"></div>
+    </div>
+    <p class="Log">77665160.log</p>
+</div>
+```
+
+`77665160.log`是一段聊天记录（hint），我们将颜色的`R`、`G`、`B`值按`ASCII`转为字符串得到下一关。
+
+```python
+import re
+
+html_content = """
+<div class="not-here">
+    <p>可爱的色块</p>
+    <div>
+        <div class="color-block" style="background-color: rgb(71,48,111)"></div>
+        <div class="color-block" style="background-color: rgb(100,33,32)"></div>
+        <div class="color-block" style="background-color: rgb(78,101,120)"></div>
+        <div class="color-block" style="background-color: rgb(116,32,105)"></div>
+        <div class="color-block" style="background-color: rgb(115,32,47)"></div>
+        <div class="color-block" style="background-color: rgb(67,84,70)"></div>
+        <div class="color-block" style="background-color: rgb(71,48,100)"></div>
+    </div>
+    <p class="Log">77665160.log</p>
+</div>
+"""
+# Extract RGB values using regex
+rgb_values = re.findall(r'rgb\((\d+),\s*(\d+),\s*(\d+)\)', html_content)
+# Convert RGB values to ASCII
+ascii_string = ""
+for r, g, b in rgb_values:
+    ascii_string += chr(int(r)) + chr(int(g)) + chr(int(b))
+
+print(ascii_string)
+# 'G0od! Next is /CTFG0d'
+```
+
+ 访问第四关`/CTFG0d`，`ctrl+A`选中所有页面可以看到与背景色融为一体的文字。
+
+```
+你已经正式通过了考验，来帮套一起逃离这里吧
+
+NTQ1NjVhNTM1NjMwNGQ3YTUyNDY0NjUwNTU2YTUyNDU1MzU2NTI1MzU1NDEzZDNk
+
+这里貌似有几层被子，要不要盖盖？
+
+62399474.log
+```
+
+`62399474.log`是一段聊天记录（hint），经过一系列`base64—>base16—>base64—>base32—>reverse`处理，我们可以得到下一关`/N4xtplace`。
+
+```python
+from base64 import *
+import binascii
+
+s = 'NTQ1NjVhNTM1NjMwNGQ3YTUyNDY0NjUwNTU2YTUyNDU1MzU2NTI1MzU1NDEzZDNk'
+# base64解码
+b64_decoded = b64decode(s)
+# b'54565a5356304d7a52464650556a52455356525355413d3d'
+# base16解码
+b16_decoded = binascii.unhexlify(b64_decoded)
+# b'TVZSV0MzRFFPUjRESVRSUA=='
+# base64解码
+b64_after_b16 = b64decode(b16_decoded)
+# b'MVRWC3DQOR4DITRP'
+# base32解码
+b32_decoded = b32decode(b64_after_b16)
+# b'ecalptx4N/'
+# 翻转字符串
+s = b32_decoded[::-1].decode()
+print(s)
+# '/N4xtplace'
+```
+
+ 访问第五关`/N4xtplace`，`F12`检查可以看到以下内容：
+
+```
+<div class="what-happend">
+<p>可恶（｀Δ´）ゞ 这到底是什么地方(;｀O´)o</p>
+<p>怎么回事(•'╻'• )꒳ᵒ꒳ᵎᵎᵎ 每句话都多了奇怪的东西"(º Д º*)</p>
+<p class="n0-look">69766277.log</p>
+</div>
+<script data-description="magic">
+ﾟωﾟﾉ= /｀ｍ´）ﾉ ~┻━┻   //*´∇｀*/ ['_']; o=(ﾟｰﾟ)  =_=3; c=(ﾟΘﾟ) =(ﾟｰﾟ)-(ﾟｰﾟ); (ﾟДﾟ) =(ﾟΘﾟ)= (o^_^o)/ (o^_^o);(ﾟДﾟ)={ﾟΘﾟ: '_' ,ﾟωﾟﾉ : ((ﾟωﾟﾉ==3) +'_') [ﾟΘﾟ] ,ﾟｰﾟﾉ :(ﾟωﾟﾉ+ '_')[o^_^o -(ﾟΘﾟ)] ,ﾟДﾟﾉ:((ﾟｰﾟ==3) +'_')[ﾟｰﾟ] }; (ﾟДﾟ) [ﾟΘﾟ] =((ﾟωﾟﾉ==3) +'_') [c^_^o];(ﾟДﾟ) ['c'] = ((ﾟДﾟ)+'_') [ (ﾟｰﾟ)+(ﾟｰﾟ)-(ﾟΘﾟ) ];(ﾟДﾟ) ['o'] = ((ﾟДﾟ)+'_') [ﾟΘﾟ];(ﾟoﾟ)=(ﾟДﾟ) ['c']+(ﾟДﾟ) ['o']+(ﾟωﾟﾉ +'_')[ﾟΘﾟ]+ ((ﾟωﾟﾉ==3) +'_') [ﾟｰﾟ] + ((ﾟДﾟ) +'_') [(ﾟｰﾟ)+(ﾟｰﾟ)]+ ((ﾟｰﾟ==3) +'_') [ﾟΘﾟ]+((ﾟｰﾟ==3) +'_') [(ﾟｰﾟ) - (ﾟΘﾟ)]+(ﾟДﾟ) ['c']+((ﾟДﾟ)+'_') [(ﾟｰﾟ)+(ﾟｰﾟ)]+ (ﾟДﾟ) ['o']+((ﾟｰﾟ==3) +'_') [ﾟΘﾟ];(ﾟДﾟ) ['_'] =(o^_^o) [ﾟoﾟ] [ﾟoﾟ];(ﾟεﾟ)=((ﾟｰﾟ==3) +'_') [ﾟΘﾟ]+ (ﾟДﾟ) .ﾟДﾟﾉ+((ﾟДﾟ)+'_') [(ﾟｰﾟ) + (ﾟｰﾟ)]+((ﾟｰﾟ==3) +'_') [o^_^o -ﾟΘﾟ]+((ﾟｰﾟ==3) +'_') [ﾟΘﾟ]+ (ﾟωﾟﾉ +'_') [ﾟΘﾟ]; (ﾟｰﾟ)+=(ﾟΘﾟ); (ﾟДﾟ)[ﾟεﾟ]='\\'; (ﾟДﾟ).ﾟΘﾟﾉ=(ﾟДﾟ+ ﾟｰﾟ)[o^_^o -(ﾟΘﾟ)];(oﾟｰﾟo)=(ﾟωﾟﾉ +'_')[c^_^o];(ﾟДﾟ) [ﾟoﾟ]='\"';(ﾟДﾟ) ['_'] ( (ﾟДﾟ) ['_'] (ﾟεﾟ+(ﾟДﾟ)[ﾟoﾟ]+ (ﾟДﾟ)[ﾟεﾟ]+((ﾟｰﾟ) + (ﾟΘﾟ))+ ((ﾟｰﾟ) + (o^_^o))+ (ﾟДﾟ)[ﾟεﾟ]+(ﾟΘﾟ)+ (ﾟｰﾟ)+ (o^_^o)+ (ﾟДﾟ)[ﾟεﾟ]+(ﾟΘﾟ)+ (ﾟｰﾟ)+ ((o^_^o) +(o^_^o))+ (ﾟДﾟ)[ﾟεﾟ]+(ﾟΘﾟ)+ ((o^_^o) +(o^_^o))+ (ﾟｰﾟ)+ (ﾟДﾟ)[ﾟεﾟ]+(ﾟΘﾟ)+ ((ﾟｰﾟ) + (ﾟΘﾟ))+ (ﾟｰﾟ)+ (ﾟДﾟ)[ﾟεﾟ]+(ﾟΘﾟ)+ (ﾟｰﾟ)+ (ﾟΘﾟ)+ (ﾟДﾟ)[ﾟεﾟ]+((o^_^o) +(o^_^o))+ ((ﾟｰﾟ) + (ﾟΘﾟ))+ (ﾟДﾟ)[ﾟεﾟ]+(ﾟΘﾟ)+ (ﾟｰﾟ)+ ((ﾟｰﾟ) + (o^_^o))+ (ﾟДﾟ)[ﾟεﾟ]+(ﾟΘﾟ)+ ((o^_^o) +(o^_^o))+ (o^_^o)+ (ﾟДﾟ)[ﾟεﾟ]+(ﾟΘﾟ)+ ((ﾟｰﾟ) + (ﾟΘﾟ))+ (c^_^o)+ (ﾟДﾟ)[ﾟεﾟ]+((o^_^o) +(o^_^o))+ (c^_^o)+ (ﾟДﾟ)[ﾟεﾟ]+(ﾟΘﾟ)+ ((o^_^o) +(o^_^o))+ ((ﾟｰﾟ) + (o^_^o))+ (ﾟДﾟ)[ﾟoﾟ]) (ﾟΘﾟ)) ('_');
+</script>
+```
+
+`69766277.log`是一段聊天记录（hint），使用`AAencode`解码得到`/cftla5gsh0w`。
+
+访问第六关`/cftla5gsh0w`，进入一个标题为`no flag here!!!`的页面，可以看到以下信息：
+
+```
+题目已经写在页面上了
+
+要不你仔细找找？
+
+找不到咱就放弃吧，套娃题狗都不做
+
+06958446.log
+```
+
+访问`06958446.log`查看聊天记录获取`hint`。
+
+```
+MuziLog --- Mar 22 2021
+
+套:给我出的考题呢？存心不让我走吗？ 17:02:06
+
+神:已经写在屏幕上了啊... 17:03:18
+
+套:我看我把屏幕抠坏都找不到。 17:06:44
+
+神:已经写在屏幕上了啊！ 17:06:52
+
+套:所以在哪啊？？？ 17:07:39
+
+神:已经写在屏幕上了啊！！！ 17:07:50
+
+CJ:既然他说已经写了那就已经写了吧。 17:15:31
+
+[获得碎片信息]
+
+[获得碎片提示 1]
+nn]ch\aXe\WcgR``OUMYKLIP
+
+[获得碎片提示 2]
+加减
+```
+
+编写`python`代码对其求解，得到`no_flag_means_no_f_l_a_g`。
+
+```python
+s = r'nn]ch\aXe\WcgR``OUMYKLIP'
+for i in range(len(s)):
+    print(chr(ord(s[i])+i),end='')
+    
+# no_flag_means_no_f_l_a_g
+```
+
+意思是把`/cftla5gsh0w`中的`f`、`l`、`a`、`g`这四个字母去掉，去掉后为`/ct5sh0w`。
+
+访问第七关`/ct5sh0w`，看到以下信息：
+
+> 好像什么也没有
+>
+> 那就当做无事发生
+>
+> 10654572.log
+
+滚动条可以往下滑啦，右键查看源码发现有一张图片。
+
+```html
+<div class="mask"></div>
+<img class="hidden flag" src="data:image/png;base64,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">
+	<div class="text light" style="top: 5%; transform: translateY(-50%);">
+	<p>好像什么也没有</p>
+	<p>那就当做无事发生</p>
+	<p class="bujiangwude">10654572.log</p>
+  </div>
+</body>
+<!--怎么又看源码,太不讲武德了-->
+<!--话说这是缩小版的码吗？-->
+```
+
+将图片直接放在浏览器中访问，得到一个打乱的二维码图片，手动修复一下即可用`QR_Research`扫码，得到`/t308g0d`。
+
+继续访问第八关`/t308g0d`，弹出一个提示框`挑战过半!`，点击确定又弹出提示框`送你一个过半的flag吧，仔细找找，格式ctfshow{}`。这还用你说？！累了，右键查看源码。
+
+```html
+<div class="not-here">
+    <p>看起来他遗忘一张照片</p>
+    <p>照片里有什么秘密呢？</p>
+    <div>
+    <p><a href="./secret_of_name.zip" target="_blank">[photo File]</a></p>
+    </div>
+    <p class="have-flag">03190886.log</p>
+</div>
+<script>
+    if(!localStorage.getItem("_has_visited")) {
+        alert("挑战过半!");
+        alert("送你一个过半的flag吧，仔细找找，格式ctfshow{}");
+        localStorage.setItem("_has_visited", "true");
+    }
+</script>
+```
+
+附件`/secret_of_name.zip`下载后解压缩，得到图片`secret_of_name.png`。
+
+在[010 Editor官方模板](https://sweetscape.com/010editor/repository/templates/)下载`PNG.bt`后放入`\Documents\SweetScape\010 Templates\Repository`中。
+
+用`010 Editor`打开图片，并运行`PNG.bt`，修改图片高度与宽度`942`一致，保存文件后打开图片，可以看到你想要的，提交`ctfshow{easy_half_and_Ez_flag}`即可。
+
+------
+
+### project Tao-2
+
+这道题的靶机环境跟上一道题是一样的。根据hint可知，“Tao-2的log貌似有点重要”。
+
+上一道题的最后一个`log`文件`03190886.log`的内容如下：
+
+```
+MuziLog --- Jun 10 2021
+
+套:这是?
+
+神:这不是你最喜欢的吗?
+
+套:别别别，我可讨厌这玩意了。
+
+神:真搞不懂你。
+
+套:那东西在哪啊？
+
+神:寸头男子是看不到图片上不上写了吗？
+
+套:你再骂？
+
+神:别想太多。
+
+[获得碎片信息]
+
+[获得碎片提示]
+注意大小写
+```
+
+打开图片`secret_of_name.png`，看到最大的文字是DEADSOUL，尝试访问`/DEADSOUL`，来到第九关。右键查看网页源码如下：
+
+```html
+<div class="not-here">
+    <p>看起来你有点累了，要不这样吧</p>
+    <p>我模仿田一名给你唱首歌吧</p>
+    <p>我晒干了沉默🎵,悔得很冲动🎵，就算这是做错也只是怕错过🎵</p>
+    <div>
+    </div>
+    <p class="a-log">38450011.log</p>
+    <p class="a-log">你知道知乎在后台日志埋藏了一个彩蛋吗？(注意大小写)</p>
+</div>
+```
+
+知乎在后台日志的彩蛋就是招聘——`HIRE`。
+
+访问第十关`/HIRE`，右键查看网页源码如下：
+
+```html
+<div class="not-here">
+    <p>给你看一张图</p>
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAACGklEQVR4nO3TMRGAMADAwFIBlYF/1GCnBnpZYfhXkCXXep97AEfz6wD4M4NAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIBINAMAgEg0AwCASDQDAIhA0E6ANMJb3uMQAAAABJRU5ErkJggm5vbm9ub25vbm9oaW50LHRyeSB5b3VyIGJlc3Qh">
+    <div>
+    </div>
+    <p class="a-log">46082046.log</p>
+</div>
+```
+
+将图片保存为`a.png`，读取任意像素得到`(14, 215, 177, 38)`，将其转为IP格式`14.215.177.38`，会跳转到百度的首页（现在的IP已经换了），最下方有个About Baidu，所以下一关是`/About_Baidu`。
+
+```
+>>> from PIL import Image
+>>> pic = Image.open('a.png')
+>>> print(pic.getpixel((5,5)))
+(14, 215, 177, 38)
+```
+
+访问第十一关`/About_Baidu`，查看网页源码如下：
+
+```html
+<div class="not-here">
+    <p>我来给你吟一首</p>
+    <p>巴山夜雨涨秋池，长安大道连狭邪。自笑平生无所着，此地空余黄鹤楼。</p>
+    <p>上头了，再来一首</p>
+    <p>前不见古人，黄河入海流。灵山多秀色，西北是融州。</p>
+    <p class="a-log">99563810.log</p>
+</div>
+```
+
+“巴山夜雨涨秋池，长安大道连狭邪。自笑平生无所着，此地空余黄鹤楼。”分别对应地名：川渝—西安—郑州—武汉。“前不见古人，黄河入海流。灵山多秀色，西北是融州。”分别对应地名：北京—山西拥挤—庐山—柳川。从百度地图上看，这些地名连线后分别是`n`和`s`的形状，所以下一关是`/ns`。
+
+访问第十二关`/ns`，查看网页源码如下：
+
+```html
+<div class="not-here">
+<p class="a-log">78716321.log</p>
+<p>这次就不磨磨唧唧了</p>
+<p>直接告诉你该干什么吧</p>
+<p>SAYL7UNIT</p> 
+</div>
+```
+
+直接访问`/SAYL7UNIT`是不对的，看`log`文件知道与摩斯电码有关，盲猜是摩斯的点和划反过来了，先用摩斯电码加密`SAYL7UNIT`，然后将点和划调换一下即可得到正确的下一关`ONLY2GAME`。
+
+```python
+MORSE_CODE_DICT = {
+    'A': '.-',     'B': '-...',   'C': '-.-.',   'D': '-..',    'E': '.',      'F': '..-.',
+    'G': '--.',    'H': '....',   'I': '..',     'J': '.---',   'K': '-.-',    'L': '.-..',
+    'M': '--',     'N': '-.',     'O': '---',    'P': '.--.',   'Q': '--.-',   'R': '.-.',
+    'S': '...',    'T': '-',      'U': '..-',    'V': '...-',   'W': '.--',    'X': '-..-',
+    'Y': '-.--',   'Z': '--..',
+    
+    '0': '-----',  '1': '.----',  '2': '..---',  '3': '...--',  '4': '....-',  '5': '.....',
+    '6': '-....',  '7': '--...',  '8': '---..',  '9': '----.',
+    
+    # 标点符号
+    '.': '.-.-.-',   # 句号
+    ',': '--..--',   # 逗号
+    '?': '..--..',   # 问号
+    "'": '.----.',   # 单引号
+    '!': '-.-.--',   # 感叹号
+    '/': '-..-.',    # 斜杠
+    '(': '-.--.',    # 左括号
+    ')': '-.--.-',   # 右括号
+    '&': '.-...',    # and 符号
+    ':': '---...',   # 冒号
+    ';': '-.-.-.',   # 分号
+    '=': '-...-',    # 等号
+    '+': '.-.-.',    # 加号
+    '-': '-....-',   # 减号/连字符
+    '_': '..--.-',   # 下划线
+    '"': '.-..-.',   # 双引号
+}
+
+def morse_encrypt(message):
+    """将英文文本转换为摩斯电码,默认用点.和划-"""
+    cipher = []
+    for char in message.upper():
+        if char == ' ':
+            cipher.append('/')
+        elif char in MORSE_CODE_DICT:
+            cipher.append(MORSE_CODE_DICT[char])
+        # 忽略不支持的字符（如中文、特殊符号等）
+    return ' '.join(cipher)
+
+MORSE_DICT = {v: k for k, v in MORSE_CODE_DICT.items()} # Reverse key and value 
+
+def morse_decrypt(ciphertext:str, dot='.', dash='-', sign=' ') -> str:
+    '''
+    ciphertext => 密文
+    dot => 点
+    dash => 划
+    sign => 分割符
+    plaintext => 明文
+    '''
+    plaintext = ''
+    for code in ciphertext.replace(dot,'.').replace(dash,'-').split(sign):
+        plaintext += MORSE_DICT[code]
+    return plaintext
+
+s = morse_encrypt('SAYL7UNIT')
+# '... .- -.-- .-.. --... ..- -. .. -'
+# morse_decrypt(s)
+# 'SAYL7UNIT'
+# 如果直接调换会报错 因为出现重复替换 需要借助中间变量 先将-换成t .换成d 再令t为. d为-
+s = s.replace('-', 't').replace('.', 'd')
+print(morse_decrypt(s,'t','d',' '))
+# 'ONLY2GAME'
+```
+
+访问第十三关`/ONLY2GAME`，网页标题是`11011 11001`，右键查看网页源码：
+
+```
+<div class="not-here">
+<p class="a-log">78716321.log</p>
+<p>梅开二度？</p>
+<p>-..../...--/--.../.--.-/..--./.--../...--/-..-.</p>
+</div>
+```
+
+尝试用摩斯电码解密失败，这并非摩斯电码而是博多码Baudot Code，网页标题用博多码解密后是个`?`。
+
+将`-`换成`1`，`.`换成`0`，`/`换成空格，得到`10000 00011 11000 01101 00110 01100 00011 10010`。
+
+```python
+>>> '-..../...--/--.../.--.-/..--./.--../...--/-..-.'.replace('-','1').replace('.','0').replace('/', ' ')
+'10000 00011 11000 01101 00110 01100 00011 10010'
+```
+
+用[Baudot Code](https://www.boxentriq.com/code-breaking/baudot-code)解密，得到`TAOFINAL`。
+
+访问第十四关`/TAOFINAL`，查看网页源码如下：
+
+```html
+<body>
+    <div class="mail" onclick="mail.open();">
+        <div class="icon">✉</div>
+    </div>
+    <div id="here-is">
+        <p><small>TaoFinal</small></p>
+        <div class="subject">Email</div>
+        <p><small>From: <a href="@77602440">套</a></small></p>
+        <hr>
+        <p>我喜欢夏天的风，秋天的太阳。</p>
+        <p>有时候一张张风景照也能让我陷入一段段可爱的回忆。</p>
+        <p>你说走这一遭还有什么可遗憾的。</p>
+		<p>还有，那就是打CTF。/doge</p>
+        <p><a href="./ctfShow.png" target="_blank">[FLAG FILE]</a></p>
+        <p class="hint">根据群主要求，题目不难，你都找到这了，该相信我了吧</p>
+        <p class="hint">哦对了，你发现彩蛋了吗？提示一下：libnum</p>
+        <p class="what-is-this">28430703.log</p>
+    </div>
+    <script data-cfasync="false" src=""></script><script>mail=[];mail.open=()=>{document.getElementById('here-is').className="that"}</script>
+</body>
+```
+
+访问`/libnum`只见`Not Found`，点击`FLAG FILE`下载图片`/ctfShow.png`。用`010 Editor`打开图片后，可以在文件尾看到`ctfshow{this_is_a_ez_try_cuz_no_time}`，提交即可。
+
+------
