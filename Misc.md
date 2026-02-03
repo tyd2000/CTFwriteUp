@@ -1081,3 +1081,6 @@ print(morse_decrypt(s,'t','d',' '))
 访问`/libnum`只见`Not Found`，点击`FLAG FILE`下载图片`/ctfShow.png`。用`010 Editor`打开图片后，可以在文件尾看到`ctfshow{this_is_a_ez_try_cuz_no_time}`，提交即可。
 
 ------
+
+### 
+
