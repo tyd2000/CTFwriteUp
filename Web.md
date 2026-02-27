@@ -4869,6 +4869,41 @@ $flag = "CTF{reverse_shell_use_nc}";"
 
 ------
 
+### 最简单的SSRF
+
+进入靶机后看到`PHP`代码如下：
+
+```php
+<?php
+error_reporting(0);
+highlight_file(__FILE__);
+$url=$_POST['url'];
+$x=parse_url($url);
+if($x['scheme']==='http'||$x['scheme']==='https'){
+    $host=$x['host'];
+    if(strlen($host)<=5){
+        $ch=curl_init($url);
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        $result=curl_exec($ch);
+        curl_close($ch);
+        echo ($result);
+    } else{
+        die('hacker');
+    }
+} else{
+    die('hacker');
+}
+```
+
+用`HackBar`构造`POST`请求，`payload`为`url=http://0/flag.php`，可以顺利拿到`flag`。
+
+按照代码逻辑，首先是协议检查：`if($x['scheme']==='http'||$x['scheme']==='https')`，我们用`http`协议可以顺利通过。接着是提取`host`，在大多数操作系统和网络库中，`0`会被解析为本地回环地址`127.0.0.1`，所以我们可以利用这一点来绕过长度判断`strlen($host)<=5`。`PHP`中的 `curl` 扩展会将`URL`中的`host`部分交给操作系统的`DNS`解析器或网络栈进行处理，所以当`curl_exec($url)`尝试连接 `http://0/flag.php` 时会将其作为`IP`地址处理，系统网络栈会将`0`转换为 `127.0.0.1`，使最终请求变成了访问 `http://127.0.0.1/flag.php`。
+
+提交`ctfshow{5e713807-d655-4372-bde1-c4e92a19c2bb}`即可。
+
+------
+
 ### 红包赛第九弹
 
 靶机给出一个登录框，密码被默认填充了，账号输入`admin`，用`Burp Suite`抓包，发现`POST`数据是：
