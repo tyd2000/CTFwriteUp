@@ -1060,6 +1060,278 @@ CTF2{de1bd42f-5466-4650-8475-48b23c678377}
 
 ------
 
+## BigMak（SunshineCTF 2025）
+
+- **平台**：CTF2 日常练习场（CTF2日常练习场）
+- **分类 / 难度**：MISC / Easy · **100 分**
+- **Flag**：`sun{burger_layout_lol}`
+- **结果**：第 1 次提交通过，+100 分
+
+### 题目
+
+> I tried typing out the flag for you, but our Astronaut **Cole**son seems to have changed the terminal's
+> keyboard layout? He went out to get a big **mak** so I guess we're screwed.
+> `rlk{blpdfp_iajylg_iyi}`
+
+### 思路
+
+题面的粗体 **Cole** + **mak** 就是在点名 **Colemak** 键盘布局。角色「Coleson」把终端切成了 Colemak，于是敲出来的字符整体错位。
+
+关键在**方向**：拿到的是 Colemak 布局下产生的字符，要找的是原本想敲的 QWERTY 字符。所以对每个字符反查「Colemak 中是什么键位打出来的」，再读那个物理键在 QWERTY 上的字符。
+
+Colemak 布局（按物理 QWERTY 键位排列）：
+
+```
+QWERTY : q w e r t y u i o p
+Colemak: q w f p g j l u y ;
+QWERTY : a s d f g h j k l ;
+Colemak: a r s t d h n e i o
+QWERTY : z x c v b n m
+Colemak: z x c v b k m
+```
+
+逆映射（Colemak 输出 → QWERTY 原字符）：
+`r→s, l→u, k→n, b→b, p→r, d→g, f→e, i→l, a→a, j→y, y→o, g→t`
+
+### 复现
+
+```python
+inv = {}
+for q, c in zip("qwertyuiop", "qwfpgjluy;"):
+    inv[c] = q
+for q, c in zip("asdfghjkl", "arstdhneio"):
+    inv[c] = q
+for q, c in zip("zxcvbnm", "zxcvbkm"):
+    inv[c] = q
+
+enc = "rlk{blpdfp_iajylg_iyi}"
+print("".join(inv.get(c, c) for c in enc))
+# sun{burger_layout_lol}
+```
+
+`rlk` → `sun`，`blpdfp` → `burger`，`iajylg` → `layout`，`iyi` → `lol`，语义自洽，方向确认无误。
+
+### 复盘
+
+- 键盘布局类题目最容易搞反方向：**先确认「已知字符是哪种布局产生的」**，再决定用正映射还是逆映射，最后用明文语义兜底验证。
+- 题面里的粗体往往是提示（Cole+mak），别当排版噪声忽略。
+
+---
+
+## t9（SunshineCTF 2025）
+
+- **平台**：CTF2 日常练习场 · **MISC / Easy · 100 分**
+- **Flag**：`sun{this_phone_is_ancient}`
+- **结果**：第 1 次通过，+100
+
+### 题目
+
+```
+7778866{844444777_7446666633_444777_26622244433668}
+alternatively (if that one is producing invalid results)
+77778866{8444447777_7446666633_4447777_26622244433668}
+```
+
+### 思路
+
+t9 = 手机九宫格输入法。规则：第 n 个数字键上的第 k 个字母，写作「数字重复 k 次」。
+
+```
+2: a b c      3: d e f      4: g h i
+5: j k l      6: m n o      7: p q r s
+8: t u v      9: w x y z
+```
+
+难点是**同键相邻字母会粘连**，需要按语义切分。逐段解：
+
+| 编码             | 切分                     | 还原        |
+| ---------------- | ------------------------ | ----------- |
+| `77778866`       | 7777(88)(66)             | **sun**     |
+| `8444447777`     | 8(44)(444)(7777)         | **this**    |
+| `7446666633`     | 7(44)(666)(66)(33)       | **phone**   |
+| `4447777`        | (444)(7777)              | **is**      |
+| `26622244433668` | 2(66)(222)(444)(33)(66)8 | **ancient** |
+
+两串只有前缀差一个 `7`：第一串解出 `run`、第三段解出 `ir`，不成词；第二串全段自洽，故以第二串为准——题面「alternatively」就是在暗示输入里的多余按键。
+
+### 复盘
+
+- t9 编码的歧义点：`66666` 既可切 `o+n` 也可切 `n+o`，`44444` 同理。**用成词性做约束**比写通用解码器更快。
+- 题面给了两串「备选」，本质是让选手用语义自校验。
+
+---
+
+## Poop Challenge（SunshineCTF 2025）
+
+- **平台**：CTF2 日常练习场 · **MISC / Easy · 100 分**
+- **Flag**：`sun{lesssgooo_solved_the_poop_challenge!}`
+- **结果**：第 1 次通过，+100
+
+### 信息收集
+
+附件是 1925 字节的文本，肉眼看是一堆 💩。逐码点统计后只有三种字符：
+
+| 码点    | 含义     | 数量 |
+| ------- | -------- | ---- |
+| U+1F4A9 | 💩        | 328  |
+| U+200B  | 零宽空格 | 191  |
+| U+000A  | 换行     | 40   |
+
+关键结构：**328 = 8 × 41**，即每一行恰好 8 个 💩，共 41 行。
+
+### 突破口
+
+每行 8 个 💩 → 每行一个字节。零宽空格并非独立比特，而是**「紧跟在这个 💩 后面」表示该位为 1**；没有零宽空格则为 0。MSB 在前。
+
+验证前三行（`PPzPzPzPPPzPz` 等，P=💩，z=零宽空格）：
+
+```
+行0: P(0) P(1) P(1) P(1) P(0) P(0) P(1) P(1) = 01110011 = 's'
+行1: 01110101 = 'u'
+行2: 01101110 = 'n'
+```
+
+### 解码脚本
+
+```python
+lines = open('poop_challenge.txt', encoding='utf-8').read().split('\n')[:-1]
+out = []
+for l in lines:
+    bits = []
+    for i, ch in enumerate(l):
+        if ch == '\U0001F4A9':
+            nxt = l[i+1] if i+1 < len(l) else ''
+            bits.append('1' if nxt == '​' else '0')
+    assert len(bits) == 8
+    out.append(int(''.join(bits), 2))
+print(''.join(map(chr, out)))
+# sun{lesssgooo_solved_the_poop_challenge!}
+```
+
+### 复盘
+
+- 只看「两种字符各有多少」容易误判成流式二进制；**先数每行字符数**，发现 8 的整除关系后才定位到「💩 是载体、零宽空格是标志位」。
+- 320+ 位的数据里藏结构：`328 = 8×41` 就是最有力的线索。
+
+---
+
+## Digital is a Scam（L3akCTF 2026，hardware-rf）
+
+- **平台**：CTF2 日常练习场 · **MISC / Medium · 100 分**
+- **Flag**：`L3AK{Cl0wN1nG_4r0uNd_w1th_4n4LoG_ciRcu1t5}`
+- **结果**：第 1 次通过，+100
+
+### 题目
+
+`digital_is_a_scam.spice`（1295 行网表）+ `output.txt`（一个 200 多位小数的电压值）。题面：「Venture into a world of strange circuits, where nothing is as simple as 0 or 1」。
+
+### 电路结构分析
+
+网表元素盘点：
+
+- `CSEG000..335`、`CBIT000..335`：336 段电容，构成 CDAC
+- `B_DAC circus_dac 0 V = { VREF*( V(flag000)/2^1 + ... + V(flag335)/2^336 ) }`——**336 位二进制加权 DAC**
+- `R001..R226` + `R_U1_BIAS`：从 `circus_dac` 到 `net_tap` 的不规则电阻网络
+- `U1..U4`：运放级，`E_*` + 反馈电阻
+- `CM1..CM3`：跨导级（`G_*` 压控电流源 + 负载/置位电阻）
+- `M_CM1_*` 等 MOSFET：**只连到 `cm*_ref` / `cm*_shadow`，这些节点在全网表中再无其它连接 → 完全孤立的诱饵**，可按短路/开路忽略
+
+信号链：`DAC → 电阻网络 → 同相放大 U1 → 跨导镜像 CM1 → 反相 U2 → CM2 → 同相 U3 → CM3 → 反相 U4 → final_out`。
+
+### 关键结论：整条链是线性的
+
+所有有源元件都是 E（VCVS）、G（VCCS）和线性电阻，MOSFET 又不参与信号通路，因此：
+
+```
+V(final_out) = G_total × V(circus_dac)
+V(circus_dac) = VREF × Σ b_i / 2^(i+1)， i = 0..335
+```
+
+于是 `output.txt = G_total × (N / 2^336)`，其中 N 是 flag 的 336 位大整数。
+
+### 逐级增益（手推 + 数值验证）
+
+- 电阻网络：对 `net_tap` 列 KCL（`circus_dac` 置 1 V，其余源接地），解出 `net_tap = 0.418519993939705174`
+- 同相级：`A·RF/(RF+RG)` 的精确式 `A/(1 + A·RG/(RG+RF))`
+- 反相级：`-(A·RF)/(RF + RIN·(A+1))`
+- 跨导级：`±(W_O/L_O)/(W_R/L_R) · RLOAD/RSET`（符号由电流注入方向决定）
+- 各级 A 都是 7e8 量级，反馈深，近似增益 `1+RF/RG`、`RF/RIN` 即可
+
+总增益 `G_total ≈ 0.202894752314954942`（900 位精度）。
+
+### 求解
+
+```python
+secret = round(measured / G_total * 2**336)
+print(secret.to_bytes(42, 'big').decode())
+```
+
+`measured/G_total × 2^336` 与最近整数的偏差仅 **3.09e-279**——说明模型完全正确。解出 42 字节：
+
+```
+L3AK{Cl0wN1nG_4r0uNd_w1th_4n4LoG_ciRcu1t5}
+```
+
+### 复盘
+
+- 模拟电路题的通用套路：**先判断每一级是否线性**。线性 ⇒ 整个系统化为一个常数增益，问题从「仿真」降格为「一次除法」。
+- 诱饵识别：数一遍每个节点的度数，`cm*_ref`/`cm*_shadow` 只被 MOSFET 引用，显然是摆设。
+- 精度陷阱：336 位 ≈ 101 位十进制，double（~16 位）完全不够；必须用 mpmath 高精度（我用了 900 dps）。这也是题面 `.option abstol=1e-30` 在暗示的。
+- 我第一次只用了 256 位（漏看了 B_DAC 后半段还有 flag256..335），导致残差 0.17；**读到一半就下结论是本次的失误点**，回头确认了 336 项的完整表达式才对上。
+
+---
+
+## Mic Check: Hosted Service（simple-service）
+
+- **平台**：CTF2 日常练习场 · **MISC / Easy · 100 分**（容器题）
+- **Flag**：`CTF2{03592562-58e4-4c20-8cad-987cb7866356}`
+- **结果**：第 1 次通过，+100
+
+### 源码
+
+```c
+unsigned int x = rand() % INT_MAX;
+unsigned int y = rand() % INT_MAX;
+printf("%d + %d = ", x, y);
+unsigned int z = 0;
+scanf("%d", &z);
+return x + y == z;
+```
+
+正确的 `z` 就是 `x + y`；答对后打印 flag 文件内容。
+
+### 利用
+
+容器是 **TLS 包装的 TCP**，端口 9999（`nc_ssl: true`）。用 Python 的 `ssl` + `socket`：
+
+```python
+ctx = ssl.create_default_context()
+ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+with socket.create_connection((HOST, 9999), timeout=20) as raw:
+    with ctx.wrap_socket(raw, server_hostname=HOST) as s:
+        buf = b""
+        while b"=" not in buf:
+            buf += s.recv(4096)
+        x, y = map(int, re.search(rb"(\d+)\s*\+\s*(\d+)", buf).groups())
+        s.sendall(str(x+y).encode() + b"\n")
+        print(s.recv(4096).decode())
+```
+
+```
+1153536589 + 1472861184 = 2626397773
+Correct!
+CTF2{03592562-58e4-4c20-8cad-987cb7866356}
+```
+
+### 复盘
+
+- 这类「Mic Check」是热身题，真正考点是**自动化交互**：先读提示 → 解析 → 应答 → 收结果，而不是手工连 nc。
+- 注意 `nc_ssl` 标志，否则明文连接会卡住；用 `ssl.CERT_NONE` 避免自签证书问题。
+
+![](img/131to98.png)
+
+------
+
 ## Web
 
 ### [ACTF2020 新生赛]Exec
