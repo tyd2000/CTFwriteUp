@@ -390,6 +390,211 @@ Date:   Thu Jan 1 00:00:00 1970 +0000
 
 提交`flag{you_traveled_beyond_time_itself}`即可。
 
+### PikaPika
+
+整道题是一个典型的「多层套娃」MISC，核心考察**细心**（题名与正文反复暗示）。
+
+#### 思路总览
+
+完整解题链路如下：
+
+```
+细心.docx
+  └─ 内嵌 OLE 对象 (oleObject1.bin)
+       └─ Ole10Native → embedded.7z
+            └─ 7z（口令藏在图片底部）→ pikapika.txt
+                 └─ 十六进制文本 → pikapika.zip
+                      └─ 可爱的皮卡丘/
+                           ├─ Pikachu.jpg（尾部藏零宽字符 → ZIP 口令）
+                           └─ 这里有什么呢？.zip（口令来自零宽字符）
+                                └─ 答案.txt（箭头密码密文）
+                                     └─ 箭头解密（口令 PikaPika）
+                                          └─ XOR 0x0F → FLAG
+```
+
+本题涉及的关键点是：**QQ秀字符解密（零宽隐藏加密）**和 **箭头解密** 以及最后一层的 **XOR**。
+
+如果你一开始的求解思路跑偏的话会有图片提示：开始的地方。
+
+**8 个解题步骤简述**：
+
+1. 解包 docx，发现内嵌 OLE 对象与图片
+2. 从 `Ole10Native` 中截取 7z
+3. 图片底部极小字口令 `9@Me_5T@rT!`
+4. `pikapika.txt` 十六进制还原为 ZIP
+5. **QQ秀字符解密**：`Pikachu.jpg` 尾部零宽串用千千秀字隐藏加密接口解出 ZIP 口令 `An_7he_E@sY_Pa55W0rD`（附完整 Python 调用代码）
+6. 解开加密 ZIP 得到箭头密文
+7. **箭头解密**：千千秀字箭头工具 + 口令 `PikaPika`
+8. XOR `0x0F`，并说明被复制吞掉的 `0x7F` 字符导致 `puzzle`→`uzzle` 的还原
+
+**使用工具**
+
+- `7z`：解 OLE 内嵌包、解多层加密压缩。
+- `Python`：`zipfile` / `base64` / `urllib` —— 解包、`hex` 还原、调用解密接口、`XOR`。
+- 千千秀字在线工具：
+  - 隐藏（零宽）字符解密：`https://www.qqxiuzi.cn/bianma/yincangjiami.php`。
+  - 箭头密码解密：`https://www.qqxiuzi.cn/bianma/wenbenjiami.php?s=jiantou`。
+
+#### 详细步骤
+
+##### 步骤1：解包 docx，发现嵌入对象
+
+`docx` 本质是 ZIP，直接解压：
+
+```bash
+python3 -c "import zipfile; zipfile.ZipFile('细心.docx').extractall('out')"
+```
+
+正文只有一句提示：**「你能在这里获取到什么呢？细心一点」**，以及几个 `..`。真正的内容藏在附件里：
+
+- `word/media/image1.jpeg` —— 一张皮卡丘图片
+- `word/embeddings/oleObject1.bin` —— **嵌入的 OLE 对象**（这是突破口）
+
+##### 步骤2：从 OLE 对象中取出 7z
+
+`oleObject1.bin` 是一个 OLE 复合文档，里面是 `Ole10Native` 数据流。用 7z 可直接列出内部结构：
+
+```bash
+7z l oleObject1.bin
+# 内含：[1]Ole10Native
+```
+
+从 `[1]Ole10Native` 中按特征定位 7z 文件头 `37 7A BC AF 27 1C`，截取后面的数据保存为 `embedded.7z`。
+
+##### 步骤3：图片底部的解压口令
+
+`image1.jpeg` 底部有一行很小的字，放大后可以读到密码：
+
+```
+9@Me_5T@rT!
+```
+
+用它解开 7z：
+
+```bash
+7z x -p'9@Me_5T@rT!' embedded.7z
+# → pikapika.txt
+```
+
+> 坑点：这行字非常小且容易把 `5/S`、`T/t`、`@/#` 看混，需要逐字符放大辨认。
+
+##### 步骤4：十六进制文本还原为 ZIP
+
+`pikapika.txt` 内容是一长串十六进制字符，末尾成对。转成二进制后是标准 ZIP：
+
+```python
+s = open('pikapika.txt').read().strip()
+open('pikapika.zip','wb').write(bytes.fromhex(s))
+```
+
+解压得到目录 `可爱的皮卡丘/`，里面有两个文件：
+
+- `Pikachu.jpg`
+- `这里有什么呢？.zip`（**加密 ZIP**）
+
+##### 步骤5：QQ秀字符解密 —— 从零宽字符拿到 ZIP 口令
+
+`Pikachu.jpg` 的 JPEG 结束标记 `FF D9` 之后还追加了一段数据，其中有一段以 `77u/`（UTF-8 BOM 的 Base64 形式）开头的 Base64：
+
+```python
+d = open('Pikachu.jpg','rb').read()
+i = d.find(b'77u/')
+s = re.sub(r'[^A-Za-z0-9+/=]','', d[i:].decode('ascii','ignore').strip())
+raw = base64.b64decode(s).decode('utf-8','replace')
+```
+
+`raw` 是一段由**零宽字符**（`U+200B` / `U+200C` / `U+200D` / `U+FEFF`）构成的文本 —— 这正是题目 hint 里说的 **QQ秀字符 / 文本隐藏加密**。
+
+关键点：这不是通用的「零宽转二进制」编码，而是 **千千秀字（qqxiuzi.cn）的「文本隐藏加密」** 专用编码。用该站的解密接口直接处理即可得到明文：
+
+```python
+import urllib.parse, urllib.request, http.cookiejar, re
+cj = http.cookiejar.CookieJar()
+op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+h = {'User-Agent':'Mozilla/5.0'}
+page = op.open(urllib.request.Request(
+    'https://www.qqxiuzi.cn/bianma/yincangjiami.php', headers=h), timeout=20).read().decode('utf-8','replace')
+tok = re.search(r'token=([0-9a-f]+)', page).group(1)
+
+data = urllib.parse.urlencode({'text': raw, 'type': 0, 'key': '0', 'token': tok}).encode()
+req = urllib.request.Request(
+    'https://www.qqxiuzi.cn/bianma/yincangjiamiShow.php', data=data,
+    headers=dict(h, Referer='https://www.qqxiuzi.cn/bianma/yincangjiami.php'))
+resp = op.open(req, timeout=20).read().decode('utf-8','replace')
+```
+
+解密结果是一段中文句子，其中给出了真正的关键信息 —— ZIP的压缩密码：
+
+```
+An_7he_E@sY_Pa55W0rD
+```
+
+> 坑点：如果按通用零宽工具（把 `200B/200C` 当 0/1）去解，只能得到乱码，这也是用户最初卡住的地方。必须用「千千秀字」的隐藏加密算法。
+
+##### 步骤6：解开加密 ZIP，得到箭头密文
+
+```bash
+7z x -p'An_7he_E@sY_Pa55W0rD' '这里有什么呢？.zip'
+# → 想知道答案吗？/答案.txt
+```
+
+`答案.txt` 内容是一整串箭头符号（结尾带 `==`）：
+
+```
+↖↓↖↘↕↖↙↙↔↲↖↕↻↲←↙↙↓↑↻↕→↗↖↔↳↘↓←↓→↔←↓←↻←↓↔↓←↓↔↙←↓↔↔←↓↔→←↓↓↻←↓↖↓←↓↖↙←↓↖↔←↓↖→←↓↗↺←↓↕↑←↓↖↳←↓↖↲←↓↗↖←↓↕↰←↓↖↲←↓↗↖←↓↕↰←↓↖↔←↓↖↱←↓↕↰←↓↖↲←↓↖↱←↓↗↑←↓↖←←↓↗↗←↓↖←←↓↗↖←↓↗↑←↓↖↲←↓↖↱←↓↖→←↓↕↰←↓↗↕←↓↗←←↓↗↻←↓↗↻←↓↖↙←↓↖←←↓↕↰←↓↗↑←↓↖↰←↓↕↰←↓↗↖←↓↖↰←↓↖↙←↓↗↓←↓↖←←↓↗↘==
+```
+
+##### 步骤7：箭头解密（第二处关键）
+
+在千千秀字的文本加密工具页面有[文本加密为箭头符号](https://www.qqxiuzi.cn/bianma/wenbenjiami.php?s=jiantou)，将以上箭头符号串直接解密发现不对，结合题目名称输入**密码 `PikaPika`**得到：
+
+```
+恢喓佯＃逕兼争.ICNH5icnht[gf|Pf|PnaPfa{j}j|{fahPzuucjP{`P|`cyjr
+```
+
+前半段中文是同一输出里的干扰，后半段 `ASCII` 串才是 `flag` 的密文。
+
+##### 步骤8：最后一层 XOR 0x0F
+
+观察字符串，发现字符集中在可打印 ASCII 区间且结构像`flag{...}`。
+
+```
+ICNH5icnht[gf|Pf|PnaPfa{j}j|{fahPzuucjP{`P|`cyjr
+```
+
+尝试单字节 XOR，密钥 `0xF`（15）。
+
+```python
+s = 'ICNH5icnht[gf|Pf|PnaPfa{j}j|{fahPzuucjP{`P|`cyjr'
+print(''.join(chr(ord(c) ^ 15) for c in s))
+# FLAG:flag{This_is_an_interesting_uzzle_to_solve}
+```
+
+提交这个`flag`的话是错误的，这是因为解码结果里 `interesting_uzzle` 少了一个字母。
+
+原密文在 `P` 与 `z` 之间其实还有一个 **DEL 控制字符 `0x7F`**（在网页中不可见），复制时被吞掉的 `0x7F` 字符导致 `puzzle`→`uzzle` 。
+
+```
+…fahP<0x7F>zuucj…
+       ↑ 0x7F ^ 0x0F = 0x70 = 'p'
+```
+
+补回该字符后即得到完整 `flag`：
+
+```
+flag{This_is_an_interesting_puzzle_to_solve}
+```
+
+---
+
+#### 关键坑点总结
+
+1. **零宽字符不是通用 0/1 编码**：`Pikachu.jpg` 尾部的零宽串用的是千千秀字的「文本隐藏加密」专用算法，必须用对应接口解，通用工具只会得到乱码。
+2. **图片口令极小**：`9@Me_5T@rT!` 需要放大逐字符辨认，注意 `5/S`、`T/t`、`@/#`。
+3. **hex 文本再套一层 ZIP**：`pikapika.txt` 不是普通文本，而是 ZIP 的十六进制表示。
+4. **不可见 DEL 字符**：最后 XOR 结果中 `0x7F` 会被复制操作吞掉，导致 `puzzle` 变成 `uzzle`，需根据语义补回。
+5. 两处解密都需要**口令**：箭头解密口令是 `PikaPika`，加密 ZIP 口令是 `An_7he_E@sY_Pa55W0rD`，不要混淆。
+
 ------
 
 ## CTFSHOW
